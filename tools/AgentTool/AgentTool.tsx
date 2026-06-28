@@ -56,6 +56,7 @@ import { runAgent } from './runAgent.js';
 import { renderGroupedAgentToolUse, renderToolResultMessage, renderToolUseErrorMessage, renderToolUseMessage, renderToolUseProgressMessage, renderToolUseRejectedMessage, renderToolUseTag, userFacingName, userFacingNameBackgroundColor } from './UI.js';
 const proactiveModule = feature('PROACTIVE') || feature('KAIROS') ? require('../../proactive/index.js') as typeof import('../../proactive/index.js') : null;
 const subagentDepthCapModule = feature('SUBAGENT_RECURSION_DEPTH_CAP') ? require('../../utils/subagentDepthCap.js') as typeof import('../../utils/subagentDepthCap.js') : null;
+const midToolAbortModule = feature('MID_TOOL_ABORT_CHECKPOINT') ? require('../../utils/midToolAbort.js') as typeof import('../../utils/midToolAbort.js') : null;
 const PROGRESS_THRESHOLD_MS = 2000; 
 const isBackgroundTasksDisabled =
 isEnvTruthy(getOpenCodeCliEnv('DISABLE_BACKGROUND_TASKS'));
@@ -281,6 +282,11 @@ export const AgentTool = buildTool({
         const deadline = Date.now() + MAX_WAIT_MS;
         while (Date.now() < deadline) {
           await sleep(POLL_INTERVAL_MS);
+          if (feature('MID_TOOL_ABORT_CHECKPOINT') && midToolAbortModule) {
+            if (midToolAbortModule.checkMidToolAbort(toolUseContext.abortController?.signal).aborted) {
+              throw new AbortError();
+            }
+          }
           currentAppState = toolUseContext.getAppState();
           const hasFailedRequiredServer = currentAppState.mcp.clients.some(c => c.type === 'failed' && requiredMcpServers.some(pattern => c.name.toLowerCase().includes(pattern.toLowerCase())));
           if (hasFailedRequiredServer) break;

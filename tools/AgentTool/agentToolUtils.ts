@@ -334,7 +334,7 @@ export function finalizeAgentTool(
     is_async: isAsync,
   })
 
-  // Signal to inference that this subagent's cache chain can be evicted.
+  // Signal to the provider that this subagent's cache chain can be evicted.
   const lastRequestId = lastAssistantMessage.requestId
   if (lastRequestId) {
     logEvent('open_code_cli_cache_eviction_hint', {

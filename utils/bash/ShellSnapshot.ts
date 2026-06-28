@@ -192,7 +192,7 @@ function getConfigFile(shellPath: string): string {
 
 /**
  * Generates user-specific snapshot content (functions, options, aliases)
- * This content is derived from the user's shell configuration file
+ * This content is based on the user's shell configuration file
  */
 function getUserSnapshotContent(configFile: string): string {
   const isZsh = configFile.endsWith('.zshrc')

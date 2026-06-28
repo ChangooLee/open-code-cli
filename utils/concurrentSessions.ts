@@ -110,7 +110,7 @@ export async function registerSession(): Promise<boolean> {
 
 /**
  * Update this session's name in its PID registry file so ListPeers
- * can surface it. Best-effort: silently no-op if name is falsy, the
+ * can surface it. Optional: silently no-op if name is falsy, the
  * file doesn't exist (session not registered), or read/write fails.
  */
 async function updatePidFile(patch: Record<string, unknown>): Promise<void> {

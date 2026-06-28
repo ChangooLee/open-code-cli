@@ -8,7 +8,7 @@ import type { Message } from '../types/message.js'
 import { isEnvDefinedFalsy, isEnvTruthy } from './envUtils.js'
 
 export type McpInstructionsDelta = {
-  /** Server names — for stateless-scan reconstruction. */
+  /** Server names — for stateless-scan restoration. */
   addedNames: string[]
   /** Rendered "## {name}\n{instructions}" blocks for addedNames. */
   addedBlocks: string[]

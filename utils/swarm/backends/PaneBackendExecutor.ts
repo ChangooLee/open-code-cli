@@ -323,7 +323,7 @@ export class PaneBackendExecutor implements TeammateExecutor {
    * Checks if a pane-based teammate is still active.
    *
    * For pane-based teammates, we check if the pane still exists.
-   * This is a best-effort check - the pane may exist but the process inside
+   * This is a optional check - the pane may exist but the process inside
    * may have exited.
    */
   async isActive(agentId: string): Promise<boolean> {

@@ -321,7 +321,7 @@ export async function notifyTeamMemoryWrite(): Promise<void> {
 /**
  * Stop the file watcher and flush pending changes.
  * Note: runs within the 2s graceful shutdown budget, so the flush
- * is best-effort — if the HTTP PUT doesn't complete in time,
+ * is optional — if the HTTP PUT doesn't complete in time,
  * process.exit() will kill it.
  */
 export async function stopTeamMemoryWatcher(): Promise<void> {
@@ -346,7 +346,7 @@ export async function stopTeamMemoryWatcher(): Promise<void> {
     try {
       await pushTeamMemory(syncState)
     } catch {
-      // Best-effort — shutdown may kill this
+      // Optional — shutdown may kill this
     }
   }
 }

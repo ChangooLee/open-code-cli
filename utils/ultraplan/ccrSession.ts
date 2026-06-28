@@ -56,7 +56,7 @@ export type ScanResult =
   | { kind: 'unchanged' }
 
 /**
- * Pill/detail-view state derived from the event stream. Transitions:
+ * Pill/detail-view state based on the event stream. Transitions:
  *   running → (turn ends, no ExitPlanMode) → needs_input
  *   needs_input → (user replies in browser) → running
  *   running → (ExitPlanMode emitted, no result yet) → plan_ready

@@ -84,7 +84,7 @@ export type InitBridgeOptions = {
   onStateChange?: (state: BridgeState, detail?: string) => void
   initialMessages?: Message[]
   // Explicit session name from `/remote-control <name>`. When set, overrides
-  // the title derived from the conversation or /rename.
+  // the title based on the conversation or /rename.
   initialName?: string
   // Fresh view of the full conversation at call time. Used by onUserMessage's
   // count-3 derivation to call generateSessionTitle over the full conversation.

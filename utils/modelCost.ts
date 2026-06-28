@@ -85,8 +85,8 @@ export function getBestModelCostTier(fastMode: boolean): ModelCosts {
 }
 
 /**
- * Pricing tier shown for the flagship ("Opus 4.6"-class) model. Reconstructed
- * from usage in commands/fast and utils/model/model.ts (display pricing only):
+ * Pricing tier shown for the flagship ("Opus 4.6"-class) model.
+ * Used in commands/fast and utils/model/model.ts (display pricing only):
  * delegates to the best-model tier so fast-mode pricing stays consistent.
  */
 export function getOpus46CostTier(fastMode: boolean): ModelCosts {

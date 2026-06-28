@@ -486,7 +486,7 @@ export async function gracefulShutdown(
     // Ignore profiling errors during shutdown
   }
 
-  // Signal to inference that this session's cache can be evicted.
+  // Signal to the provider that this session's cache can be evicted.
   // Fires before analytics flush so the event makes it to the pipeline.
   const lastRequestId = getLastMainRequestId()
   if (lastRequestId) {

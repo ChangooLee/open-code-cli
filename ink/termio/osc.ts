@@ -53,7 +53,7 @@ export function wrapForMultiplexer(sequence: string): string {
  *   with prefix+] works. System clipboard depends on tmux's set-clipboard
  *   option + outer terminal OSC 52 support; can't know from here.
  * - 'osc52': only the raw OSC 52 sequence will be written to stdout.
- *   Best-effort; iTerm2 disables OSC 52 by default.
+ *   Optional; iTerm2 disables OSC 52 by default.
  *
  * pbcopy gating uses SSH_CONNECTION specifically, not SSH_TTY — tmux panes
  * inherit SSH_TTY forever even after local reattach, but SSH_CONNECTION is
@@ -395,7 +395,7 @@ function* splitTabStatusPairs(data: string): Generator<[string, string]> {
 
 // Output generators
 
-/** Start a hyperlink (OSC 8). Auto-assigns an id= param derived from the URL
+/** Start a hyperlink (OSC 8). Auto-assigns an id= param based on the URL
  *  so terminals group wrapped lines of the same link together (the spec says
  *  cells with matching URI *and* nonempty id are joined; without an id each
  *  wrapped line is a separate link — inconsistent hover, partial tooltips).

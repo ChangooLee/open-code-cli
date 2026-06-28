@@ -74,7 +74,7 @@ export async function clearConversation({
     timeoutMs: sessionEndTimeoutMs,
   })
 
-  // Signal to inference that this conversation's cache can be evicted.
+  // Signal to the provider that this conversation's cache can be evicted.
   const lastRequestId = getLastMainRequestId()
   if (lastRequestId) {
     logEvent('open_code_cli_cache_eviction_hint', {

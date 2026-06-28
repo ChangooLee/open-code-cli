@@ -138,7 +138,7 @@ Focus on HIGH and MEDIUM findings only. Better to miss some theoretical issues t
 
 FALSE POSITIVE FILTERING:
 
-> You do not need to run commands to reproduce the vulnerability, just read the code to determine if it is a real vulnerability. Do not use the bash tool or write to any files.
+> You do not need to run commands to apply the vulnerability, just read the code to determine if it is a real vulnerability. Do not use the bash tool or write to any files.
 >
 > HARD EXCLUSIONS - Automatically exclude findings matching these patterns:
 > 1. Denial of Service (DOS) vulnerabilities or resource exhaustion attacks.

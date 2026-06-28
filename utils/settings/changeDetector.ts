@@ -52,12 +52,12 @@ const MDM_POLL_INTERVAL_MS = 30 * 60 * 1000 // 30 minutes
 
 /**
  * Grace period in milliseconds before processing a settings file deletion.
- * Handles the common delete-and-recreate pattern during auto-updates or when
+ * Handles the common delete-and-renew pattern during auto-updates or when
  * another session starts up. If an `add` or `change` event fires within this
- * window (file was recreated), the deletion is cancelled and treated as a change.
+ * window (file was renewed), the deletion is cancelled and treated as a change.
  *
  * Must exceed chokidar's awaitWriteFinish delay (stabilityThreshold + pollInterval)
- * so the grace window outlasts the write stability check on the recreated file.
+ * so the grace window outlasts the write stability check on the renewed file.
  */
 const DELETION_GRACE_MS =
   FILE_STABILITY_THRESHOLD_MS + FILE_STABILITY_POLL_INTERVAL_MS + 200
@@ -269,14 +269,14 @@ function handleChange(path: string): void {
   const source = getSourceForPath(path)
   if (!source) return
 
-  // If a deletion was pending for this path (delete-and-recreate pattern),
+  // If a deletion was pending for this path (delete-and-renew pattern),
   // cancel the deletion — we'll process this as a change instead.
   const pendingTimer = pendingDeletions.get(path)
   if (pendingTimer) {
     clearTimeout(pendingTimer)
     pendingDeletions.delete(path)
     logForDebugging(
-      `Cancelled pending deletion of ${path} — file was recreated`,
+      `Cancelled pending deletion of ${path} — file was renewed`,
     )
   }
 
@@ -302,7 +302,7 @@ function handleChange(path: string): void {
 }
 
 /**
- * Handle a file being re-added (e.g. after a delete-and-recreate). Cancels any
+ * Handle a file being re-added (e.g. after a delete-and-renew). Cancels any
  * pending deletion grace timer and treats the event as a change.
  */
 function handleAdd(path: string): void {
@@ -322,9 +322,9 @@ function handleAdd(path: string): void {
 }
 
 /**
- * Handle a file being deleted. Uses a grace period to absorb delete-and-recreate
+ * Handle a file being deleted. Uses a grace period to absorb delete-and-renew
  * patterns (e.g. auto-updater, another session starting up). If the file is
- * recreated within the grace period (detected via 'add' or 'change' event),
+ * renewed within the grace period (detected via 'add' or 'change' event),
  * the deletion is cancelled and treated as a normal change instead.
  */
 function handleDelete(path: string): void {

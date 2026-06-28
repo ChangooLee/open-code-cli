@@ -1190,7 +1190,7 @@ export async function teleportToRemote(options: {
 }
 
 /**
- * Best-effort session archive. POST /v1/sessions/{id}/archive has no
+ * Optional session archive. POST /v1/sessions/{id}/archive has no
  * running-status check (unlike DELETE which 409s on RUNNING), so it works
  * mid-implementation. Archived sessions reject new events (send_events.go),
  * so the remote stops on its next write. 409 (already archived) treated as

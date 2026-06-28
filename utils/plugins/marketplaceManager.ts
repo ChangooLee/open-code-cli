@@ -1166,7 +1166,7 @@ async function cacheMarketplaceFromGit(
   )
   if (result.code !== 0) {
     // Clean up any partial directory created by the failed clone so the next
-    // attempt starts fresh. Best-effort: if this fails, the stale dir will be
+    // attempt starts fresh. Optional: if this fails, the stale dir will be
     // auto-detected and removed at the top of the next call.
     try {
       await fs.rm(cachePath, { recursive: true, force: true })

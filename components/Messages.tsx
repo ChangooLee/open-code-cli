@@ -237,7 +237,7 @@ type Props = {
   /** When true, only show Brief tool output (hide everything else) */
   isBriefOnly?: boolean;
   /** Fullscreen-mode "─── N new ───" divider. Renders before the first
-   *  renderableMessage derived from firstUnseenUuid (matched by the 24-char
+   *  renderableMessage based on firstUnseenUuid (matched by the 24-char
    *  prefix that deriveUUID preserves). */
   unseenDivider?: UnseenDivider;
   /** Fullscreen-mode ScrollBox handle. Enables React-level virtualization when present. */
@@ -450,7 +450,7 @@ const MessagesImpl = ({
     const msg_1 = createAssistantMessage({
       content: [streamingToolUse.contentBlock]
     });
-    // Override randomUUID with deterministic value derived from content
+    // Override randomUUID with deterministic value based on content
     // block ID to prevent React key changes on every memo recomputation.
     // Same class of bug fixed in normalizeMessages (commit 383326e613):
     // fresh randomUUID → unstable React keys → component remounts →
@@ -732,8 +732,8 @@ function expandKey(msg: RenderableMessage): string {
 
 // Custom comparator to prevent unnecessary re-renders during streaming.
 // Default React.memo does shallow comparison which fails when:
-// 1. onOpenRateLimitOptions callback is recreated (doesn't affect render output)
-// 2. streamingToolUses array is recreated on every delta, but only contentBlock matters for rendering
+// 1. onOpenRateLimitOptions callback is re-created (doesn't affect render output)
+// 2. streamingToolUses array is re-created on every delta, but only contentBlock matters for rendering
 // 3. streamingThinking changes on every delta - we DO want to re-render for this
 function setsEqual<T>(a: Set<T>, b: Set<T>): boolean {
   if (a.size !== b.size) return false;

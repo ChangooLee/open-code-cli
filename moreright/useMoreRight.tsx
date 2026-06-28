@@ -1,4 +1,4 @@
-// Stub for external builds — the real hook is internal only.
+// External build variant — the full hook is internal only.
 //
 // Self-contained: no relative imports. Typecheck sees this file at
 // scripts/external-stubs/src/moreright/ before overlay, where ../types/

@@ -1,4 +1,4 @@
-// Reconstructed: utility types that can't be expressed as Zod schemas.
+// Utility types that cannot be expressed as Zod schemas.
 
 /**
  * The provider API usage shape with every field present (non-nullable).

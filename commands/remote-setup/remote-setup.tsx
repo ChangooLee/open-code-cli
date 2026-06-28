@@ -138,7 +138,7 @@ function Web({
       return;
     }
 
-    // Token import succeeded. Environment creation is best-effort — if it
+    // Token import succeeded. Environment creation is optional — if it
     // fails, the web state machine routes to env-setup on landing, which is
     // one extra click but still better than the OAuth dance.
     await createDefaultEnvironment();

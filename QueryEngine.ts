@@ -487,7 +487,7 @@ export class QueryEngine {
 
     const mainLoopModel = modelFromUserInput ?? initialMainLoopModel
 
-    // Recreate after processing the prompt to pick up updated messages and
+    // Renew after processing the prompt to pick up updated messages and
     // model (from slash commands).
     processUserInputContext = {
       messages,

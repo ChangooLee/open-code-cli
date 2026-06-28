@@ -495,7 +495,7 @@ export function initExtractMemories(): void {
         appendSystemMessage?.(msg)
       }
     } catch (error) {
-      // Extraction is best-effort — log but don't notify on error
+      // Extraction is optional — log but don't notify on error
       logForDebugging(`[extractMemories] error: ${error}`)
       logEvent('open_code_cli_extract_memories_error', {
         duration_ms: Date.now() - startTime,

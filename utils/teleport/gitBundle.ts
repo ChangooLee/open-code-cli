@@ -45,7 +45,7 @@ type BundleCreateResult =
 
 // Bundle --all → HEAD → squashed-root. HEAD drops side branches/tags but
 // keeps full current-branch history. Squashed-root is a single parentless
-// commit of HEAD's tree (or the stash tree if WIP exists) — no history,
+// commit of HEAD's tree (or the stash tree if uncommitted changes exist) — no history,
 // just the snapshot. Receiver needs refs/seed/root handling for that tier.
 async function _bundleWithFallback(
   gitRoot: string,
@@ -96,7 +96,7 @@ async function _bundleWithFallback(
   }
 
   // Last resort: squash to a single parentless commit. Uses the stash tree
-  // when WIP exists (bakes uncommitted changes in — can't bundle the stash
+  // when uncommitted changes exist (bakes working-tree changes in — can't bundle the stash
   // ref separately since its parents would drag history back).
   logForDebugging(
     `[gitBundle] HEAD bundle is ${(headSize / 1024 / 1024).toFixed(1)}MB, retrying squashed-root`,
@@ -147,7 +147,7 @@ async function _bundleWithFallback(
 
 // Bundle the repo and upload to Files API; return file_id for
 // seed_bundle_file_id. --all → HEAD → squashed-root fallback chain.
-// Tracked WIP via stash create → refs/seed/stash (or baked into the
+// Tracked uncommitted changes via stash create → refs/seed/stash (or baked into the
 // squashed tree); untracked not captured.
 export async function createAndUploadGitBundle(
   config: FilesApiConfig,
@@ -200,10 +200,10 @@ export async function createAndUploadGitBundle(
   const hasWip = wipStashSha !== ''
   if (stashResult.code !== 0) {
     logForDebugging(
-      `[gitBundle] git stash create failed (${stashResult.code}), proceeding without WIP: ${stashResult.stderr.slice(0, 200)}`,
+      `[gitBundle] git stash create failed (${stashResult.code}), proceeding without uncommitted changes: ${stashResult.stderr.slice(0, 200)}`,
     )
   } else if (hasWip) {
-    logForDebugging(`[gitBundle] Captured WIP as stash ${wipStashSha}`)
+    logForDebugging(`[gitBundle] Captured uncommitted changes as stash ${wipStashSha}`)
     // env-runner reads the SHA via bundle list-heads refs/seed/stash.
     await execFileNoThrowWithCwd(
       gitExe(),

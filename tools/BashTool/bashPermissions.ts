@@ -568,7 +568,7 @@ export function stripSafeWrappers(command: string): string {
   // SECURITY: Only matches unquoted values with safe characters (no $(), `, $var, ;|&).
   //
   // SECURITY: Trailing whitespace MUST be [ \t]+ (horizontal only), NOT \s+.
-  // \s matches \n/\r. If reconstructCommand emits an unquoted newline between
+  // \s matches \n/\r. If rebuildCommand emits an unquoted newline between
   // `TZ=UTC` and `echo`, \s+ would match across it and strip `TZ=UTC<NL>`,
   // leaving `echo curl evil.com` to match Bash(echo:*). But bash treats the
   // newline as a command separator. Defense-in-depth with needsQuoting fix.

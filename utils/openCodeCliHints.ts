@@ -5,7 +5,7 @@
  * `<open-code-cli-hint />` tag to stderr (merged into stdout by the shell
  * tools). The harness scans tool output for these tags, strips them before
  * the output reaches the model, and surfaces an install prompt to the
- * user — no inference, no proactive execution.
+ * user — no guessing, no proactive execution.
  *
  * This file provides both the parser and a small module-level store for
  * the pending hint. The store is a single slot (not a queue) — we surface

@@ -71,7 +71,7 @@ import { plural } from '../../utils/stringUtils.js'
 /** Valid installable scopes (excludes 'managed' which can only be installed from managed-settings.json) */
 export const VALID_INSTALLABLE_SCOPES = ['user', 'project', 'local'] as const
 
-/** Installation scope type derived from VALID_INSTALLABLE_SCOPES */
+/** Installation scope type based on VALID_INSTALLABLE_SCOPES */
 export type InstallableScope = (typeof VALID_INSTALLABLE_SCOPES)[number]
 
 /** Valid scopes for update operations (includes 'managed' since managed plugins can be updated) */
@@ -445,7 +445,7 @@ export async function uninstallPluginOp(
   let pluginName: string
 
   if (foundPlugin) {
-    // Find the matching settings key for this plugin (may differ from `plugin`
+    // Find the matching settings key for this plugin (may use a different key than `plugin`
     // if user gave short name but settings has plugin@marketplace)
     pluginId =
       Object.keys(settings?.enabledPlugins ?? {}).find(

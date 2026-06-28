@@ -58,7 +58,7 @@ export function isChannelsEnabled(): boolean {
  * actually pass the gate. Not a security boundary: channel_enable still runs
  * the full gate. Matches the allowlist comparison inside gateChannelServer()
  * but standalone (no session/marketplace coupling — those are tautologies
- * when the entry is derived from pluginSource).
+ * when the entry is based on pluginSource).
  *
  * Returns false for undefined pluginSource (non-plugin server — can never
  * match the {marketplace, plugin}-keyed ledger) and for @-less sources

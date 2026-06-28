@@ -423,7 +423,7 @@ export function useTypeahead({
 
   // Track the latest search token to discard stale results from slow async operations
   const latestSearchTokenRef = useRef<string | null>(null);
-  // Track previous input to detect actual text changes vs. callback recreations
+  // Track previous input to detect actual text changes vs. callback renewals
   const prevInputRef = useRef('');
   // Track the latest path token to discard stale results from path completion
   const latestPathTokenRef = useRef('');
@@ -431,7 +431,7 @@ export function useTypeahead({
   const latestBashInputRef = useRef('');
   // Track the latest slack channel token to discard stale results from MCP
   const latestSlackTokenRef = useRef('');
-  // Track suggestions via ref to avoid updateSuggestions being recreated on selection changes
+  // Track suggestions via ref to avoid updateSuggestions being renewed on selection changes
   const suggestionsRef = useRef(suggestions);
   suggestionsRef.current = suggestions;
   // Track the input value when suggestions were manually dismissed to prevent re-triggering
@@ -845,7 +845,7 @@ export function useTypeahead({
         }
 
         // Skip if we already fetched for this exact token (prevents loop from
-        // suggestions dependency causing updateSuggestions to be recreated)
+        // suggestions dependency causing updateSuggestions to be renewed)
         if (latestSearchTokenRef.current === searchToken) {
           return;
         }
@@ -882,7 +882,7 @@ export function useTypeahead({
       }
     }
   }, [suggestionType, commands, setSuggestionsState, clearSuggestions, debouncedFetchFileSuggestions, debouncedFetchSlackChannels, mode, suppressSuggestions,
-  // Note: using suggestionsRef instead of suggestions to avoid recreating
+  // Note: using suggestionsRef instead of suggestions to avoid renewing
   // this callback when only selectedSuggestion changes (not the suggestions list)
   allCommandsMaxWidth]);
 
@@ -895,7 +895,7 @@ export function useTypeahead({
     if (dismissedForInputRef.current === input) {
       return;
     }
-    // When the actual input text changes (not just updateSuggestions being recreated),
+    // When the actual input text changes (not just updateSuggestions being renewed),
     // reset the search token ref so the same query can be re-fetched.
     // This fixes: type @readme.md, clear, retype @readme.md → no suggestions.
     if (prevInputRef.current !== input) {

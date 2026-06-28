@@ -113,7 +113,7 @@ ${question}`
  * The old code used `.find(m => m.type === 'assistant')` which grabbed the
  * first (thinking-only) message, found no text block, and returned null →
  * "No response received". Repos with large context (many skills, big OPEN_CODE.md)
- * trigger thinking more often, which is why this reproduced in the monorepo
+ * trigger thinking more often, which is why this occurred in the monorepo
  * but not here.
  *
  * Secondary failure modes also surfaced as "No response received":

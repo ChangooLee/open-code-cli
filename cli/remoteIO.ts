@@ -146,7 +146,7 @@ export class RemoteIO extends StructuredIO {
 
       // Register internal event readers for session resume.
       // When set, hydrateFromCCRv2InternalEvents() can fetch foreground
-      // and subagent internal events to reconstruct conversation state.
+      // and subagent internal events to restore conversation state.
       setInternalEventReader(
         () => this.ccrClient!.readInternalEvents(),
         () => this.ccrClient!.readSubagentInternalEvents(),

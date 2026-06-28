@@ -1,4 +1,4 @@
-// AUTO-RECONSTRUCTED from controlSchemas.ts (z.infer of each lazySchema).
+// Generated from controlSchemas.ts (z.infer of each lazySchema).
 import type { z } from 'zod/v4'
 import type {
   SDKHookCallbackMatcherSchema,

@@ -1,5 +1,5 @@
-// AUTO-RECONSTRUCTED from coreSchemas.ts (z.infer of each lazySchema).
-// Mirrors the committed generated types produced by scripts/generate-sdk-types.ts.
+// Generated from coreSchemas.ts (z.infer of each lazySchema).
+// Produced by scripts/generate-sdk-types.ts.
 import type { z } from 'zod/v4'
 import type {
   ModelUsageSchema,

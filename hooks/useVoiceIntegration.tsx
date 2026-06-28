@@ -435,7 +435,7 @@ export function useVoiceKeybindingHandler({
   // rare. For letter bindings (validation warns) this may over-strip
   // one pre-existing char if the input already ended in the bound
   // letter (e.g. "hav" + hold "v" → "ha"). We don't track that
-  // boundary — it's best-effort and the warning says so.
+  // boundary — it's optional and the warning says so.
   const charsInInputRef = useRef(0);
   // Trailing-char count remaining after the activation strip — these
   // belong to the user's anchored prefix and must be preserved during

@@ -1,5 +1,5 @@
-// Reconstructed from usage: `DeepImmutable<T>` (deep readonly) and
-// `Permutations<T>` (string-union permutations) are the only consumed exports.
+// Shared utility types: `DeepImmutable<T>` (deep readonly) and
+// `Permutations<T>` (string-union permutations).
 
 export type DeepImmutable<T> = T extends (infer U)[]
   ? ReadonlyArray<DeepImmutable<U>>

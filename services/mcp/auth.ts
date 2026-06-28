@@ -476,7 +476,7 @@ export async function revokeServerTokens(
   const serverKey = getServerKey(serverName, serverConfig)
   const tokenData = existingData.mcpOAuth[serverKey]
 
-  // Attempt server-side revocation if there are tokens to revoke (best-effort)
+  // Attempt server-side revocation if there are tokens to revoke (optional)
   if (tokenData?.accessToken || tokenData?.refreshToken) {
     try {
       // For XAA (and any PRM-discovered auth), the AS is at a different host
@@ -565,7 +565,7 @@ export async function revokeServerTokens(
         }
       }
     } catch (error: unknown) {
-      // Log error but don't throw - revocation is best-effort
+      // Log error but don't throw - revocation is optional
       logMCPDebug(serverName, `Failed to revoke tokens: ${errorMessage(error)}`)
     }
   } else {
@@ -1297,7 +1297,7 @@ export async function performMCPOAuthFlow(
       oauthErrorCode = error.errorCode
       // SDK does not attach HTTP status as a property, but the fallback ServerError
       // embeds it in the message as "HTTP {status}:" when the response body was
-      // unparseable. Best-effort extraction.
+      // unparseable. Optional extraction.
       const statusMatch = error.message.match(/^HTTP (\d{3}):/)
       if (statusMatch) {
         httpStatus = Number(statusMatch[1])

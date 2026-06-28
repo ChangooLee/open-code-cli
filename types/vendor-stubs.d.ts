@@ -1,7 +1,7 @@
-// Ambient stubs for private / platform-specific packages that are NOT published
+// Ambient module declarations for private / platform-specific packages that are NOT published
 // to npm. These are optional integrations (macOS computer-use, browser MCP, the
 // .mcpb plugin bundle format, and the agent SDK package self-reference). They
-// are unavailable in this open-source tree, so they are declared here as opaque
+// are optional platform integrations, declared here as opaque
 // `any` modules. This keeps `tsc --noEmit` focused on real source errors instead
 // of cascading "cannot find module" failures. The corresponding features are
 // gated behind runtime checks / `feature()` flags and degrade gracefully.
@@ -26,7 +26,7 @@ declare module '*.md' {
 }
 
 // Optional native addons / platform packages that are not installed in this
-// open-source tree. Features that use them are gated behind runtime checks or
+// repo. Features that use them are gated behind runtime checks or
 // `feature()` flags. Declared as opaque `any` modules so tsc stays focused on
 // real source errors.
 declare module 'sharp'

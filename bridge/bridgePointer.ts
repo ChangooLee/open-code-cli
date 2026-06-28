@@ -56,7 +56,7 @@ export function getBridgePointerPath(dir: string): string {
 /**
  * Write the pointer. Also used to refresh mtime during long sessions —
  * calling with the same IDs is a cheap no-content-change write that bumps
- * the staleness clock. Best-effort — a crash-recovery file must never
+ * the staleness clock. Optional — a crash-recovery file must never
  * itself cause a crash. Logs and swallows on error.
  */
 export async function writeBridgePointer(

@@ -105,7 +105,7 @@ const GIT_INTERNAL_PREFIXES = ['head', 'objects', 'refs', 'hooks'] as const
  */
 function resolveEscapingPathToCwdRelative(n: string): string | null {
   const cwd = getCwd()
-  // Reconstruct a platform-resolvable path from the posix-normalized form.
+  // Restore a platform-resolvable path from the posix-normalized form.
   // `n` has forward slashes (normalizeGitPathArg converted \\ → /); resolve()
   // handles forward slashes on Windows.
   const abs = resolve(cwd, n)

@@ -366,7 +366,7 @@ const WHITESPACE_REGEX = /\s+/
 
 /**
  * Extracts file extensions from a bash command for analytics.
- * Best-effort: splits on operators and whitespace, extracts extensions
+ * Optional: splits on operators and whitespace, extracts extensions
  * from non-flag args of allowed commands. No heavy shell parsing needed
  * because grep patterns and sed scripts rarely resemble file extensions.
  */

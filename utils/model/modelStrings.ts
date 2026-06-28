@@ -67,7 +67,7 @@ export function getModelStrings(): ModelStrings {
  * Ensures model strings have been initialized. For the OpenAI-compatible
  * provider this is synchronous (built-in strings), but callers (main.tsx,
  * cli/print.ts) await it to stay forward-compatible with async providers.
- * Reconstructed from usage: callers only `await` it for its side effect.
+ * Callers only `await` it for its side effect.
  */
 export async function ensureModelStringsInitialized(): Promise<void> {
   getModelStrings()

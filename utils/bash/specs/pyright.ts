@@ -18,7 +18,7 @@ export default {
     { name: '-', description: 'Read file or directory list from stdin' },
     {
       name: '--createstub',
-      description: 'Create type stub file(s) for import',
+      description: 'Create type declaration file(s) for import',
       args: { name: 'IMPORT' },
     },
     {

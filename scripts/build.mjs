@@ -1,9 +1,7 @@
-// Experimental Node-side build for open-code-cli.
+// Node/esbuild build script for open-code-cli.
 //
-// Upstream is bundled with Bun, which resolves the `bun:bundle` macro
-// (`feature()`) and the global `MACRO` object at build time. This script is the
-// non-Bun fallback: it uses esbuild (transpile + bundle, no type checking) and
-// reproduces those build-time substitutions:
+// Bundles the CLI with esbuild (transpile + bundle, no type checking) and
+// applies build-time substitutions:
 //
 //   - `feature('FLAG')`  -> inlined boolean from the OPEN_CODE_CLI_FEATURES
 //                           comma-separated allowlist (default: all false), so
@@ -69,7 +67,7 @@ const featureInlinePlugin = {
 }
 
 // Optional native addons / platform packages that are not installed in this
-// open-source tree. Some are imported statically (hoisted to the top of an ESM
+// repo. Some optional packages are imported statically (hoisted to the top of an ESM
 // bundle), so we cannot simply mark them `external` — Node would fail at
 // startup. Instead we resolve them to a permissive empty CommonJS stub so the
 // bundle loads. The features that actually use them are gated behind runtime
@@ -103,7 +101,7 @@ const optionalStubPlugin = {
       return null
     })
     b.onLoad({ filter: /.*/, namespace: 'optional-stub' }, () => ({
-      // Permissive self-returning stub: any named/default import and any deep
+      // Permissive self-returning shim: any named/default import and any deep
       // property access or call resolves to the same callable proxy, so
       // module-init expressions like `pkg.Foo.bar` don't throw. Build-time
       // "no matching export" errors are avoided via CJS interop.

@@ -854,7 +854,7 @@ export async function powershellToolHasPermission(
     // Preserve pre-parse ask messaging when parse fails. The deferred ask
     // (2b prefix rule or UNC) carries a better decisionReason than the
     // generic parse-error ask. Sub-command deny can't run the AST loop
-    // without a parse, so the fallback scan above is best-effort.
+    // without a parse, so the fallback scan above is optional.
     if (preParseAskDecision !== null) {
       return preParseAskDecision
     }

@@ -13,7 +13,7 @@
  *   plain identifiers and operators like `=` `:` aren't scoped, so they
  *   render in default fg instead of white/pink. Output structure (line
  *   numbers, markers, backgrounds, word-diff) is identical.
- * - BAT_THEME env support is a stub: highlight.js has no bat theme set, so
+ * - BAT_THEME env support is a placeholder: highlight.js has no bat theme set, so
  *   getSyntaxTheme always returns the default for the given Open Code CLI theme.
  */
 

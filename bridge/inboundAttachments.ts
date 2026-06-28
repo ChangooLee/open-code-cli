@@ -6,7 +6,7 @@
  * (oauth-authed, same store), write to ~/.open-code-cli/uploads/{sessionId}/, and
  * return @path refs to prepend. Open Code CLI's Read tool takes it from there.
  *
- * Best-effort: any failure (no token, network, non-2xx, disk) logs debug and
+ * Optional: any failure (no token, network, non-2xx, disk) logs debug and
  * skips that attachment. The message still reaches Open Code CLI, just without @path.
  */
 

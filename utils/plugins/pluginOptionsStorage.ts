@@ -203,7 +203,7 @@ export function savePluginOptions(
  * a plugin can be installed in multiple scopes and the user's config should
  * survive removing it from one scope while it remains in another.
  *
- * Best-effort: keychain write failure is logged but doesn't throw, since
+ * Optional: keychain write failure is logged but doesn't throw, since
  * the uninstall itself succeeded and we don't want to surface a confusing
  * "uninstall failed" message for a cleanup side-effect.
  */
@@ -314,7 +314,7 @@ export function getUnconfiguredOptions(
  * On Windows, normalizes backslashes to forward slashes so shell commands
  * don't interpret them as escape characters.
  *
- * ${OPEN_CODE_CLI_PLUGIN_ROOT} — version-scoped install dir (recreated on update)
+ * ${OPEN_CODE_CLI_PLUGIN_ROOT} — version-scoped install dir (renewed on update)
  * ${OPEN_CODE_PLUGIN_DATA} — persistent state dir (survives updates)
  *
  * Both patterns use the function-replacement form of .replace(): ROOT so

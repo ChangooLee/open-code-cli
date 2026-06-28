@@ -1,11 +1,7 @@
-// Reconstructed from consumer usage (utils/messages.ts constructors,
+// Internal message/event representation for the CLI. Field shapes mirror the
+// literals produced by the createX message factories (utils/messages.ts,
 // utils/messages/mappers.ts, collapse*/group* renderers, query.ts stream loop,
-// Tool.ts). These are the CLI's internal message/event representation. Field
-// shapes mirror the literals produced by the createX message factories.
-//
-// NOTE: This module was reverse-engineered from how the codebase reads/writes
-// these values; runtime semantics should match upstream but exact optionality
-// of rarely-used fields is inferred.
+// Tool.ts).
 
 import type { UUID } from 'crypto'
 import type {

@@ -124,7 +124,7 @@ export type BridgeCoreParams = {
     signal: AbortSignal
   }) => Promise<string | null>
   /**
-   * POST /v1/sessions/{id}/archive. Same injection rationale. Best-effort;
+   * POST /v1/sessions/{id}/archive. Same injection rationale. Optional;
    * the callback MUST NOT throw.
    */
   archiveSession: (sessionId: string) => Promise<void>
@@ -617,7 +617,7 @@ export async function initBridgeCore(
   async function doReconnect(): Promise<boolean> {
     environmentRecreations++
     // Invalidate any in-flight v2 handshake — the environment is being
-    // recreated, so a stale transport arriving post-reconnect would be
+    // reinitialized, so a stale transport arriving post-reconnect would be
     // pointed at a dead session.
     v2Generation++
     logForDebugging(
@@ -651,7 +651,7 @@ export async function initBridgeCore(
     flushGate.drop()
 
     // Release the current work item (force=false — we may want the session
-    // back). Best-effort: the env is probably gone, so this likely 404s.
+    // back). Optional: the env is probably gone, so this likely 404s.
     if (currentWorkId) {
       const workIdBeingCleared = currentWorkId
       await api
@@ -2234,7 +2234,7 @@ async function startWorkPollLoop({
           break
         }
 
-        onStateChange?.('reconnecting', 'environment lost, recreating session')
+        onStateChange?.('reconnecting', 'environment lost, rebuilding session')
         const newCreds = await onEnvironmentLost()
         // doReconnect() makes several sequential network calls (1-5s).
         // If the user triggered teardown during that window, its internal
@@ -2380,7 +2380,7 @@ async function startWorkPollLoop({
               info.sessionToken,
             )
           } catch {
-            // Best-effort — if heartbeat also fails the lease dies, same as
+            // Optional — if heartbeat also fails the lease dies, same as
             // pre-poll_due behavior (where the only heartbeat-loop exits were
             // ones where the lease was already dying).
           }

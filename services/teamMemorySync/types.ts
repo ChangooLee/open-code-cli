@@ -67,7 +67,7 @@ export type SkippedSecretFile = {
   path: string
   /** Gitleaks rule ID (e.g., "github-pat", "aws-access-token") */
   ruleId: string
-  /** Human-readable label derived from rule ID */
+  /** Human-readable label based on rule ID */
   label: string
 }
 

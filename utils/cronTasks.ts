@@ -41,7 +41,7 @@ export type CronTask = {
    * The scheduler anchors first-sight from `lastFiredAt ?? createdAt` — a
    * never-fired task uses createdAt (correct for pinned crons like
    * `30 14 27 2 *` whose next-from-now is next year); a fired-before task
-   * reconstructs the same `nextFireAt` the prior process had in memory.
+   * restores the same `nextFireAt` the prior process had in memory.
    * Never set for one-shots (they're deleted on fire).
    */
   lastFiredAt?: number
@@ -51,7 +51,7 @@ export type CronTask = {
    * When true, the task is exempt from recurringMaxAgeMs auto-expiry.
    * System escape hatch for assistant mode's built-in tasks (catch-up/
    * morning-checkin/dream) — the installer's writeIfMissing() skips existing
-   * files so re-install can't recreate them. Not settable via CronCreateTool;
+   * files so re-install can't renew them. Not settable via CronCreateTool;
    * only written directly to scheduled_tasks.json by src/assistant/install.ts.
    */
   permanent?: boolean
@@ -337,7 +337,7 @@ export type CronJitterConfig = {
    * heap leaks compound indefinitely. The default (7 days) covers "check
    * my PRs every hour this week" workflows while capping worst-case
    * session lifetime. Permanent tasks (assistant mode's catch-up/
-   * morning-checkin/dream) never age out — they can't be recreated if
+   * morning-checkin/dream) never age out — they can't be renewed if
    * deleted because install.ts's writeIfMissing() skips existing files.
    *
    * `0` = unlimited (tasks never auto-expire).

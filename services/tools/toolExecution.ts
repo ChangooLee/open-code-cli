@@ -580,7 +580,7 @@ export function buildSchemaNotSentHint(
   messages: Message[],
   tools: readonly { name: string }[],
 ): string | null {
-  // Optimistic gating — reconstructing open-code-cli.ts's full useToolSearch
+  // Optimistic gating — restoring open-code-cli.ts's full useToolSearch
   // computation is fragile. These two gates prevent pointing at a ToolSearch
   // that isn't callable; occasional misfires (Haiku, tst-auto below threshold)
   // cost one extra round-trip on an already-failing path.
@@ -590,7 +590,7 @@ export function buildSchemaNotSentHint(
   const discovered = extractDiscoveredToolNames(messages)
   if (discovered.has(tool.name)) return null
   return (
-    `\n\nThis tool's schema was not sent to the API — it was not in the discovered-tool set derived from message history. ` +
+    `\n\nThis tool's schema was not sent to the API — it was not in the discovered-tool set based on message history. ` +
     `Without the schema in your prompt, typed parameters (arrays, numbers, booleans) get emitted as strings and the client-side parser rejects them. ` +
     `Load the tool first: call ${TOOL_SEARCH_TOOL_NAME} with query "select:${tool.name}", then retry this call.`
   )
@@ -1181,7 +1181,7 @@ async function checkPermissionsAndCallTool(
   // If processedInput still points at the backfill clone, no hook/permission
   // replaced it — pass the pre-backfill callInput so call() sees the model's
   // original field values. Otherwise converge on the hook-supplied input.
-  // Permission/hook flows may return a fresh object derived from the
+  // Permission/hook flows may return a fresh object based on the
   // backfilled clone (e.g. via inputSchema.parse). If its file_path matches
   // the backfill-expanded value, restore the model's original so the tool
   // result string embeds the path the model emitted — keeps transcript/VCR

@@ -63,7 +63,7 @@ let currentBeforeExitHandler: (() => void) | null = null
 let currentExitHandler: (() => void) | null = null
 
 // Track whether auth was available when the client was created
-// This allows us to detect when we need to recreate with fresh auth headers
+// This allows us to detect when we need to renew with fresh auth headers
 let clientCreatedWithAuth = false
 
 // Store experiment data from payload for logging exposures later
@@ -627,7 +627,7 @@ export const initializeGrowthBook = memoize(
     }
 
     // Check if auth has become available since the client was created
-    // If so, we need to recreate the client with fresh auth headers
+    // If so, we need to renew the client with fresh auth headers
     // Only check if trust is established to avoid triggering apiKeyHelper before trust dialog
     if (!clientCreatedWithAuth) {
       const hasTrust =
@@ -937,7 +937,7 @@ export async function checkGate_CACHED_OR_BLOCKING(
 /**
  * Refresh GrowthBook after auth changes (login/logout).
  *
- * NOTE: This must destroy and recreate the client because GrowthBook's
+ * NOTE: This must destroy and renew the client because GrowthBook's
  * apiHostRequestHeaders cannot be updated after client creation.
  */
 export function refreshGrowthBookAfterAuthChange(): void {
@@ -1018,10 +1018,10 @@ let refreshInterval: ReturnType<typeof setInterval> | null = null
 let beforeExitListener: (() => void) | null = null
 
 /**
- * Light refresh - re-fetch features from server without recreating client.
+ * Light refresh - re-fetch features from server without renewing client.
  * Use this for periodic refresh when auth headers haven't changed.
  *
- * Unlike refreshGrowthBookAfterAuthChange() which destroys and recreates the client,
+ * Unlike refreshGrowthBookAfterAuthChange() which destroys and renews the client,
  * this preserves client state and just fetches fresh feature values.
  */
 export async function refreshGrowthBookFeatures(): Promise<void> {
@@ -1079,7 +1079,7 @@ export async function refreshGrowthBookFeatures(): Promise<void> {
 
 /**
  * Set up periodic refresh of GrowthBook features.
- * Uses light refresh (refreshGrowthBookFeatures) to re-fetch without recreating client.
+ * Uses light refresh (refreshGrowthBookFeatures) to re-fetch without renewing client.
  *
  * Call this after initialization for long-running sessions to ensure
  * feature values stay fresh. Matches Statsig's 6-hour refresh interval.

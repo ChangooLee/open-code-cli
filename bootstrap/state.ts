@@ -246,7 +246,7 @@ type State = {
   promptId: string | null
   // Last API requestId for the main conversation chain (not subagents).
   // Updated after each successful API response for main-session queries.
-  // Read at shutdown to send cache eviction hints to inference.
+  // Read at shutdown to send cache eviction hints to the provider.
   lastMainRequestId: string | undefined
   // Timestamp (Date.now()) of the last successful API call completion.
   // Used to compute timeSinceLastApiCallMs in open_code_cli_api_success for

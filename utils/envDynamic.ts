@@ -88,7 +88,7 @@ async function detectJetBrainsIDEFromParentProcessAsync(): Promise<
       }
     }
   } catch {
-    // Silently fail - this is a best-effort detection
+    // Silently fail - this is a optional detection
   }
 
   jetBrainsIDECache = null

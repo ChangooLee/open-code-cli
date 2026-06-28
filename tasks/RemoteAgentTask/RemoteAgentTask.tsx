@@ -468,7 +468,7 @@ export function registerRemoteAgentTask(options: {
 /**
  * Restore remote-agent tasks from the session sidecar on --resume.
  *
- * Scans remote-agents/, fetches live CCR status for each, reconstructs
+ * Scans remote-agents/, fetches live CCR status for each, rebuilds
  * RemoteAgentTaskState into AppState.tasks, and restarts polling for sessions
  * still running. Sessions that are archived or 404 have their sidecar file
  * removed. Must run after switchSession() so getSessionId() points at the
@@ -779,7 +779,7 @@ function startRemoteSessionPolling(taskId: string, context: TaskContext): () => 
           return; // Stop polling
         }
       } catch {
-        // Best effort — if getAppState fails, continue polling
+        // Optional — if getAppState fails, continue polling
       }
     }
 

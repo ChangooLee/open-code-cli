@@ -52,7 +52,7 @@ export function TeamsDialog({
   // Register as overlay so CancelRequestHandler doesn't intercept escape
   useRegisterOverlay('teams-dialog');
 
-  // initialTeams is derived from teamContext in PromptInput (no filesystem I/O)
+  // initialTeams is based on teamContext in PromptInput (no filesystem I/O)
   const setAppState = useSetAppState();
 
   // Initialize dialogLevel with first team name if available
@@ -64,7 +64,7 @@ export function TeamsDialog({
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  // initialTeams is now always provided from PromptInput (derived from teamContext)
+  // initialTeams is now always provided from PromptInput (based on teamContext)
   // No filesystem I/O needed here
 
   const teammateStatuses = useMemo(() => {

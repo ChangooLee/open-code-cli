@@ -425,7 +425,7 @@ export function extractReadFilesFromMessages(
             typeof content.content === 'string' &&
             // Dedup stubs contain no file content — the earlier real Read
             // already cached it. Chronological last-wins would otherwise
-            // overwrite the real entry with stub text.
+            // overwrite the real entry with placeholder text.
             !content.content.startsWith(FILE_UNCHANGED_STUB)
           ) {
             // Remove system-reminder blocks from the content

@@ -125,7 +125,7 @@ export async function listSessionsTouchedSince(
 
 /**
  * Stamp from manual /dream. Optimistic — fires at prompt-build time,
- * no post-skill completion hook. Best-effort.
+ * no post-skill completion hook. Optional.
  */
 export async function recordConsolidation(): Promise<void> {
   try {

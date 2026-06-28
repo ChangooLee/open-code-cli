@@ -46,9 +46,9 @@ export function createSyntheticAssistantMessage(
 }
 
 /**
- * Create a minimal Tool stub for tools that aren't loaded locally.
+ * Create a minimal Tool placeholder for tools that aren't loaded locally.
  * This happens when the remote CCR has tools (e.g., MCP tools) that the
- * local CLI doesn't know about. The stub routes to FallbackPermissionRequest.
+ * local CLI doesn't know about. The placeholder routes to FallbackPermissionRequest.
  */
 export function createToolStub(toolName: string): Tool {
   return {

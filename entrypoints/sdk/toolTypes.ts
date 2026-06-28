@@ -1,5 +1,4 @@
-// Reconstructed SDK tool types (marked @internal upstream until the SDK API
-// stabilizes). Re-exported via `export *` from entrypoints/agentSdkTypes.ts.
+// SDK tool types. Re-exported via `export *` from entrypoints/agentSdkTypes.ts.
 
 export type SdkToolName = string
 

@@ -257,7 +257,7 @@ export async function getBridgeSession(
  * session.
  *
  * Callers must handle errors — this function has no try/catch; 5xx,
- * timeouts, and network errors throw. Archival is best-effort during
+ * timeouts, and network errors throw. Archival is optional during
  * cleanup; call sites wrap with .catch().
  */
 export async function archiveBridgeSession(
@@ -322,7 +322,7 @@ export async function archiveBridgeSession(
  * Called when the user renames a session via /rename while a bridge
  * connection is active, so the title stays in sync on open-code-cli.dev/code.
  *
- * Errors are swallowed — title sync is best-effort.
+ * Errors are swallowed — title sync is optional.
  */
 export async function updateBridgeSessionTitle(
   sessionId: string,

@@ -1,7 +1,5 @@
-// Reconstructed SDK runtime types (callbacks, interfaces with methods).
-// These are referenced by entrypoints/agentSdkTypes.ts function signatures.
-// Shapes are inferred from how the SDK surface is described; the concrete
-// runtime is not part of this build.
+// SDK runtime types (callbacks, interfaces with methods).
+// Referenced by entrypoints/agentSdkTypes.ts function signatures.
 
 import type { z, ZodRawShape } from 'zod/v4'
 import type {

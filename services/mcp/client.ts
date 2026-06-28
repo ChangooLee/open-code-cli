@@ -304,7 +304,7 @@ function setMcpAuthCacheEntry(serverId: string): void {
       authCachePromise = null
     })
     .catch(() => {
-      // Best-effort cache write
+      // Optional cache write
     })
 }
 
@@ -930,7 +930,7 @@ export const connectToServer = memoize(
         isComputerUseMCPServer!(name)
       ) {
         // Run the Computer Use MCP server in-process — same rationale as
-        // Chrome above. The package's CallTool handler is a stub; real
+        // Chrome above. The package's CallTool handler is a placeholder; real
         // dispatch goes through wrapper.tsx's .call() override.
         const { createComputerUseMcpServerForCli } = await import(
           '../../utils/computerUse/mcpServer.js'

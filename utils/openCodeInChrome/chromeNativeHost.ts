@@ -36,7 +36,7 @@ function log(message: string, ...args: unknown[]): void {
     const timestamp = new Date().toISOString()
     const formattedArgs = args.length > 0 ? ' ' + jsonStringify(args) : ''
     const logLine = `[${timestamp}] [Open Code CLI Chrome Native Host] ${message}${formattedArgs}\n`
-    // Fire-and-forget: logging is best-effort and callers (including event
+    // Fire-and-forget: logging is optional and callers (including event
     // handlers) don't await
     void appendFile(LOG_FILE, logLine).catch(() => {
       // Ignore file write errors

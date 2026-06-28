@@ -109,7 +109,7 @@ export function setupOpenCodeInChrome(): {
     // is needed because the native host manifest "path" field cannot contain arguments.
     const execCommand = `"${process.execPath}" --chrome-native-host`
 
-    // Run asynchronously without blocking; best-effort so swallow errors
+    // Run asynchronously without blocking; optional so swallow errors
     void createWrapperScript(execCommand)
       .then(manifestBinaryPath =>
         installChromeNativeHostManifest(manifestBinaryPath),

@@ -215,7 +215,7 @@ export async function fileHistoryMakeSnapshot(
     captured = state
     return state
   })
-  if (!captured) return // updateFileHistoryState was a no-op stub (e.g. mcp.ts)
+  if (!captured) return // updateFileHistoryState was a no-op (e.g. mcp.ts)
 
   // Phase 2: do all IO async, outside the updater.
   const trackedFileBackups: Record<string, FileHistoryBackup> = {}
@@ -1097,7 +1097,7 @@ async function notifyVscodeSnapshotFilesUpdated(
   }
 }
 
-/** Async read that swallows all errors and returns null (best-effort). */
+/** Async read that swallows all errors and returns null (optional). */
 async function readFileAsyncOrNull(path: string): Promise<string | null> {
   try {
     return await readFile(path, 'utf-8')

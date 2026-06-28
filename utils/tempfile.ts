@@ -7,7 +7,7 @@ import { join } from 'path'
  *
  * @param prefix Optional prefix for the temp file name
  * @param extension Optional file extension (defaults to '.md')
- * @param options.contentHash When provided, the identifier is derived from a
+ * @param options.contentHash When provided, the identifier is based on a
  *   SHA-256 hash of this string (first 16 hex chars). This produces a path
  *   that is stable across process boundaries — any process with the same
  *   content will get the same path. Use this when the path ends up in content

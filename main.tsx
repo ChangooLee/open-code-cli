@@ -674,7 +674,7 @@ export async function main() {
   // command handles it, giving the full interactive TUI. Position-0 only
   // (matching the ssh pattern below) — indexOf would false-positive on
   // `open-code-cli -p "explain assistant"`. Root-flag-before-subcommand
-  // (e.g. `--debug assistant`) falls through to the stub, which
+  // (e.g. `--debug assistant`) falls through to the placeholder module, which
   // prints usage.
   if (feature('KAIROS') && _pendingAssistantChat) {
     const rawArgs = process.argv.slice(2);
@@ -689,7 +689,7 @@ export async function main() {
         rawArgs.splice(0, 1); // drop 'assistant'
         process.argv = [process.argv[0]!, process.argv[1]!, ...rawArgs];
       }
-      // else: `open-code-cli assistant --help` → fall through to stub
+      // else: `open-code-cli assistant --help` → fall through to placeholder module
     }
   }
 
@@ -3051,7 +3051,7 @@ async function run(): Promise<CommanderCommand> {
     // Set up per-turn session environment data uploader (ant-only build).
     // Default-enabled for all ant users when working in an OpenAICompatible-owned
     // repo. Captures git/filesystem state (NOT transcripts) at each turn so
-    // environments can be recreated at any user message index. Gating:
+    // environments can be rebuilt at any user message index. Gating:
     //   - Build-time: this import is stubbed in external builds.
     //   - Runtime: uploader checks github.com/open-code-cli/* remote + gcloud auth.
     //   - Safety: OPEN_CODE_CLI_DISABLE_SESSION_DATA_UPLOAD=1 bypasses (tests set this).
@@ -4331,7 +4331,7 @@ async function run(): Promise<CommanderCommand> {
       // Argv rewriting above should have consumed `assistant [id]`
       // before commander runs. Reaching here means a root flag came first
       // (e.g. `--debug assistant`) and the position-0 predicate
-      // didn't match. Print usage like the ssh stub does.
+      // didn't match. Print usage like the ssh placeholder module does.
       process.stderr.write('Usage: open-code-cli assistant [sessionId]\n\n' + 'Attach the REPL as a viewer client to a running bridge session.\n' + 'Omit sessionId to discover and pick from available sessions.\n');
       process.exit(1);
     });

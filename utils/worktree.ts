@@ -584,7 +584,7 @@ async function performPostCreationSetup(
     await symlinkDirectories(repoRoot, worktreePath, dirsToSymlink)
   }
 
-  // Copy gitignored files specified in .worktreeinclude (best-effort)
+  // Copy gitignored files specified in .worktreeinclude (optional)
   await copyWorktreeIncludeFiles(repoRoot, worktreePath)
 
   // The core.hooksPath config-set above is fragile: husky's prepare script

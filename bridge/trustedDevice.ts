@@ -81,14 +81,14 @@ export function clearTrustedDeviceToken(): void {
       secureStorage.update(data)
     }
   } catch {
-    // Best-effort — don't block login if storage is inaccessible
+    // Optional — don't block login if storage is inaccessible
   }
   readStoredToken.cache?.clear?.()
 }
 
 /**
  * Enroll this device via POST /auth/trusted_devices and persist the token
- * to keychain. Best-effort — logs and returns on failure so callers
+ * to keychain. Optional — logs and returns on failure so callers
  * (post-login hooks) don't block the login flow.
  *
  * The server gates enrollment on account_session.created_at < 10min, so

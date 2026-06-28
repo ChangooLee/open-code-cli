@@ -104,7 +104,7 @@ function hexComponent(hex: string): number {
  * round-trip completes. Format is `fg;bg` (or `fg;other;bg`) where values
  * are ANSI color indices. rxvt convention: bg 0–6 or 8 are dark; bg 7
  * and 9–15 are light. Only set by some terminals (rxvt-family, Konsole,
- * iTerm2 with the option enabled), so this is a best-effort hint.
+ * iTerm2 with the option enabled), so this is a optional hint.
  */
 function detectFromColorFgBg(): SystemTheme | undefined {
   const colorfgbg = process.env['COLORFGBG']

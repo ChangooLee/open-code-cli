@@ -70,7 +70,7 @@ export type SpinnerAnimationRowProps = {
 
 /**
  * The 50ms-animated portion of SpinnerWithVerb. Owns useAnimationFrame(50)
- * and all values derived from the animation clock (frame, glimmer, token
+ * and all values based on the animation clock (frame, glimmer, token
  * counter animation, elapsed-time, stalled intensity, thinking shimmer).
  *
  * The parent SpinnerWithVerb is freed from the 50ms render loop and only
@@ -102,7 +102,7 @@ export function SpinnerAnimationRow({
 }: SpinnerAnimationRowProps): React.ReactNode {
   const [viewportRef, time] = useAnimationFrame(reducedMotion ? null : 50);
 
-  // === Elapsed time (wall-clock, derived from refs each frame) ===
+  // === Elapsed time (wall-clock, based on refs each frame) ===
   const now = Date.now();
   const elapsedTimeMs = pauseStartTimeRef.current !== null ? pauseStartTimeRef.current - loadingStartTimeRef.current - totalPausedMsRef.current : now - loadingStartTimeRef.current - totalPausedMsRef.current;
 
@@ -193,7 +193,7 @@ export function SpinnerAnimationRow({
   const thinkingOnly = showThinking && thinkingStatus === 'thinking' && !spinnerSuffix && !showTimer && !showTokens && true;
 
   // === Thinking shimmer color (formerly ThinkingShimmerText's own timer) ===
-  // Same sine-wave opacity, but derived from our shared `time` instead of a
+  // Same sine-wave opacity, but based on our shared `time` instead of a
   // second useAnimationFrame(50) subscription.
   const thinkingElapsedSec = (time - THINKING_DELAY_MS) / 1000;
   const thinkingOpacity = time < THINKING_DELAY_MS ? 0 : (Math.sin(thinkingElapsedSec * Math.PI * 2 / THINKING_GLOW_PERIOD_S) + 1) / 2;

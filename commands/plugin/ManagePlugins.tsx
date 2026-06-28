@@ -1141,7 +1141,7 @@ export function ManagePlugins({
   };
 
   // Latest-ref: lets the auto-action effect call the current closure without
-  // adding handleSingleOperation (recreated every render) to its deps.
+  // adding handleSingleOperation (renewed every render) to its deps.
   const handleSingleOperationRef = useRef(handleSingleOperation);
   handleSingleOperationRef.current = handleSingleOperation;
 

@@ -49,7 +49,7 @@ export type LogOption = {
   prRepository?: string // Repository in "owner/repo" format
   mode?: 'coordinator' | 'normal' // Session mode for coordinator/normal detection
   worktreeSession?: PersistedWorktreeSession | null // Worktree state at session end (null = exited, undefined = never entered)
-  contentReplacements?: ContentReplacementRecord[] // Replacement decisions for resume reconstruction
+  contentReplacements?: ContentReplacementRecord[] // Replacement decisions for resume restoration
 }
 
 export type SummaryMessage = {
@@ -172,7 +172,7 @@ export type WorktreeStateEntry = {
 
 /**
  * Records content blocks whose in-context representation was replaced with a
- * smaller stub (the full content was persisted elsewhere). Replayed on resume
+ * smaller marker (the full content was persisted elsewhere). Replayed on resume
  * for prompt cache stability. Written once per enforcement pass that replaces
  * at least one block. When agentId is set, the record belongs to a subagent
  * sidechain (AgentTool resume reads these); when absent, it's main-thread
@@ -239,11 +239,11 @@ export type SpeculationAcceptMessage = {
 /**
  * Persisted context-collapse commit. The archived messages themselves are
  * NOT persisted — they're already in the transcript as ordinary user/
- * assistant messages. We only persist enough to reconstruct the splice
+ * assistant messages. We only persist enough to restore the splice
  * instruction (boundary uuids) and the summary placeholder (which is NOT
  * in the transcript because it's never yielded to the REPL).
  *
- * On restore, the store reconstructs CommittedCollapse with archived=[];
+ * On restore, the store restores CommittedCollapse with archived=[];
  * projectView lazily fills the archive the first time it finds the span.
  *
  * Discriminator is obfuscated to match the gate name. sessionStorage.ts

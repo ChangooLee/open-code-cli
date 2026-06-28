@@ -32,7 +32,7 @@ export type FilePermissionDialogProps<T extends ToolInput = ToolInput> = {
 
   // Logging
   completionType?: CompletionType;
-  languageName?: string; // override — derived from path when omitted
+  languageName?: string; // override — based on path when omitted
 
   // File/directory operations
   path: string | null;

@@ -522,7 +522,7 @@ export const FileReadTool = buildTool({
     const fullFilePath = expandPath(file_path)
 
     // Dedup: if we've already read this exact range and the file hasn't
-    // changed on disk, return a stub instead of re-sending the full content.
+    // changed on disk, return a unchanged marker instead of re-sending the full content.
     // The earlier Read tool_result is still in context — two full copies
     // waste cache_creation tokens on every subsequent turn. BQ proxy shows
     // ~18% of Read calls are same-file collisions (up to 2.64% of fleet
@@ -530,7 +530,7 @@ export const FileReadTool = buildTool({
     // aren't cached in readFileState so won't match here.
     //
     // Ant soak: 1,734 dedup hits in 2h, no Read error regression.
-    // Killswitch pattern: GB can disable if the stub message confuses
+    // Killswitch pattern: GB can disable if the unchanged marker confuses
     // the model externally.
     // 3P default: killswitch off = dedup enabled. Client-side only — no
     // server support needed, safe for OpenAICompatible/OpenAICompatible/OpenAICompatible.

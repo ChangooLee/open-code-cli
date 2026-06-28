@@ -593,7 +593,7 @@ export function extractDiscoveredToolNames(messages: Message[]): Set<string> {
 
 export type DeferredToolsDelta = {
   addedNames: string[]
-  /** Rendered lines for addedNames; the scan reconstructs from names. */
+  /** Rendered lines for addedNames; the scan rebuilds from names. */
   addedLines: string[]
   removedNames: string[]
 }
@@ -635,7 +635,7 @@ export function isDeferredToolsDeltaEnabled(): boolean {
 
 /**
  * Diff the current deferred-tool pool against what's already been
- * announced in this conversation (reconstructed by scanning for prior
+ * announced in this conversation (built by scanning for prior
  * deferred_tools_delta attachments). Returns null if nothing changed.
  *
  * A name that was announced but has since stopped being deferred — yet

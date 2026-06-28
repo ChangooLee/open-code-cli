@@ -182,7 +182,7 @@ export class SSETransport implements Transport {
   // Liveness detection
   private livenessTimer: NodeJS.Timeout | null = null
 
-  // POST URL (derived from SSE URL)
+  // POST URL (based on SSE URL)
   private postUrl: string
 
   // Runtime epoch for CCR v2 event format
@@ -220,7 +220,7 @@ export class SSETransport implements Transport {
 
   /**
    * High-water mark of sequence numbers seen on this stream. Callers that
-   * recreate the transport (e.g. replBridge onWorkReceived) read this before
+   * renew the transport (e.g. replBridge onWorkReceived) read this before
    * close() and pass it as `initialSequenceNum` to the next instance so the
    * server resumes from the right point instead of replaying everything.
    */

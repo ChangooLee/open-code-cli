@@ -1603,7 +1603,7 @@ export async function createAsyncAgentAttachmentsIfNeeded(
  * (normalized via expandPath). Used to dedup post-compact file restoration
  * against what's already visible in the preserved tail.
  *
- * Skips Reads whose tool_result is a dedup stub — the stub points at an
+ * Skips Reads whose tool_result is a dedup marker — the marker points at an
  * earlier full Read that may have been compacted away, so we want
  * createPostCompactFileAttachments to re-inject the real content.
  */

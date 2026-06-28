@@ -891,7 +891,7 @@ export const SettingsSchema = lazySchema(() =>
       // works when explicitly enabled. Which servers can connect at all is
       // still governed by allowedMcpServers/deniedMcpServers. Not
       // feature-spread: KAIROS_CHANNELS is external:true, and the spread
-      // wrecks type inference for allowedChannelPlugins (the .passthrough()
+      // wrecks TypeScript narrowing for allowedChannelPlugins (the .passthrough()
       // catch-all gives {} instead of the array type).
       channelsEnabled: z
         .boolean()

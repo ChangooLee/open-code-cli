@@ -216,7 +216,7 @@ export function createDumpPromptsFetch(
             jsonStringify({ type: 'response', timestamp, data }) + '\n',
           )
         } catch {
-          // Best effort
+          // Optional
         }
       })()
     }

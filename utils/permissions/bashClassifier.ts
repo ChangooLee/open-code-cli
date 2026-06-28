@@ -1,4 +1,4 @@
-// Stub for external builds - classifier permissions feature is ANT-ONLY
+// External build variant — classifier permissions feature is ANT-ONLY
 
 export const PROMPT_PREFIX = 'prompt:'
 

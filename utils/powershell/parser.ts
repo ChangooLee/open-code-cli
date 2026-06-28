@@ -213,7 +213,7 @@ function getParseTimeoutMs(): number {
   }
   return DEFAULT_PARSE_TIMEOUT_MS
 }
-// MAX_COMMAND_LENGTH is derived from PARSE_SCRIPT_BODY.length below (after the
+// MAX_COMMAND_LENGTH is based on PARSE_SCRIPT_BODY.length below (after the
 // script body is defined) so it cannot go stale as the script grows.
 
 /**
@@ -591,7 +591,7 @@ $output | ConvertTo-Json -Depth 10 -Compress
 // rules silently downgrade to ask). Finding #36.
 //
 // COMPUTED from PARSE_SCRIPT_BODY.length so it cannot drift. The prior
-// hardcoded value (4,500) was derived from a ~6K body estimate; the body is
+// hardcoded value (4,500) was based on a ~6K body estimate; the body is
 // actually ~11K chars, so the real ceiling was ~1,850. Commands in the
 // 1,850–4,500 range passed this gate but then failed CreateProcess on
 // Windows, returning valid=false and skipping all AST-based security checks.
@@ -1294,11 +1294,11 @@ const parsePowerShellCommandCached = memoizeWithLRU(
 export { parsePowerShellCommandCached as parsePowerShellCommand }
 
 // ---------------------------------------------------------------------------
-// Analysis helpers — derived from the parsed AST structure.
+// Analysis helpers — based on the parsed AST structure.
 // ---------------------------------------------------------------------------
 
 /**
- * Security-relevant flags derived from the parsed AST.
+ * Security-relevant flags based on the parsed AST.
  */
 type SecurityFlags = {
   /** Contains $(...) subexpression */

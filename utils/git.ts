@@ -496,7 +496,7 @@ export async function getGitState(): Promise<GitRepoState | null> {
       worktreeCount,
     }
   } catch (_) {
-    // Fail silently - git state is best effort
+    // Fail silently - git state is optional
     return null
   }
 }
@@ -535,7 +535,7 @@ export type PreservedGitState = {
   /** Untracked files with their contents */
   untracked_files: Array<{ path: string; content: string }>
   /** git format-patch output for committed changes between merge-base and HEAD.
-   *  Used to reconstruct the actual commit chain (author, date, message) in
+   *  Used to restore the actual commit chain (author, date, message) in
    *  replay containers. null when there are no commits between merge-base and HEAD. */
   format_patch: string | null
   /** The current HEAD SHA (tip of the feature branch) */
@@ -809,7 +809,7 @@ export async function preserveGitStateForIssue(): Promise<PreservedGitState | nu
       captureUntrackedFiles(),
       // format-patch for committed changes between merge-base and HEAD.
       // Preserves the actual commit chain (author, date, message) so replay
-      // containers can reconstruct the branch with real commits instead of a
+      // containers can restore the branch with real commits instead of a
       // squashed diff. Uses --stdout to emit all patches as a single text stream.
       execFileNoThrow(gitExe(), [
         'format-patch',

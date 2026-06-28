@@ -32,7 +32,7 @@ type SecretRule = {
 export type SecretMatch = {
   /** Gitleaks rule ID that matched (e.g., "github-pat", "aws-access-token") */
   ruleId: string
-  /** Human-readable label derived from the rule ID */
+  /** Human-readable label based on the rule ID */
   label: string
 }
 

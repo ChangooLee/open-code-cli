@@ -37,7 +37,7 @@ function hasMarkdownSyntax(s: string): boolean {
 function cachedLexer(content: string): Token[] {
   // Fast path: plain text with no markdown syntax → single paragraph token.
   // Skips marked.lexer's full GFM parse (~3ms on long content). Not cached —
-  // reconstruction is a single object allocation, and caching would retain
+  // restoration is a single object allocation, and caching would retain
   // 4× content in raw/text fields plus the hash key for zero benefit.
   if (!hasMarkdownSyntax(content)) {
     return [{

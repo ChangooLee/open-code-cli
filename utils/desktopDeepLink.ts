@@ -144,7 +144,7 @@ export async function getDesktopInstallStatus(): Promise<DesktopInstallStatus> {
   try {
     version = await getDesktopVersion()
   } catch {
-    // Best effort — proceed with handoff if version detection fails
+    // Optional — proceed with handoff if version detection fails
     return { status: 'ready', version: 'unknown' }
   }
 

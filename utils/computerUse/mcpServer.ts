@@ -45,7 +45,7 @@ async function tryGetInstalledAppNames(): Promise<string[] | undefined> {
 
 /**
  * Construct the in-process server. Delegates to the package's
- * `createComputerUseMcpServer` for the Server object + stub CallTool handler,
+ * `createComputerUseMcpServer` for the Server object + placeholder CallTool handler,
  * then REPLACES the ListTools handler with one that includes installed-app
  * names in the `request_access` description (the package's factory doesn't
  * take `installedAppNames`, and Cowork builds its own tool array in

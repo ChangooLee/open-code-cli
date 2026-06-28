@@ -124,7 +124,7 @@ async function writeMcpjsonFile(config: McpJsonConfig): Promise<void> {
     try {
       await unlink(tempPath)
     } catch {
-      // Best-effort cleanup
+      // Optional cleanup
     }
     throw e
   }

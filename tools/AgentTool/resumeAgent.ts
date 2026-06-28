@@ -77,7 +77,7 @@ export async function resumeAgentBackground({
     resumedMessages,
     transcript.contentReplacements,
   )
-  // Best-effort: if the original worktree was removed externally, fall back
+  // Optional: if the original worktree was removed externally, fall back
   // to parent cwd rather than crashing on chdir later.
   const resumedWorktreePath = meta?.worktreePath
     ? await fsp.stat(meta.worktreePath).then(
@@ -142,7 +142,7 @@ export async function resumeAgentBackground({
     }
     if (!forkParentSystemPrompt) {
       throw new Error(
-        'Cannot resume fork agent: unable to reconstruct parent system prompt',
+        'Cannot resume fork agent: unable to restore parent system prompt',
       )
     }
   }

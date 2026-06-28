@@ -38,7 +38,7 @@ const CHECKING_TEXT = 'Attempting to auto-approve\u2026';
 // 50ms clock tick re-rendered the entire dialog (PermissionDialog + Select +
 // all children) for the ~1-3 seconds the classifier typically takes. Inner also
 // has a Compiler bailout (see below), so nothing was auto-memoized — the full
-// JSX tree was reconstructed 20-60 times per classifier check.
+// JSX tree was rebuilt 20-60 times per classifier check.
 function ClassifierCheckingSubtitle() {
   const $ = _c(6);
   const [ref, glimmerIndex] = useShimmerAnimation("requesting", CHECKING_TEXT, false);

@@ -28,7 +28,7 @@ export const MAX_TOOL_RESULT_TOKENS = 100_000
 export const BYTES_PER_TOKEN = 4
 
 /**
- * Maximum size for tool results in bytes (derived from token limit).
+ * Maximum size for tool results in bytes (based on token limit).
  */
 export const MAX_TOOL_RESULT_BYTES = MAX_TOOL_RESULT_TOKENS * BYTES_PER_TOKEN
 

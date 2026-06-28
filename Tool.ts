@@ -287,7 +287,7 @@ export type ToolUseContext = {
    * Main thread: REPL provisions once (never resets — stale UUID keys
    * are inert). Subagents: createSubagentContext clones the parent's state
    * by default (cache-sharing forks need identical decisions), or
-   * resumeAgentBackground threads one reconstructed from sidechain records.
+   * resumeAgentBackground threads one restored from sidechain records.
    */
   contentReplacementState?: ContentReplacementState
   /**

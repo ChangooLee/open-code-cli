@@ -134,7 +134,7 @@ async function releasePressed(input: Input, pressed: string[]): Promise<void> {
     try {
       await input.key(k, 'release')
     } catch {
-      // Swallow — best-effort release.
+      // Swallow — optional release.
     }
   }
 }

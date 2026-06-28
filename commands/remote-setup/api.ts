@@ -109,7 +109,7 @@ async function hasExistingEnvironment(): Promise<boolean> {
 }
 
 /**
- * Best-effort default environment creation. Mirrors the web onboarding's
+ * Optional default environment creation. Mirrors the web onboarding's
  * DEFAULT_CLOUD_ENVIRONMENT_REQUEST so a first-time user lands on the
  * composer instead of env-setup. Checks for existing environments first
  * so re-running /web-setup doesn't pile up duplicates. Failures are

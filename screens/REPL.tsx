@@ -293,7 +293,7 @@ import { createAttachmentMessage, getQueuedCommandAttachments } from '../utils/a
 // cause useEffect dependency changes and infinite re-render loops.
 const EMPTY_MCP_CLIENTS: MCPServerConnection[] = [];
 
-// Stable stub for useAssistantHistory's non-KAIROS branch — avoids a new
+// Stable no-op for useAssistantHistory's non-KAIROS branch — avoids a new
 // function identity each render, which would break composedOnScroll's memo.
 const HISTORY_STUB = {
   maybeLoadOlder: (_: ScrollBoxHandle) => {}
@@ -534,7 +534,7 @@ export type Props = {
   pendingHookMessages?: Promise<HookResultMessage[]>;
   initialFileHistorySnapshots?: FileHistorySnapshot[];
   // Content-replacement records from a resumed session's transcript — used to
-  // reconstruct contentReplacementState so the same results are re-replaced
+  // restore contentReplacementState so the same results are re-replaced
   initialContentReplacements?: ContentReplacementRecord[];
   // Initial agent context for session resume (name/color set via /rename or /color)
   initialAgentName?: string;
@@ -839,7 +839,7 @@ export function REPL({
   // Ref mirror so onSubmit can read the latest value without adding
   // streamMode to its deps. streamMode flips between
   // requesting/responding/tool-use ~10x per turn during streaming; having it
-  // in onSubmit's deps was recreating onSubmit on every flip, which
+  // in onSubmit's deps was renewing onSubmit on every flip, which
   // cascaded into PromptInput prop churn and downstream useCallback/useMemo
   // invalidation. The only consumers inside callbacks are debug logging and
   // telemetry (handlePromptSubmit.ts), so a stale-by-one-render value is
@@ -1498,7 +1498,7 @@ export function REPL({
   //
   // Lazy init via useState initializer — useRef(expr) evaluates expr on every
   // render (React ignores it after first, but the computation still runs).
-  // For large resumed sessions, reconstruction does O(messages × blocks)
+  // For large resumed sessions, restoration does O(messages × blocks)
   // work; we only want that once.
   const [contentReplacementStateRef] = useState(() => ({
     current: provisionContentReplacementState(initialMessages, initialContentReplacements)
@@ -1565,7 +1565,7 @@ export function REPL({
   // Resets UI loading state. Does NOT call onTurnComplete - that should be
   // called explicitly only when a query turn actually completes.
   const resetLoadingState = useCallback(() => {
-    // isLoading is now derived from queryGuard — no setter call needed.
+    // isLoading is now based on queryGuard — no setter call needed.
     // queryGuard.end() (onQuery finally) or cancelReservation() (executeUserInput
     // finally) have already transitioned the guard to idle by the time this runs.
     // External loading (remote/backgrounding) is reset separately by those hooks.
@@ -1909,7 +1909,7 @@ export function REPL({
         setCostStateForRestore(targetSessionCosts);
       }
 
-      // Reconstruct replacement state for the resumed session. Runs after
+      // Restore replacement state for the resumed session. Runs after
       // setSessionId so any NEW replacements post-resume write to the
       // resumed session's tool-results dir. Gated on ref.current: the
       // initial mount already read the feature flag, so we don't re-read
@@ -1917,7 +1917,7 @@ export function REPL({
       // directions).
       //
       // Skipped for in-session /branch: the existing ref is already correct
-      // (branch preserves tool_use_ids), so there's no need to reconstruct.
+      // (branch preserves tool_use_ids), so there's no need to restore.
       // createFork() does write content-replacement entries to the forked
       // JSONL with the fork's sessionId, so `open-code-cli -r {forkId}` also works.
       if (contentReplacementStateRef.current && entrypoint !== 'fork') {
@@ -2885,7 +2885,7 @@ export function REPL({
       return;
     }
     try {
-      // isLoading is derived from queryGuard — tryStart() above already
+      // isLoading is based on queryGuard — tryStart() above already
       // transitioned dispatching→running, so no setter call needed here.
       resetTimingRefs();
       setMessages(oldMessages => [...oldMessages, ...newMessages]);
@@ -2900,7 +2900,7 @@ export function REPL({
 
       // messagesRef is updated synchronously by the setMessages wrapper
       // above, so it already includes newMessages from the append at the
-      // top of this try block.  No reconstruction needed, no waiting for
+      // top of this try block.  No restoration needed, no waiting for
       // React's scheduler (previously cost 20-56ms per prompt; the 56ms
       // case was a GC pause caught during the await).
       const latestMessages = messagesRef.current;
@@ -3532,12 +3532,12 @@ export function REPL({
     }
   }, [queryGuard,
   // isLoading is read at the !isLoading checks above for input-clearing
-  // and submitCount gating. It's derived from isQueryActive || isExternalLoading,
+  // and submitCount gating. It's based on isQueryActive || isExternalLoading,
   // so including it here ensures the closure captures the fresh value.
   isLoading, isExternalLoading, inputMode, commands, setInputValue, setInputMode, setPastedContents, setSubmitCount, setIDESelection, setToolJSX, getToolUseContext,
   // messages is read via messagesRef.current inside the callback to
   // keep onSubmit stable across message updates (see L2384/L2400/L2662).
-  // Without this, each setMessages call (~30× per turn) recreates
+  // Without this, each setMessages call (~30× per turn) renews
   // onSubmit, pinning the REPL render scope (1776B) + that render's
   // messages array in downstream closures (PromptInput, handleAutoRunIssue).
   // Heap analysis showed ~9 REPL scopes and ~15 messages array versions

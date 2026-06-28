@@ -140,7 +140,7 @@ export function useAssistantHistory({
     [setMessages],
   )
 
-  // Initial fetch on mount — best-effort.
+  // Initial fetch on mount — optional.
   useEffect(() => {
     if (!enabled || !config) return
     let cancelled = false
@@ -156,7 +156,7 @@ export function useAssistantHistory({
     return () => {
       cancelled = true
     }
-    // config identity is stable (created once in main.tsx, never recreated)
+    // config identity is stable (created once in main.tsx, never renewed)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled])
 

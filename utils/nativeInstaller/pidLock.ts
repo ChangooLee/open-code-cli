@@ -221,7 +221,7 @@ function writeLockFile(
     })
     fs.renameSync(tempPath, lockFilePath)
   } catch (error) {
-    // Clean up temp file on failure (best-effort)
+    // Clean up temp file on failure (optional)
     try {
       fs.unlinkSync(tempPath)
     } catch {

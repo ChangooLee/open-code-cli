@@ -259,9 +259,9 @@ export function convertToSandboxRuntimeConfig(
   // core.fsmonitor) escapes the sandbox when Open Code CLI's unsandboxed git runs.
   //
   // Unconditionally denying these paths makes sandbox-runtime mount
-  // /dev/null at non-existent ones, which (a) leaves a 0-byte HEAD stub on
+  // /dev/null at non-existent ones, which (a) leaves a 0-byte HEAD placeholder on
   // the host and (b) breaks `git log HEAD` inside bwrap ("ambiguous argument").
-  // So: if a file exists, denyWrite (ro-bind in place, no stub). If not, scrub
+  // So: if a file exists, denyWrite (ro-bind in place, no placeholder). If not, scrub
   // it post-command in scrubBareGitRepoFiles() — planted files are gone before
   // unsandboxed git runs; inside the command, git is itself sandboxed.
   bareGitRepoScrubPaths.length = 0
@@ -504,7 +504,7 @@ function isSandboxRequired(): boolean {
  * Supports: macOS, Linux, and WSL2+ (WSL1 is not supported)
  */
 const isSupportedPlatform = memoize((): boolean => {
-  // Guard against the optional sandbox runtime being a self-returning stub
+  // Guard against the optional sandbox runtime being a self-returning shim
   // (not installed), whose return value can't be coerced to a boolean safely.
   try {
     return BaseSandboxManager.isSupportedPlatform() === true

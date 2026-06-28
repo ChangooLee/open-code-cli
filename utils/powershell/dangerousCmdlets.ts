@@ -151,7 +151,7 @@ export const ARG_GATED_CMDLETS = new Set([
 /**
  * Commands to never suggest as a wildcard prefix in the permission dialog.
  *
- * Derived from the validator lists above plus the small static shells list.
+ * Based on the validator lists above plus the small static shells list.
  * Add a cmdlet to the appropriate validator list and it automatically
  * appears here — no separate maintenance.
  */
@@ -170,7 +170,7 @@ export const NEVER_SUGGEST: ReadonlySet<string> = (() => {
     // FileInfo.Delete(). StaticParameterBinder identifies the
     // PropertyAndMethodSet parameter set, but the set handles both; the arg
     // is a plain StringConstantExpressionAst with no property/method signal.
-    // Pipeline type inference (upstream OutputType → GetMember) misses ETS
+    // Pipeline type propagation (upstream OutputType → GetMember) misses ETS
     // AliasProperty members and has no answer for `$var | %` or external
     // upstream. Not in ARG_GATED (no allowlist entry to sync with).
     'foreach-object',

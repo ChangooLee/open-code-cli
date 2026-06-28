@@ -160,7 +160,7 @@ export async function getPluginDataDirSize(
 }
 
 /**
- * Best-effort cleanup on last-scope uninstall. Failure is logged but does
+ * Optional cleanup on last-scope uninstall. Failure is logged but does
  * not throw — the uninstall itself already succeeded; we don't want a
  * cleanup side-effect surfacing as "uninstall failed". Same rationale as
  * deletePluginOptions (pluginOptionsStorage.ts).

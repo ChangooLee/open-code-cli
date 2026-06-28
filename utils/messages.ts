@@ -952,7 +952,7 @@ export function reorderMessagesInUI(
     }
   }
 
-  // Second pass: reconstruct the message list in the correct order
+  // Second pass: rebuild the message list in the correct order
   const result: (
     | NormalizedUserMessage
     | NormalizedAssistantMessage
@@ -1948,7 +1948,7 @@ function relocateToolReferenceSiblings(
 
     // Find the next user message with tool_result but no tool_reference.
     // Skip tool_reference-containing targets — moving there would just
-    // recreate the problem one position later.
+    // move the problem one position later.
     let targetIdx = -1
     for (let j = i + 1; j < result.length; j++) {
       const cand = result[j]!
@@ -2439,7 +2439,7 @@ export function mergeUserMessages(a: UserMessage, b: UserMessage): UserMessage {
   }
   return {
     ...a,
-    // Preserve the non-meta message's uuid so [id:] tags (derived from uuid)
+    // Preserve the non-meta message's uuid so [id:] tags (based on uuid)
     // stay stable across API calls (meta messages like system context get fresh uuids each call)
     uuid: a.isMeta ? b.uuid : a.uuid,
     message: {

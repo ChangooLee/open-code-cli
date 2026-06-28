@@ -384,7 +384,7 @@ export function isPersistError(
  * /clear, rewind, resume, or compact are never looked up (tool_use_ids are
  * UUIDs) so they're harmless. Subagents: createSubagentContext clones the
  * parent's state by default (cache-sharing forks like agentSummary need
- * identical decisions), or resumeAgentBackground threads one reconstructed
+ * identical decisions), or resumeAgentBackground threads one restored
  * from sidechain records.
  */
 export type ContentReplacementState = {
@@ -436,10 +436,10 @@ export function getPerMessageBudgetLimit(): number {
 /**
  * Provision replacement state for a new conversation thread.
  *
- * Encapsulates the feature-flag gate + reconstruct-vs-fresh choice:
+ * Encapsulates the feature-flag gate + restore-vs-fresh choice:
  *   - Flag off → undefined (query.ts skips enforcement entirely)
  *   - No initialMessages (cold start) → fresh
- *   - initialMessages present → reconstruct (freeze all candidate IDs so the
+ *   - initialMessages present → restore (freeze all candidate IDs so the
  *     budget never replaces content the model already saw unreplaced). Empty
  *     or absent records freeze everything; non-empty records additionally
  *     populate the replacements Map for byte-identical re-apply.
@@ -764,7 +764,7 @@ async function buildReplacement(
  * Returns `{ messages, newlyReplaced }`:
  *   - messages: same array instance when no replacement is needed
  *   - newlyReplaced: replacements made THIS call (not re-applies).
- *     Caller persists these to the transcript for resume reconstruction.
+ *     Caller persists these to the transcript for resume restoration.
  */
 export async function enforceToolResultBudget(
   messages: Message[],
@@ -936,7 +936,7 @@ export async function applyToolResultBudget(
 }
 
 /**
- * Reconstruct replacement state from content-replacement records loaded from
+ * Restore replacement state from content-replacement records loaded from
  * the transcript. Used on resume so the budget makes the same choices it
  * made in the original session (prompt cache stability).
  *
@@ -991,7 +991,7 @@ export function reconstructContentReplacementState(
  * AgentTool-resume variant: encapsulates the feature-flag gate + parent
  * gap-fill so both AgentTool.call and resumeAgentBackground share one
  * implementation. Returns undefined when parentState is undefined (feature
- * off); otherwise reconstructs from sidechain records with parent's live
+ * off); otherwise restores from sidechain records with parent's live
  * replacements filling gaps for fork-inherited mustReapply entries.
  *
  * Kept out of AgentTool.tsx — that file is at the feature() DCE complexity

@@ -219,7 +219,7 @@ function validateBlock(
       }
     } else if (action === 'voice:pushToTalk') {
       // Hold detection needs OS auto-repeat. Bare letters print into the
-      // input during warmup and the activation strip is best-effort —
+      // input during warmup and the activation strip is optional —
       // space (default) or a modifier combo like meta+k avoid that.
       const ks = parseChord(key)[0]
       if (

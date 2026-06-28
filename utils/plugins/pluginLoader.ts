@@ -391,7 +391,7 @@ export async function copyPluginToVersionedCache(
       )
       return cachePath
     }
-    // Directory exists but is empty, remove it so we can recreate with content
+    // Directory exists but is empty, remove it so we can renew with content
     logForDebugging(
       `Removing empty cache directory for ${pluginId} at ${cachePath}`,
     )
@@ -1771,7 +1771,7 @@ export async function createPluginFromPath(
 }
 
 /**
- * Schema derived from SettingsSchema that only keeps keys plugins are allowed to set.
+ * Schema based on SettingsSchema that only keeps keys plugins are allowed to set.
  * Uses .strip() so unknown keys are silently removed during parsing.
  */
 const PluginSettingsSchema = lazySchema(() =>

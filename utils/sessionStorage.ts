@@ -457,7 +457,7 @@ function getProject(): Project {
         try {
           project?.reAppendSessionMetadata()
         } catch {
-          // Best-effort — don't let metadata re-append crash the cleanup
+          // Optional — don't let metadata re-append crash the cleanup
         }
       })
       cleanupRegistered = true
@@ -509,7 +509,7 @@ type InternalEventReader = () => Promise<
 /**
  * Register a CCR v2 internal event reader for session resume.
  * When set, hydrateFromCCRv2InternalEvents() can fetch foreground and
- * subagent internal events to reconstruct conversation state on reconnection.
+ * subagent internal events to restore conversation state on reconnection.
  */
 export function setInternalEventReader(
   reader: InternalEventReader,
@@ -1964,7 +1964,7 @@ function applyPreservedSegmentRelinks(
  * Unlike compact_boundary which truncates a prefix, snip removes
  * middle ranges. The JSONL is append-only, so removed messages stay on disk
  * and the surviving messages' parentUuid chains walk through them. Without
- * this filter, buildConversationChain reconstructs the full unsnipped history
+ * this filter, buildConversationChain restores the full unsnipped history
  * and resume immediately PTLs (adamr-20260320-165831: 397K displayed → 1.65M
  * actual).
  *
@@ -2208,12 +2208,12 @@ function recoverOrphanedParallelToolResults(
 }
 
 /**
- * Find the latest turn_duration checkpoint in the reconstructed chain and
+ * Find the latest turn_duration checkpoint in the restored chain and
  * compare its recorded messageCount against the chain's position at that
  * point. Emits open_code_cli_resume_consistency_delta for BigQuery monitoring of
  * write→load round-trip drift — the class of bugs where snip/compact/
  * parallel-TR operations mutate in-memory but the parentUuid walk on disk
- * reconstructs a different set (adamr-20260320-165831: 397K displayed →
+ * restores a different set (adamr-20260320-165831: 397K displayed →
  * 1.65M actual on resume).
  *
  * delta > 0: resume loaded MORE than in-session (the usual failure mode)
@@ -2229,7 +2229,7 @@ export function checkResumeConsistency(chain: Message[]): void {
     if (m.type !== 'system' || m.subtype !== 'turn_duration') continue
     const expected = m.messageCount
     if (expected === undefined) return
-    // `i` is the 0-based index of the checkpoint in the reconstructed chain.
+    // `i` is the 0-based index of the checkpoint in the restored chain.
     // The checkpoint was appended AFTER messageCount messages, so its own
     // position should be messageCount (i.e., i === expected).
     const actual = i

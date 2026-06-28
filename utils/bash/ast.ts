@@ -1887,7 +1887,7 @@ function walkVariableAssignment(
     if (containsAnyPlaceholder(value)) {
       return {
         kind: 'too-complex',
-        reason: 'PS4 value derived from cmdsub/variable — runtime unknowable',
+        reason: 'PS4 value based on cmdsub/variable — runtime unknowable',
         nodeType: 'variable_assignment',
       }
     }

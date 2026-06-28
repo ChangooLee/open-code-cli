@@ -736,7 +736,7 @@ export const LspServerConfigSchema = lazySchema(() =>
         message: 'extensionToLanguage must have at least one mapping',
       })
       .describe(
-        'Mapping from file extension to LSP language ID. File extensions and languages are derived from this mapping.',
+        'Mapping from file extension to LSP language ID. File extensions and languages are based on this mapping.',
       ),
     transport: z
       .enum(['stdio', 'socket'])
@@ -852,7 +852,7 @@ const NpmPackageNameSchema = lazySchema(() =>
 /**
  * Schema for plugin settings that get merged into the settings cascade.
  * Accepts any record here; filtering to allowlisted keys happens at load time
- * in pluginLoader.ts via PluginSettingsSchema (derived from SettingsSchema).
+ * in pluginLoader.ts via PluginSettingsSchema (based on SettingsSchema).
  */
 const PluginManifestSettingsSchema = lazySchema(() =>
   z.object({

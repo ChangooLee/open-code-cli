@@ -12,7 +12,7 @@ type Selection = ReturnType<typeof useSelection>
  * Mirrors iTerm2's "Copy to pasteboard on selection" — the highlight is left
  * intact so the user can see what was copied. Only fires in alt-screen mode
  * (selection state is ink-instance-owned; outside alt-screen, the native
- * terminal handles selection and this hook is a no-op via the ink stub).
+ * terminal handles selection and this hook is a no-op via the ink placeholder).
  *
  * selection.subscribe fires on every mutation (start/update/finish/clear/
  * multiclick). Both char drags and multi-clicks set isDragging=true while

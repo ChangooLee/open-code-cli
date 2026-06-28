@@ -24,7 +24,7 @@ export const CCR_API_KEY_PATH = `${CCR_TOKEN_DIR}/.api_key`
 export const CCR_SESSION_INGRESS_TOKEN_PATH = `${CCR_TOKEN_DIR}/.session_ingress_token`
 
 /**
- * Best-effort write of the token to a well-known location for subprocess
+ * Optional write of the token to a well-known location for subprocess
  * access. CCR-gated: outside CCR there's no /home/open-code-cli/ and no reason to
  * put a token on disk that the FD was meant to keep off disk.
  */

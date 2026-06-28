@@ -75,12 +75,12 @@ type Props = {
   // Called when stdin data arrives after a >STDIN_RESUME_GAP_MS gap.
   // Ink re-asserts terminal modes: extended key reporting, and (when in
   // fullscreen) re-enters alt-screen + mouse tracking. Idempotent on the
-  // terminal side. Optional so testing.tsx doesn't need to stub it.
+  // terminal side. Optional so testing.tsx doesn't need to mock it.
   readonly onStdinResume?: () => void;
   // Receives the declared native-cursor position from useDeclaredCursor
   // so ink.tsx can park the terminal cursor there after each frame.
   // Enables IME composition at the input caret and lets screen readers /
-  // magnifiers track the input. Optional so testing.tsx doesn't stub it.
+  // magnifiers track the input. Optional so testing.tsx doesn't mock it.
   readonly onCursorDeclaration?: CursorDeclarationSetter;
   // Dispatch a keyboard event through the DOM tree. Called for each
   // parsed key alongside the legacy EventEmitter path.

@@ -590,7 +590,7 @@ export async function cleanupSessionTeams(): Promise<void> {
 }
 
 /**
- * Best-effort kill of all pane-backed teammate panes for a team.
+ * Optional kill of all pane-backed teammate panes for a team.
  * Called from cleanupSessionTeams on ungraceful leader exit (SIGINT/SIGTERM).
  * Dynamic imports avoid adding registry/detection to this module's static
  * dep graph — this only runs at shutdown, so the import cost is irrelevant.

@@ -977,7 +977,7 @@ function isPathAllowed(
 }
 
 /**
- * Best-effort deny check for paths obscured by :: or backtick syntax.
+ * Optional deny check for paths obscured by :: or backtick syntax.
  * ONLY checks deny rules — never auto-allows. If the stripped guess
  * doesn't match a deny rule, we fall through to ask as before.
  */

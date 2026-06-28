@@ -1477,7 +1477,7 @@ export function getDeferredToolsDeltaAttachment(
 
 /**
  * Diff the current filtered agent pool against what's already been announced
- * in this conversation (reconstructed from prior agent_listing_delta
+ * in this conversation (built from prior agent_listing_delta
  * attachments). Returns [] if nothing changed or the gate is off.
  *
  * The agent list was embedded in AgentTool's description, causing ~10.2% of
@@ -1521,7 +1521,7 @@ export function getAgentListingDeltaAttachment(
     filtered = filtered.filter(a => allowedAgentTypes.includes(a.agentType))
   }
 
-  // Reconstruct announced set from prior deltas in the transcript.
+  // Build announced set from prior deltas in the transcript.
   const announced = new Set<string>()
   for (const msg of messages ?? []) {
     if (msg.type !== 'attachment') continue

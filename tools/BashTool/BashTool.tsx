@@ -1040,7 +1040,7 @@ async function* runShellCommand({
         // backgroundTaskId but skips outputFilePath (it assumes the background
         // message or <task_notification> will carry the path). Strip
         // backgroundTaskId so the model sees a clean completed command,
-        // reconstruct outputFilePath for large outputs, and suppress the
+        // restore outputFilePath for large outputs, and suppress the
         // redundant <task_notification> from the .then() handler.
         // Check result.backgroundTaskId (not the closure var) to also cover
         // Ctrl+B, which calls shellCommand.background() directly.

@@ -381,7 +381,7 @@ export function VirtualMessageList({
   }, [messages, selectedIndex, setCursor, isVisible]);
   // Two-phase jump + search engine. Read-through-ref so the handle stays
   // stable across renders — offsets/messages identity changes every render,
-  // can't go in useImperativeHandle deps without recreating the handle.
+  // can't go in useImperativeHandle deps without renewing the handle.
   const jumpState = useRef({
     offsets,
     start,
@@ -685,7 +685,7 @@ export function VirtualMessageList({
     st.ptr = ptr;
     st.screenOrd = 0; // resolved after scan (wantLast → length-1)
     jump(matches[ptr]!, delta < 0);
-    // screenOrd will resolve after scan. Best-effort: prefixSum[ptr] + 0
+    // screenOrd will resolve after scan. Optional: prefixSum[ptr] + 0
     // for n (first pos), prefixSum[ptr+1] for N (last pos = count-1).
     // The scan-effect's highlight will be the real value; this is a
     // pre-scan placeholder so the badge updates immediately.

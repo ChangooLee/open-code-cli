@@ -3,7 +3,7 @@ import { stringWidth } from '../ink/stringWidth.js';
 import { Box, Text } from '../ink.js';
 import { truncateToWidth } from '../utils/format.js';
 
-// Constants for width calculations - derived from actual rendered strings
+// Constants for width calculations - based on actual rendered strings
 const ALL_TAB_LABEL = 'All';
 const TAB_PADDING = 2; // Space before and after tab text: " {tab} "
 const HASH_PREFIX_LENGTH = 1; // "#" prefix for non-All tabs

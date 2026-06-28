@@ -33,7 +33,7 @@ let cachedExclusions: string[] | null = null
  *   args for searches outside the cache).
  *
  * Warmed eagerly in main.tsx after orphan GC; the lazy-compute path here
- * is a fallback. Best-effort: returns empty array if anything goes wrong.
+ * is a fallback. Optional: returns empty array if anything goes wrong.
  */
 export async function getGlobExclusionsForPluginCache(
   searchPath?: string,
@@ -81,7 +81,7 @@ export async function getGlobExclusionsForPluginCache(
     })
     return cachedExclusions
   } catch {
-    // Best-effort — don't break core search tools if ripgrep fails here
+    // Optional — don't break core search tools if ripgrep fails here
     cachedExclusions = []
     return cachedExclusions
   }

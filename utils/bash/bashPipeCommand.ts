@@ -40,7 +40,7 @@ export function rearrangePipeCommand(command: string): string {
 
   // Join continuation lines before parsing: shell-quote doesn't handle \<newline>
   // and produces empty string tokens for each occurrence, causing spurious empty
-  // arguments in the reconstructed command
+  // arguments in the rebuilt command
   const joined = joinContinuationLines(command)
 
   // shell-quote treats bare newlines as whitespace, not command separators.

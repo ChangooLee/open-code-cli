@@ -96,7 +96,7 @@ function PromptInputQueuedCommandsImpl(): React.ReactNode {
         content = `<bash-input>${content}</bash-input>`;
       }
       // [Image #N] placeholders are inline in the text value (inserted at
-      // paste time), so the queue preview shows them without stub blocks.
+      // paste time), so the queue preview shows them without placeholder blocks.
       return createUserMessage({
         content
       });

@@ -112,7 +112,7 @@ export function scopeToSettingSource(
 
 /**
  * Convert an editable setting source to its corresponding plugin scope.
- * Derived from SETTING_SOURCE_TO_SCOPE to maintain a single source of truth.
+ * Based on SETTING_SOURCE_TO_SCOPE to maintain a single source of truth.
  * @param source The setting source
  * @returns The corresponding plugin scope
  */

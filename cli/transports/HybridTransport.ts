@@ -14,7 +14,7 @@ const BATCH_FLUSH_INTERVAL_MS = 100
 // the serialized queue. Without this, a hung connection stalls all writes.
 const POST_TIMEOUT_MS = 15_000
 // Grace period for queued writes on close(). Covers a healthy POST (~100ms)
-// plus headroom; best-effort, not a delivery guarantee under degraded network.
+// plus headroom; optional, not a delivery guarantee under degraded network.
 // Void-ed (nothing awaits it) so this is a last resort — replBridge teardown
 // now closes AFTER archive so archive latency is the primary drain window.
 // NOTE: gracefulShutdown's cleanup budget is 2s (not the 5s outer failsafe);

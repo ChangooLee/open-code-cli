@@ -3086,7 +3086,7 @@ function runHeadlessStreaming(
             )
             currentAgents = [...r.agentDefinitions.allAgents, ...sdkAgents]
 
-            // Reload succeeded — gather response data best-effort so a
+            // Reload succeeded — gather response data optional so a
             // read failure doesn't mask the successful state change.
             // allSettled so one failure doesn't discard the others.
             let plugins: SDKControlReloadPluginsResponse['plugins'] = []

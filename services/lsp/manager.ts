@@ -232,7 +232,7 @@ export function reinitializeLspServerManager(): void {
 
   logForDebugging('[LSP MANAGER] reinitializeLspServerManager() called')
 
-  // Best-effort shutdown of any running servers on the old instance so
+  // Optional shutdown of any running servers on the old instance so
   // /reload-plugins doesn't leak child processes. Fire-and-forget: the
   // primary use case (issue #15521) has 0 servers so this is usually a no-op.
   if (lspManagerInstance) {

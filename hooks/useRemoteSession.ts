@@ -332,7 +332,7 @@ export function useRemoteSession({
           `[useRemoteSession] Permission request for tool: ${request.tool_name}`,
         )
 
-        // Look up the Tool object by name, or create a stub for unknown tools
+        // Look up the Tool object by name, or create a placeholder for unknown tools
         const tool =
           findToolByName(toolsRef.current, request.tool_name) ??
           createToolStub(request.tool_name)
@@ -593,7 +593,7 @@ export function useRemoteSession({
     managerRef.current = null
   }, [])
 
-  // All four fields are already stable (boolean derived from a prop that
+  // All four fields are already stable (boolean based on a prop that
   // doesn't change mid-session, three useCallbacks with stable deps). The
   // result object is consumed by REPL's onSubmit useCallback deps — without
   // memoization the fresh literal invalidates onSubmit on every REPL render,

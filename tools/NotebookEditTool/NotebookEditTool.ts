@@ -433,7 +433,7 @@ export const NotebookEditTool = buildTool({
       // Update readFileState with post-write mtime (matches FileEditTool/
       // FileWriteTool). offset:undefined breaks FileReadTool's dedup match —
       // without this, Read→NotebookEdit→Read in the same millisecond would
-      // return the file_unchanged stub against stale in-context content.
+      // return the file_unchanged marker against stale in-context content.
       readFileState.set(fullPath, {
         content: updatedContent,
         timestamp: getFileModificationTime(fullPath),

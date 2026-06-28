@@ -48,7 +48,7 @@ import { createAgentId } from './uuid.js'
  * to share the parent's prompt cache. The OpenAICompatible API cache key is composed of:
  * system prompt, tools, model, messages (prefix), and thinking config.
  *
- * CacheSafeParams carries the first five. Thinking config is derived from the
+ * CacheSafeParams carries the first five. Thinking config is based on the
  * inherited toolUseContext.options.thinkingConfig — but can be inadvertently
  * changed if the fork sets maxOutputTokens, which clamps budget_tokens in
  * open-code-cli.ts (but only for older models that do not use adaptive thinking).
@@ -298,7 +298,7 @@ export type SubagentContextOverrides = {
    *  Used by speculation for overlay file path rewriting. */
   requireCanUseTool?: boolean
   /** Override replacement state — used by resumeAgentBackground to thread
-   * state reconstructed from the resumed sidechain so the same results
+   * state restored from the resumed sidechain so the same results
    * are re-replaced (prompt cache stability). */
   contentReplacementState?: ContentReplacementState
 }
@@ -394,7 +394,7 @@ export function createSubagentContext(
     // cache hit. For non-forking subagents the parent UUIDs never match
     // — clone is a harmless no-op.
     //
-    // Override: AgentTool resume (reconstructed from sidechain records)
+    // Override: AgentTool resume (restored from sidechain records)
     // and inProcessRunner (per-teammate persistent loop state).
     contentReplacementState:
       overrides?.contentReplacementState ??

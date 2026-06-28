@@ -319,7 +319,7 @@ export function createCronScheduler(
         const newNext =
           jitteredNextCronRunMs(t.cron, now, t.id, jitterCfg) ?? Infinity
         nextFireAt.set(t.id, newNext)
-        // Persist lastFiredAt=now so next process spawn reconstructs this
+        // Persist lastFiredAt=now so next process spawn restores this
         // same newNext on first-sight. Session tasks skip — process-local.
         if (!isSession) firedFileRecurring.push(t.id)
       } else if (isSession) {

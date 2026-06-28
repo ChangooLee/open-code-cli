@@ -91,7 +91,7 @@ export function startMdmSettingsLoad(): void {
           error_count: mdm.errors.length,
         })
       } catch {
-        // Diagnostic logging is best-effort
+        // Diagnostic logging is optional
       }
     }
   })()

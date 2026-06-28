@@ -10,7 +10,7 @@ import type { QuerySource } from 'src/constants/querySource.js'
 /** Messages yielded by the streaming model call (see queryModelWithStreaming). */
 type StreamedMessage = StreamEvent | AssistantMessage | SystemAPIErrorMessage
 
-// Context-collapse runtime: an experimental strategy that archives older
+// Context-collapse runtime: archives older
 // message spans into summaries, projecting a collapsed "view" of the
 // conversation for the model while preserving the raw REPL history.
 

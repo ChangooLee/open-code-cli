@@ -1,6 +1,5 @@
-// Reconstructed from usage across tool UIs (BashTool/UI, WebSearchTool/UI,
-// AgentTool/UI, TaskOutputTool, SkillTool/UI, etc.). These are the `data`
-// payload types carried by `ProgressMessage<P>` while a tool runs.
+// Tool progress payload types carried by `ProgressMessage<P>` while a tool runs.
+// Used across tool UIs (BashTool/UI, WebSearchTool/UI, AgentTool/UI, etc.).
 
 import type { HookProgress } from './hooks.js'
 import type { Message, NormalizedMessage } from './message.js'

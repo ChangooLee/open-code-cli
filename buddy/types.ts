@@ -97,7 +97,7 @@ export const STAT_NAMES = [
 ] as const
 export type StatName = (typeof STAT_NAMES)[number]
 
-// Deterministic parts — derived from hash(userId)
+// Deterministic parts — based on hash(userId)
 export type CompanionBones = {
   rarity: Rarity
   species: Species

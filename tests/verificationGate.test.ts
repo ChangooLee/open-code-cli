@@ -88,3 +88,20 @@ test('counts subagent edits reported via the result marker', () => {
   assert.equal(r.editCount, 3)
   assert.equal(r.action, 'block')
 })
+
+// A subagent that failed its OWN verification surfaces a marker; the parent
+// gate must not treat the delegated work as done even with 0 parent edits.
+test('blocks when a subagent reported its own verification failure', () => {
+  const subagentResult = {
+    message: {
+      content: [
+        {
+          type: 'tool_result',
+          tool_use_id: 'agent1',
+          content: 'partial work\n<subagent_verification_failed/>',
+        },
+      ],
+    },
+  }
+  assert.equal(evaluateVerificationGate([subagentResult]).action, 'block')
+})

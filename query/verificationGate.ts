@@ -43,6 +43,7 @@ export function evaluateVerificationGate(messages: any[]): {
   }
   let editCount = 0
   let directiveCount = 0
+  let subagentFailed = false
   // tool_use ids of Agent calls that spawned the verification subagent. A
   // VERDICT: PASS only counts when it comes back as THAT call's tool_result —
   // so an unrelated Bash log echoing the string cannot fake a pass.
@@ -67,11 +68,16 @@ export function evaluateVerificationGate(messages: any[]): {
       } else if (block?.type === 'tool_result') {
         // Edits made by a subagent are reported back via a marker in the
         // Agent tool_result so the parent gate is not blind to delegated work.
-        const m = toolResultText(block).match(
-          /<subagent_edits>(\d+)<\/subagent_edits>/,
-        )
+        const text = toolResultText(block)
+        const m = text.match(/<subagent_edits>(\d+)<\/subagent_edits>/)
         if (m) {
           editCount += Number(m[1])
+        }
+        // A subagent that failed its own verification surfaces this marker;
+        // the parent must then verify (or fail) rather than treat the
+        // delegated work as done.
+        if (text.includes('<subagent_verification_failed/>')) {
+          subagentFailed = true
         }
       } else if (
         block?.type === 'text' &&
@@ -95,7 +101,7 @@ export function evaluateVerificationGate(messages: any[]): {
       }
     }
   }
-  const nonTrivial = editCount >= NONTRIVIAL_EDIT_THRESHOLD
+  const nonTrivial = editCount >= NONTRIVIAL_EDIT_THRESHOLD || subagentFailed
   if (!nonTrivial || passVerdict) {
     return { action: 'allow', editCount }
   }

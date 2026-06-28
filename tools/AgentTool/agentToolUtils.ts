@@ -243,6 +243,7 @@ export function finalizeAgentTool(
     agentType: string
     isAsync: boolean
   },
+  terminalReason?: string,
 ): AgentToolResult {
   const {
     prompt,
@@ -307,6 +308,12 @@ export function finalizeAgentTool(
       content = [
         ...content,
         { type: 'text', text: `<subagent_edits>${subagentEditCount}</subagent_edits>` } as any,
+      ]
+    }
+    if (terminalReason === 'verification_failed' || terminalReason === 'no_progress') {
+      content = [
+        ...content,
+        { type: 'text', text: '<subagent_verification_failed/>' } as any,
       ]
     }
   }
@@ -464,7 +471,7 @@ export async function runAsyncAgentLifecycle({
   abortController: AbortController
   makeStream: (
     onCacheSafeParams: ((p: CacheSafeParams) => void) | undefined,
-  ) => AsyncGenerator<MessageType, void>
+  ) => AsyncGenerator<MessageType, string | undefined | void>
   metadata: Parameters<typeof finalizeAgentTool>[2]
   description: string
   toolUseContext: ToolUseContext

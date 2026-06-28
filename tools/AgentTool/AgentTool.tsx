@@ -640,6 +640,7 @@ export const AgentTool = buildTool({
         })[Symbol.asyncIterator]();
         let syncAgentError: Error | undefined;
         let wasAborted = false;
+        let syncTerminalReason: string | undefined;
         let worktreeResult: {
           worktreePath?: string;
           worktreeBranch?: string;
@@ -797,7 +798,10 @@ export const AgentTool = buildTool({
             const {
               result
             } = raceResult;
-            if (result.done) break;
+            if (result.done) {
+              syncTerminalReason = result.value as string | undefined;
+              break;
+            }
             const message = result.value;
             agentMessages.push(message);
             updateProgressFromMessage(syncTracker, message, syncResolveActivity, toolUseContext.options.tools);
@@ -915,7 +919,7 @@ export const AgentTool = buildTool({
           }
           logForDebugging(`Sync agent recovering from error with ${agentMessages.length} messages`);
         }
-        const agentResult = finalizeAgentTool(agentMessages, syncAgentId, metadata);
+        const agentResult = finalizeAgentTool(agentMessages, syncAgentId, metadata, syncTerminalReason);
         if (feature('TRANSCRIPT_CLASSIFIER')) {
           const currentAppState = toolUseContext.getAppState();
           const handoffWarning = await classifyHandoffIfNeeded({

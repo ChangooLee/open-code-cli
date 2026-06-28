@@ -163,7 +163,7 @@ export async function* runAgent({ agentDefinition, promptMessages, toolUseContex
     description?: string;
     transcriptSubdir?: string;
     onQueryProgress?: () => void;
-}): AsyncGenerator<Message, void> {
+}): AsyncGenerator<Message, string | undefined> {
     const appState = toolUseContext.getAppState();
     const permissionMode = appState.toolPermissionContext.mode;
     const rootSetAppState = toolUseContext.setAppStateForTasks ?? toolUseContext.setAppState;
@@ -382,17 +382,22 @@ export async function* runAgent({ agentDefinition, promptMessages, toolUseContex
         ...(description && { description }),
     }).catch(_err => logForDebugging(`Failed to write agent metadata: ${_err}`));
     let lastRecordedUuid: UUID | null = initialMessages.at(-1)?.uuid ?? null;
+    let subagentTerminalReason: string | undefined;
     try {
-        for await (const message of query({
-            messages: initialMessages,
-            systemPrompt: agentSystemPrompt,
-            userContext: resolvedUserContext,
-            systemContext: resolvedSystemContext,
-            canUseTool,
-            toolUseContext: agentToolUseContext,
-            querySource,
-            maxTurns: maxTurns ?? agentDefinition.maxTurns,
-        })) {
+        const queryGen = (async function* () {
+            const ret = yield* query({
+                messages: initialMessages,
+                systemPrompt: agentSystemPrompt,
+                userContext: resolvedUserContext,
+                systemContext: resolvedSystemContext,
+                canUseTool,
+                toolUseContext: agentToolUseContext,
+                querySource,
+                maxTurns: maxTurns ?? agentDefinition.maxTurns,
+            });
+            subagentTerminalReason = (ret as { reason?: string } | undefined)?.reason;
+        })();
+        for await (const message of queryGen) {
             onQueryProgress?.();
             if (message.type === 'stream_event' &&
                 message.event.type === 'message_start' &&
@@ -431,6 +436,7 @@ export async function* runAgent({ agentDefinition, promptMessages, toolUseContex
         if (isBuiltInAgent(agentDefinition) && agentDefinition.callback) {
             agentDefinition.callback();
         }
+        return subagentTerminalReason;
     }
     finally {
         await mcpCleanup();

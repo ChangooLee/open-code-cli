@@ -214,6 +214,7 @@ async function* queryLoop(
   } = params
   const deps = params.deps ?? productionDeps()
   const effectiveMaxTurns = resolveEffectiveMaxTurns(maxTurns)
+  let modelCallCount = 0
   let state: State = {
     messages: params.messages,
     toolUseContext: params.toolUseContext,
@@ -467,6 +468,19 @@ async function* queryLoop(
         try {
           let streamingFallbackOccured = false
           queryCheckpoint('query_api_streaming_start')
+          if (
+            feature('BOUNDED_AUTONOMY') &&
+            effectiveMaxTurns !== undefined &&
+            modelCallCount >= effectiveMaxTurns
+          ) {
+            yield createAttachmentMessage({
+              type: 'max_turns_reached',
+              maxTurns: effectiveMaxTurns,
+              turnCount: modelCallCount,
+            })
+            return { reason: 'max_turns', turnCount: modelCallCount }
+          }
+          modelCallCount++
           for await (const message of deps.callModel({
             messages: prependUserContext(messagesForQuery, userContext),
             systemPrompt: fullSystemPrompt,

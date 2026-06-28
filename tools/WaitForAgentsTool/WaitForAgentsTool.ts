@@ -82,10 +82,15 @@ export const WaitForAgentsTool: Tool<InputSchema, Output> = buildTool({
         throw new AbortError()
       }
       const tasks = toolUseContext.getAppState().tasks ?? {}
-      const anyPending = agent_ids.some(id =>
-        isPending(tasks[id] as TaskState | undefined),
-      )
-      if (!anyPending) {
+      // Keep waiting while any listed agent is still running/pending OR not yet
+      // observable (handles spawn races). A missing id is NEVER treated as done:
+      // conflating "lost track of a task" with "task completed" would be a
+      // false-positive join.
+      const stillWaiting = agent_ids.some(id => {
+        const t = tasks[id] as TaskState | undefined
+        return t === undefined || isPending(t)
+      })
+      if (!stillWaiting) {
         break
       }
       await sleep(100)
@@ -94,7 +99,7 @@ export const WaitForAgentsTool: Tool<InputSchema, Output> = buildTool({
     const agents: AgentResult[] = agent_ids.map(id => {
       const t = tasks[id] as TaskState | undefined
       if (!t) {
-        return { agent_id: id, found: false, status: 'unknown' }
+        return { agent_id: id, found: false, status: 'not_found' }
       }
       const base: AgentResult = { agent_id: id, found: true, status: t.status }
       if (t.type === 'local_agent') {
@@ -108,10 +113,13 @@ export const WaitForAgentsTool: Tool<InputSchema, Output> = buildTool({
       }
       return base
     })
-    const timed_out = agents.some(
-      a => a.found && (a.status === 'running' || a.status === 'pending'),
+    // all_terminal ONLY when every agent was found AND reached a terminal state.
+    const anyUnfinished = agents.some(
+      a => !a.found || a.status === 'running' || a.status === 'pending',
     )
-    return { data: { all_terminal: !timed_out, timed_out, agents } }
+    return {
+      data: { all_terminal: !anyUnfinished, timed_out: anyUnfinished, agents },
+    }
   },
   mapToolResultToToolResultBlockParam(data, toolUseID) {
     const parts: string[] = []

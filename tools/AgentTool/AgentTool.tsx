@@ -513,6 +513,19 @@ export const AgentTool = buildTool({
           };
         });
       }
+      if (feature('MULTI_AGENT_CHILD_ABORT')) {
+        const childAbort = agentBackgroundTask.abortController;
+        const parentSignal = toolUseContext.abortController.signal;
+        if (childAbort) {
+          if (parentSignal.aborted) {
+            childAbort.abort();
+          } else {
+            parentSignal.addEventListener('abort', () => childAbort.abort(), {
+              once: true
+            });
+          }
+        }
+      }
       const asyncAgentContext = {
         agentId: asyncAgentId,
         parentSessionId: getParentSessionId(),

@@ -11,7 +11,6 @@ const EDIT_TOOL_NAMES = new Set([
   'MultiEdit',
 ])
 const NONTRIVIAL_EDIT_THRESHOLD = 3
-const MAX_VERIFY_CYCLES = 3
 const MAX_VERIFY_DIRECTIVES = 3
 const DIRECTIVE_MARKER = 'independent verification verdict'
 
@@ -33,17 +32,21 @@ function toolResultText(block: any): string {
   return ''
 }
 
+export type VerificationGateAction = 'allow' | 'block' | 'fail'
+
 export function evaluateVerificationGate(messages: any[]): {
-  blockCompletion: boolean
+  action: VerificationGateAction
   editCount: number
 } {
   if (!feature('VERIFY_IMPLEMENTATION_BEFORE_COMPLETION')) {
-    return { blockCompletion: false, editCount: 0 }
+    return { action: 'allow', editCount: 0 }
   }
   let editCount = 0
-  let verifyCycles = 0
-  let passVerdict = false
   let directiveCount = 0
+  // tool_use ids of Agent calls that spawned the verification subagent. A
+  // VERDICT: PASS only counts when it comes back as THAT call's tool_result —
+  // so an unrelated Bash log echoing the string cannot fake a pass.
+  const verifierToolUseIds = new Set<string>()
   for (const m of messages) {
     const raw = (m as any)?.message?.content
     if (typeof raw === 'string' && raw.includes(DIRECTIVE_MARKER)) {
@@ -56,13 +59,10 @@ export function evaluateVerificationGate(messages: any[]): {
         }
         if (
           block.name === AGENT_TOOL_NAME &&
-          block?.input?.subagent_type === VERIFICATION_AGENT_TYPE
+          block?.input?.subagent_type === VERIFICATION_AGENT_TYPE &&
+          typeof block.id === 'string'
         ) {
-          verifyCycles++
-        }
-      } else if (block?.type === 'tool_result') {
-        if (/VERDICT:\s*PASS/.test(toolResultText(block))) {
-          passVerdict = true
+          verifierToolUseIds.add(block.id)
         }
       } else if (
         block?.type === 'text' &&
@@ -73,13 +73,32 @@ export function evaluateVerificationGate(messages: any[]): {
       }
     }
   }
+  let passVerdict = false
+  for (const m of messages) {
+    for (const block of contentBlocks(m)) {
+      if (
+        block?.type === 'tool_result' &&
+        typeof block.tool_use_id === 'string' &&
+        verifierToolUseIds.has(block.tool_use_id) &&
+        /VERDICT:\s*PASS/.test(toolResultText(block))
+      ) {
+        passVerdict = true
+      }
+    }
+  }
   const nonTrivial = editCount >= NONTRIVIAL_EDIT_THRESHOLD
-  const blockCompletion =
-    nonTrivial &&
-    !passVerdict &&
-    verifyCycles < MAX_VERIFY_CYCLES &&
-    directiveCount < MAX_VERIFY_DIRECTIVES
-  return { blockCompletion, editCount }
+  if (!nonTrivial || passVerdict) {
+    return { action: 'allow', editCount }
+  }
+  // Non-trivial work, not verified: keep blocking and re-prompting for
+  // verification. Do NOT silently complete after a few tries — once the
+  // directive budget is exhausted the task FAILS explicitly rather than
+  // reporting success unverified. (The model-call cap is the ultimate
+  // backstop if the model ignores the directives entirely.)
+  if (directiveCount < MAX_VERIFY_DIRECTIVES) {
+    return { action: 'block', editCount }
+  }
+  return { action: 'fail', editCount }
 }
 
 export function buildVerificationDirective(editCount: number): string {

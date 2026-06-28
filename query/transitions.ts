@@ -19,3 +19,4 @@ export type Terminal =
   | { reason: 'stop_hook_prevented' }
   | { reason: 'hook_stopped' }
   | { reason: 'no_progress' }
+  | { reason: 'verification_failed' }

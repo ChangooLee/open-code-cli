@@ -1025,7 +1025,7 @@ async function* queryLoop(
         ...messagesForQuery,
         ...assistantMessages,
       ])
-      if (verificationGate.blockCompletion) {
+      if (verificationGate.action === 'block') {
         state = {
           messages: [
             ...messagesForQuery,
@@ -1046,6 +1046,13 @@ async function* queryLoop(
           transition: { reason: 'verification_required' },
         }
         continue
+      }
+      if (verificationGate.action === 'fail') {
+        yield createUserMessage({
+          content: `⚠ Task stopped: ${verificationGate.editCount} file changes were made but could not be independently verified (no VERDICT: PASS from the verification agent). Refusing to report success unverified.`,
+          isMeta: true,
+        })
+        return { reason: 'verification_failed' }
       }
       return { reason: 'completed' }
     }

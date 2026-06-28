@@ -5,6 +5,7 @@ export type Continue =
   | { reason: 'max_output_tokens_recovery'; attempt: number }
   | { reason: 'stop_hook_blocking' }
   | { reason: 'token_budget_continuation' }
+  | { reason: 'verification_required' }
   | { reason: 'collapse_drain_retry'; committed: number }
 export type Terminal =
   | { reason: 'completed' }

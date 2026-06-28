@@ -4,6 +4,10 @@ import type {
 } from 'src/services/api/openaiCompatible.js'
 import type { CanUseToolFn } from './hooks/useCanUseTool.js'
 import { resolveEffectiveMaxTurns } from './query/boundedAutonomy.js'
+import {
+  evaluateVerificationGate,
+  buildVerificationDirective,
+} from './query/verificationGate.js'
 import { FallbackTriggeredError } from './services/api/withRetry.js'
 import {
   calculateTokenWarningState,
@@ -1001,6 +1005,32 @@ async function* queryLoop(
             queryDepth: queryTracking.depth,
           })
         }
+      }
+      const verificationGate = evaluateVerificationGate([
+        ...messagesForQuery,
+        ...assistantMessages,
+      ])
+      if (verificationGate.blockCompletion) {
+        state = {
+          messages: [
+            ...messagesForQuery,
+            ...assistantMessages,
+            createUserMessage({
+              content: buildVerificationDirective(verificationGate.editCount),
+              isMeta: true,
+            }),
+          ],
+          toolUseContext,
+          autoCompactTracking: tracking,
+          maxOutputTokensRecoveryCount: 0,
+          hasAttemptedReactiveCompact,
+          maxOutputTokensOverride: undefined,
+          pendingToolUseSummary: undefined,
+          stopHookActive: undefined,
+          turnCount,
+          transition: { reason: 'verification_required' },
+        }
+        continue
       }
       return { reason: 'completed' }
     }

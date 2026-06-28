@@ -10,6 +10,16 @@ const detectOscillation: (sigs: string[]) => {
   ? require('./loopOscillation.js').detectOscillation
   : () => ({ stop: false })
 
+const normalizeInput: (input: any) => string = feature('AGENT_LOOP_DETECTION_NORMALIZE')
+  ? require('./loopNormalize.js').normalizeInput
+  : (input: any) => {
+      try {
+        return JSON.stringify(input)
+      } catch {
+        return String(input)
+      }
+    }
+
 function toolSignatures(messages: any[]): string[] {
   const sigs: string[] = []
   for (const m of messages) {
@@ -19,12 +29,7 @@ function toolSignatures(messages: any[]): string[] {
     }
     for (const block of content) {
       if (block?.type === 'tool_use') {
-        let inputSig: string
-        try {
-          inputSig = JSON.stringify(block.input)
-        } catch {
-          inputSig = String(block.input)
-        }
+        const inputSig = normalizeInput(block.input)
         sigs.push(`${block.name}:${inputSig}`)
       }
     }

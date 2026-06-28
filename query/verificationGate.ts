@@ -44,9 +44,11 @@ export function evaluateVerificationGate(messages: any[]): {
   let editCount = 0
   let directiveCount = 0
   let subagentFailed = false
-  // tool_use ids of Agent calls that spawned the verification subagent. A
-  // VERDICT: PASS only counts when it comes back as THAT call's tool_result —
-  // so an unrelated Bash log echoing the string cannot fake a pass.
+  // tool_use ids of Agent calls (any subagent), and of the verification
+  // subagent specifically. Delegated-work and PASS markers only count when
+  // they come back as THAT Agent call's tool_result — so an unrelated Bash
+  // log echoing the strings cannot fake edits, a failure, or a pass.
+  const agentToolUseIds = new Set<string>()
   const verifierToolUseIds = new Set<string>()
   for (const m of messages) {
     const raw = (m as any)?.message?.content
@@ -58,26 +60,11 @@ export function evaluateVerificationGate(messages: any[]): {
         if (EDIT_TOOL_NAMES.has(block.name)) {
           editCount++
         }
-        if (
-          block.name === AGENT_TOOL_NAME &&
-          block?.input?.subagent_type === VERIFICATION_AGENT_TYPE &&
-          typeof block.id === 'string'
-        ) {
-          verifierToolUseIds.add(block.id)
-        }
-      } else if (block?.type === 'tool_result') {
-        // Edits made by a subagent are reported back via a marker in the
-        // Agent tool_result so the parent gate is not blind to delegated work.
-        const text = toolResultText(block)
-        const m = text.match(/<subagent_edits>(\d+)<\/subagent_edits>/)
-        if (m) {
-          editCount += Number(m[1])
-        }
-        // A subagent that failed its own verification surfaces this marker;
-        // the parent must then verify (or fail) rather than treat the
-        // delegated work as done.
-        if (text.includes('<subagent_verification_failed/>')) {
-          subagentFailed = true
+        if (block.name === AGENT_TOOL_NAME && typeof block.id === 'string') {
+          agentToolUseIds.add(block.id)
+          if (block?.input?.subagent_type === VERIFICATION_AGENT_TYPE) {
+            verifierToolUseIds.add(block.id)
+          }
         }
       } else if (
         block?.type === 'text' &&
@@ -92,10 +79,25 @@ export function evaluateVerificationGate(messages: any[]): {
   for (const m of messages) {
     for (const block of contentBlocks(m)) {
       if (
-        block?.type === 'tool_result' &&
-        typeof block.tool_use_id === 'string' &&
+        block?.type !== 'tool_result' ||
+        typeof block.tool_use_id !== 'string'
+      ) {
+        continue
+      }
+      const text = toolResultText(block)
+      // Delegated-work markers count only from a genuine Agent subagent result.
+      if (agentToolUseIds.has(block.tool_use_id)) {
+        const em = text.match(/<subagent_edits>(\d+)<\/subagent_edits>/)
+        if (em) {
+          editCount += Number(em[1])
+        }
+        if (text.includes('<subagent_verification_failed/>')) {
+          subagentFailed = true
+        }
+      }
+      if (
         verifierToolUseIds.has(block.tool_use_id) &&
-        /VERDICT:\s*PASS/.test(toolResultText(block))
+        /VERDICT:\s*PASS/.test(text)
       ) {
         passVerdict = true
       }

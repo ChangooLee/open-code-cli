@@ -413,18 +413,23 @@ export class QueryEngine {
         const initialStructuredOutputCalls = jsonSchema
             ? countToolCalls(this.mutableMessages, SYNTHETIC_OUTPUT_TOOL_NAME)
             : 0;
-        for await (const message of query({
-            messages,
-            systemPrompt,
-            userContext,
-            systemContext,
-            canUseTool: wrappedCanUseTool,
-            toolUseContext: processUserInputContext,
-            fallbackModel,
-            querySource: 'sdk',
-            maxTurns,
-            taskBudget,
-        })) {
+        let queryTerminalReason: string | undefined;
+        const queryGen = (async function* () {
+            const ret = yield* query({
+                messages,
+                systemPrompt,
+                userContext,
+                systemContext,
+                canUseTool: wrappedCanUseTool,
+                toolUseContext: processUserInputContext,
+                fallbackModel,
+                querySource: 'sdk',
+                maxTurns,
+                taskBudget,
+            });
+            queryTerminalReason = (ret as { reason?: string } | undefined)?.reason;
+        })();
+        for await (const message of queryGen) {
             if (message.type === 'assistant' ||
                 message.type === 'user' ||
                 (message.type === 'system' && message.subtype === 'compact_boundary')) {
@@ -693,7 +698,10 @@ export class QueryEngine {
                 await flushSessionStorage();
             }
         }
-        if (!isResultSuccessful(result, lastStopReason)) {
+        const terminatedWithError =
+            queryTerminalReason === 'verification_failed' ||
+            queryTerminalReason === 'no_progress';
+        if (terminatedWithError || !isResultSuccessful(result, lastStopReason)) {
             yield {
                 type: 'result',
                 subtype: 'error_during_execution',

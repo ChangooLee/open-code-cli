@@ -10,90 +10,85 @@ import { MessageResponse } from '../MessageResponse.js';
 import { InVirtualListContext } from '../messageActions.js';
 import { useExpandShellOutput } from './ExpandShellOutputContext.js';
 export function tryFormatJson(line: string): string {
-  try {
-    const parsed = jsonParse(line);
-    const stringified = jsonStringify(parsed);
-    const normalizedOriginal = line.replace(/\\\//g, '/').replace(/\s+/g, '');
-    const normalizedStringified = stringified.replace(/\s+/g, '');
-    if (normalizedOriginal !== normalizedStringified) {
-      return line;
+    try {
+        const parsed = jsonParse(line);
+        const stringified = jsonStringify(parsed);
+        const normalizedOriginal = line.replace(/\\\//g, '/').replace(/\s+/g, '');
+        const normalizedStringified = stringified.replace(/\s+/g, '');
+        if (normalizedOriginal !== normalizedStringified) {
+            return line;
+        }
+        return jsonStringify(parsed, null, 2);
     }
-    return jsonStringify(parsed, null, 2);
-  } catch {
-    return line;
-  }
+    catch {
+        return line;
+    }
 }
-const MAX_JSON_FORMAT_LENGTH = 10_000;
+const MAX_JSON_FORMAT_LENGTH = 10000;
 export function tryJsonFormatContent(content: string): string {
-  if (content.length > MAX_JSON_FORMAT_LENGTH) {
-    return content;
-  }
-  const allLines = content.split('\n');
-  return allLines.map(tryFormatJson).join('\n');
+    if (content.length > MAX_JSON_FORMAT_LENGTH) {
+        return content;
+    }
+    const allLines = content.split('\n');
+    return allLines.map(tryFormatJson).join('\n');
 }
 const URL_IN_JSON = /https?:\/\/[^\s"'<>\\]+/g;
 export function linkifyUrlsInText(content: string): string {
-  return content.replace(URL_IN_JSON, url => createHyperlink(url));
+    return content.replace(URL_IN_JSON, url => createHyperlink(url));
 }
 export function OutputLine(t0) {
-  const $ = _c(11);
-  const {
-    content,
-    verbose,
-    isError,
-    isWarning,
-    linkifyUrls
-  } = t0;
-  const {
-    columns
-  } = useTerminalSize();
-  const expandShellOutput = useExpandShellOutput();
-  const inVirtualList = React.useContext(InVirtualListContext);
-  const shouldShowFull = verbose || expandShellOutput;
-  let t1;
-  if ($[0] !== columns || $[1] !== content || $[2] !== inVirtualList || $[3] !== linkifyUrls || $[4] !== shouldShowFull) {
-    bb0: {
-      let formatted = tryJsonFormatContent(content);
-      if (linkifyUrls) {
-        formatted = linkifyUrlsInText(formatted);
-      }
-      if (shouldShowFull) {
-        t1 = stripUnderlineAnsi(formatted);
-        break bb0;
-      }
-      t1 = stripUnderlineAnsi(renderTruncatedContent(formatted, columns, inVirtualList));
+    const $ = _c(11);
+    const { content, verbose, isError, isWarning, linkifyUrls } = t0;
+    const { columns } = useTerminalSize();
+    const expandShellOutput = useExpandShellOutput();
+    const inVirtualList = React.useContext(InVirtualListContext);
+    const shouldShowFull = verbose || expandShellOutput;
+    let t1;
+    if ($[0] !== columns || $[1] !== content || $[2] !== inVirtualList || $[3] !== linkifyUrls || $[4] !== shouldShowFull) {
+        bb0: {
+            let formatted = tryJsonFormatContent(content);
+            if (linkifyUrls) {
+                formatted = linkifyUrlsInText(formatted);
+            }
+            if (shouldShowFull) {
+                t1 = stripUnderlineAnsi(formatted);
+                break bb0;
+            }
+            t1 = stripUnderlineAnsi(renderTruncatedContent(formatted, columns, inVirtualList));
+        }
+        $[0] = columns;
+        $[1] = content;
+        $[2] = inVirtualList;
+        $[3] = linkifyUrls;
+        $[4] = shouldShowFull;
+        $[5] = t1;
     }
-    $[0] = columns;
-    $[1] = content;
-    $[2] = inVirtualList;
-    $[3] = linkifyUrls;
-    $[4] = shouldShowFull;
-    $[5] = t1;
-  } else {
-    t1 = $[5];
-  }
-  const formattedContent = t1;
-  const color = isError ? "error" : isWarning ? "warning" : undefined;
-  let t2;
-  if ($[6] !== formattedContent) {
-    t2 = <Ansi>{formattedContent}</Ansi>;
-    $[6] = formattedContent;
-    $[7] = t2;
-  } else {
-    t2 = $[7];
-  }
-  let t3;
-  if ($[8] !== color || $[9] !== t2) {
-    t3 = <MessageResponse><Text color={color}>{t2}</Text></MessageResponse>;
-    $[8] = color;
-    $[9] = t2;
-    $[10] = t3;
-  } else {
-    t3 = $[10];
-  }
-  return t3;
+    else {
+        t1 = $[5];
+    }
+    const formattedContent = t1;
+    const color = isError ? "error" : isWarning ? "warning" : undefined;
+    let t2;
+    if ($[6] !== formattedContent) {
+        t2 = <Ansi>{formattedContent}</Ansi>;
+        $[6] = formattedContent;
+        $[7] = t2;
+    }
+    else {
+        t2 = $[7];
+    }
+    let t3;
+    if ($[8] !== color || $[9] !== t2) {
+        t3 = <MessageResponse><Text color={color}>{t2}</Text></MessageResponse>;
+        $[8] = color;
+        $[9] = t2;
+        $[10] = t3;
+    }
+    else {
+        t3 = $[10];
+    }
+    return t3;
 }
 export function stripUnderlineAnsi(content: string): string {
-  return content.replace(
-  /\u001b\[([0-9]+;)*4(;[0-9]+)*m|\u001b\[4(;[0-9]+)*m|\u001b\[([0-9]+;)*4m/g, '');
+    return content.replace(/\u001b\[([0-9]+;)*4(;[0-9]+)*m|\u001b\[4(;[0-9]+)*m|\u001b\[([0-9]+;)*4m/g, '');
 }

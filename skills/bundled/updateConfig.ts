@@ -1,10 +1,10 @@
-import { toJSONSchema } from 'zod/v4'
-import { SettingsSchema } from '../../utils/settings/types.js'
-import { jsonStringify } from '../../utils/slowOperations.js'
-import { registerBundledSkill } from '../bundledSkills.js'
+import { toJSONSchema } from 'zod/v4';
+import { SettingsSchema } from '../../utils/settings/types.js';
+import { jsonStringify } from '../../utils/slowOperations.js';
+import { registerBundledSkill } from '../bundledSkills.js';
 function generateSettingsSchema(): string {
-  const jsonSchema = toJSONSchema(SettingsSchema(), { io: 'input' })
-  return jsonStringify(jsonSchema, null, 2)
+    const jsonSchema = toJSONSchema(SettingsSchema(), { io: 'input' });
+    return jsonStringify(jsonSchema, null, 2);
 }
 const SETTINGS_EXAMPLES_DOCS = `## Settings File Locations
 Choose the appropriate file based on scope:
@@ -83,7 +83,7 @@ Plugin syntax: \`plugin-name@source\` where source is \`open-code-cli-marketplac
 - \`spinnerVerbs\`: Customize spinner verbs (\`{ "mode": "append" | "replace", "verbs": [...] }\`)
 - \`spinnerTipsOverride\`: Override spinner tips (\`{ "excludeDefault": true, "tips": ["Custom tip"] }\`)
 - \`syntaxHighlightingDisabled\`: Disable diff highlighting
-`
+`;
 const HOOKS_DOCS = `## Hooks Configuration
 Hooks run commands at specific points in Open Code CLI's lifecycle.
 ### Hook Structure
@@ -221,7 +221,7 @@ echo '{"systemMessage": "Session complete!"}'
   }
 }
 \`\`\`
-`
+`;
 const HOOK_VERIFICATION_FLOW = `## Constructing a Hook (with verification)
 Given an event, matcher, target file, and desired behavior, follow this flow. Each step catches a different failure class — a hook that silently does nothing is worse than no hook.
 1. **Dedup check.** Read the target file. If a hook already exists on the same event+matcher, show the existing command and ask: keep it, replace it, or add alongside.
@@ -244,7 +244,7 @@ Given an event, matcher, target file, and desired behavior, follow this flow. Ea
    **Always clean up** — revert the violation, strip the sentinel prefix — whether the proof passed or failed.
    **If proof fails but pipe-test passed and \`jq -e\` passed**: the settings watcher isn't watching \`.open-code-cli/\` — it only watches directories that had a settings file when this session started. The hook is written correctly. Tell the user to open \`/hooks\` once (reloads config) or restart — you can't do this yourself; \`/hooks\` is a user UI menu and opening it ends this turn.
 7. **Handoff.** Tell the user the hook is live (or needs \`/hooks\`/restart per the watcher caveat). Point them at \`/hooks\` to review, edit, or disable it later. The UI only shows "Ran N hooks" if a hook errors or is slow — silent success is invisible by design.
-`
+`;
 const UPDATE_CONFIG_PROMPT = `# Update Config Skill
 Modify Open Code CLI configuration by updating settings.json files.
 ## When Hooks Are Required (Not Memory)
@@ -346,30 +346,29 @@ If a hook isn't running:
 4. **Check hook type** - Is it "command", "prompt", or "agent"?
 5. **Test the command** - Run the hook command manually to see if it works
 6. **Use --debug** - Run \`open-code-cli --debug\` to see hook execution logs
-`
+`;
 export function registerUpdateConfigSkill(): void {
-  registerBundledSkill({
-    name: 'update-config',
-    description:
-      'Use this skill to configure the Open Code CLI harness via settings.json. Automated behaviors ("from now on when X", "each time X", "whenever X", "before/after X") require hooks configured in settings.json - the harness executes these, not Open Code CLI, so memory/preferences cannot fulfill them. Also use for: permissions ("allow X", "add permission", "move permission to"), env vars ("set X=Y"), hook troubleshooting, or any changes to settings.json/settings.local.json files. Examples: "allow npm commands", "add bq permission to global settings", "move permission to user settings", "set DEBUG=true", "when Open Code CLI stops show X". For simple settings like theme/model, use Config tool.',
-    allowedTools: ['Read'],
-    userInvocable: true,
-    async getPromptForCommand(args) {
-      if (args.startsWith('[hooks-only]')) {
-        const req = args.slice('[hooks-only]'.length).trim()
-        let prompt = HOOKS_DOCS + '\n\n' + HOOK_VERIFICATION_FLOW
-        if (req) {
-          prompt += `\n\n## Task\n\n${req}`
-        }
-        return [{ type: 'text', text: prompt }]
-      }
-      const jsonSchema = generateSettingsSchema()
-      let prompt = UPDATE_CONFIG_PROMPT
-      prompt += `\n\n## Full Settings JSON Schema\n\n\`\`\`json\n${jsonSchema}\n\`\`\``
-      if (args) {
-        prompt += `\n\n## User Request\n\n${args}`
-      }
-      return [{ type: 'text', text: prompt }]
-    },
-  })
+    registerBundledSkill({
+        name: 'update-config',
+        description: 'Use this skill to configure the Open Code CLI harness via settings.json. Automated behaviors ("from now on when X", "each time X", "whenever X", "before/after X") require hooks configured in settings.json - the harness executes these, not Open Code CLI, so memory/preferences cannot fulfill them. Also use for: permissions ("allow X", "add permission", "move permission to"), env vars ("set X=Y"), hook troubleshooting, or any changes to settings.json/settings.local.json files. Examples: "allow npm commands", "add bq permission to global settings", "move permission to user settings", "set DEBUG=true", "when Open Code CLI stops show X". For simple settings like theme/model, use Config tool.',
+        allowedTools: ['Read'],
+        userInvocable: true,
+        async getPromptForCommand(args) {
+            if (args.startsWith('[hooks-only]')) {
+                const req = args.slice('[hooks-only]'.length).trim();
+                let prompt = HOOKS_DOCS + '\n\n' + HOOK_VERIFICATION_FLOW;
+                if (req) {
+                    prompt += `\n\n## Task\n\n${req}`;
+                }
+                return [{ type: 'text', text: prompt }];
+            }
+            const jsonSchema = generateSettingsSchema();
+            let prompt = UPDATE_CONFIG_PROMPT;
+            prompt += `\n\n## Full Settings JSON Schema\n\n\`\`\`json\n${jsonSchema}\n\`\`\``;
+            if (args) {
+                prompt += `\n\n## User Request\n\n${args}`;
+            }
+            return [{ type: 'text', text: prompt }];
+        },
+    });
 }

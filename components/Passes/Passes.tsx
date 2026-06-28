@@ -13,88 +13,89 @@ import { count } from '../../utils/array.js';
 import { logError } from '../../utils/log.js';
 import { Pane } from '../design-system/Pane.js';
 type PassStatus = {
-  passNumber: number;
-  isAvailable: boolean;
+    passNumber: number;
+    isAvailable: boolean;
 };
 type Props = {
-  onDone: (result?: string, options?: {
-    display?: CommandResultDisplay;
-  }) => void;
+    onDone: (result?: string, options?: {
+        display?: CommandResultDisplay;
+    }) => void;
 };
-export function Passes({
-  onDone
-}: Props): React.ReactNode {
-  const [loading, setLoading] = useState(true);
-  const [passStatuses, setPassStatuses] = useState<PassStatus[]>([]);
-  const [isAvailable, setIsAvailable] = useState(false);
-  const [referralLink, setReferralLink] = useState<string | null>(null);
-  const [referrerReward, setReferrerReward] = useState<ReferrerRewardInfo | null | undefined>(undefined);
-  const exitState = useExitOnCtrlCDWithKeybindings(() => onDone('Guest passes dialog dismissed', {
-    display: 'system'
-  }));
-  const handleCancel = useCallback(() => {
-    onDone('Guest passes dialog dismissed', {
-      display: 'system'
+export function Passes({ onDone }: Props): React.ReactNode {
+    const [loading, setLoading] = useState(true);
+    const [passStatuses, setPassStatuses] = useState<PassStatus[]>([]);
+    const [isAvailable, setIsAvailable] = useState(false);
+    const [referralLink, setReferralLink] = useState<string | null>(null);
+    const [referrerReward, setReferrerReward] = useState<ReferrerRewardInfo | null | undefined>(undefined);
+    const exitState = useExitOnCtrlCDWithKeybindings(() => onDone('Guest passes dialog dismissed', {
+        display: 'system'
+    }));
+    const handleCancel = useCallback(() => {
+        onDone('Guest passes dialog dismissed', {
+            display: 'system'
+        });
+    }, [onDone]);
+    useKeybinding('confirm:no', handleCancel, {
+        context: 'Confirmation'
     });
-  }, [onDone]);
-  useKeybinding('confirm:no', handleCancel, {
-    context: 'Confirmation'
-  });
-  useInput((_input, key) => {
-    if (key.return && referralLink) {
-      void setClipboard(referralLink).then(raw => {
-        if (raw) process.stdout.write(raw);
-        logEvent('open_code_cli_guest_passes_link_copied', {});
-        onDone(`Referral link copied to clipboard!`);
-      });
-    }
-  });
-  useEffect(() => {
-    async function loadPassesData() {
-      try {
-        const eligibilityData = await getCachedOrFetchPassesEligibility();
-        if (!eligibilityData || !eligibilityData.eligible) {
-          setIsAvailable(false);
-          setLoading(false);
-          return;
+    useInput((_input, key) => {
+        if (key.return && referralLink) {
+            void setClipboard(referralLink).then(raw => {
+                if (raw)
+                    process.stdout.write(raw);
+                logEvent('open_code_cli_guest_passes_link_copied', {});
+                onDone(`Referral link copied to clipboard!`);
+            });
         }
-        setIsAvailable(true);
-        if (eligibilityData.referral_code_details?.referral_link) {
-          setReferralLink(eligibilityData.referral_code_details.referral_link);
+    });
+    useEffect(() => {
+        async function loadPassesData() {
+            try {
+                const eligibilityData = await getCachedOrFetchPassesEligibility();
+                if (!eligibilityData || !eligibilityData.eligible) {
+                    setIsAvailable(false);
+                    setLoading(false);
+                    return;
+                }
+                setIsAvailable(true);
+                if (eligibilityData.referral_code_details?.referral_link) {
+                    setReferralLink(eligibilityData.referral_code_details.referral_link);
+                }
+                setReferrerReward(eligibilityData.referrer_reward);
+                const campaign = eligibilityData.referral_code_details?.campaign ?? 'open_code_cli_guest_pass';
+                let redemptionsData: ReferralRedemptionsResponse;
+                try {
+                    redemptionsData = await fetchReferralRedemptions(campaign);
+                }
+                catch (err_0) {
+                    logError(err_0 as Error);
+                    setIsAvailable(false);
+                    setLoading(false);
+                    return;
+                }
+                const redemptions = redemptionsData.redemptions || [];
+                const maxRedemptions = redemptionsData.limit || 3;
+                const statuses: PassStatus[] = [];
+                for (let i = 0; i < maxRedemptions; i++) {
+                    const redemption = redemptions[i];
+                    statuses.push({
+                        passNumber: i + 1,
+                        isAvailable: !redemption
+                    });
+                }
+                setPassStatuses(statuses);
+                setLoading(false);
+            }
+            catch (err) {
+                logError(err as Error);
+                setIsAvailable(false);
+                setLoading(false);
+            }
         }
-        setReferrerReward(eligibilityData.referrer_reward);
-        const campaign = eligibilityData.referral_code_details?.campaign ?? 'open_code_cli_guest_pass';
-        let redemptionsData: ReferralRedemptionsResponse;
-        try {
-          redemptionsData = await fetchReferralRedemptions(campaign);
-        } catch (err_0) {
-          logError(err_0 as Error);
-          setIsAvailable(false);
-          setLoading(false);
-          return;
-        }
-        const redemptions = redemptionsData.redemptions || [];
-        const maxRedemptions = redemptionsData.limit || 3;
-        const statuses: PassStatus[] = [];
-        for (let i = 0; i < maxRedemptions; i++) {
-          const redemption = redemptions[i];
-          statuses.push({
-            passNumber: i + 1,
-            isAvailable: !redemption
-          });
-        }
-        setPassStatuses(statuses);
-        setLoading(false);
-      } catch (err) {
-        logError(err as Error);
-        setIsAvailable(false);
-        setLoading(false);
-      }
-    }
-    void loadPassesData();
-  }, []);
-  if (loading) {
-    return <Pane>
+        void loadPassesData();
+    }, []);
+    if (loading) {
+        return <Pane>
         <Box flexDirection="column" gap={1}>
           <Text dimColor>Loading guest pass information…</Text>
           <Text dimColor italic>
@@ -102,9 +103,9 @@ export function Passes({
           </Text>
         </Box>
       </Pane>;
-  }
-  if (!isAvailable) {
-    return <Pane>
+    }
+    if (!isAvailable) {
+        return <Pane>
         <Box flexDirection="column" gap={1}>
           <Text>Guest passes are not currently available.</Text>
           <Text dimColor italic>
@@ -112,19 +113,19 @@ export function Passes({
           </Text>
         </Box>
       </Pane>;
-  }
-  const availableCount = count(passStatuses, p => p.isAvailable);
-  const sortedPasses = [...passStatuses].sort((a, b) => +b.isAvailable - +a.isAvailable);
-  const renderTicket = (pass: PassStatus) => {
-    const isRedeemed = !pass.isAvailable;
-    if (isRedeemed) {
-      return <Box key={pass.passNumber} flexDirection="column" marginRight={1}>
+    }
+    const availableCount = count(passStatuses, p => p.isAvailable);
+    const sortedPasses = [...passStatuses].sort((a, b) => +b.isAvailable - +a.isAvailable);
+    const renderTicket = (pass: PassStatus) => {
+        const isRedeemed = !pass.isAvailable;
+        if (isRedeemed) {
+            return <Box key={pass.passNumber} flexDirection="column" marginRight={1}>
           <Text dimColor>{'┌─────────╱'}</Text>
           <Text dimColor>{` ) CC ${TEARDROP_ASTERISK} ┊╱`}</Text>
           <Text dimColor>{'└───────╱'}</Text>
         </Box>;
-    }
-    return <Box key={pass.passNumber} flexDirection="column" marginRight={1}>
+        }
+        return <Box key={pass.passNumber} flexDirection="column" marginRight={1}>
         <Text>{'┌──────────┐'}</Text>
         <Text>
           {' ) CC '}
@@ -133,8 +134,8 @@ export function Passes({
         </Text>
         <Text>{'└──────────┘'}</Text>
       </Box>;
-  };
-  return <Pane>
+    };
+    return <Pane>
       <Box flexDirection="column" gap={1}>
         <Text color="permission">Guest passes · {availableCount} left</Text>
         <Box flexDirection="row" marginLeft={2}>

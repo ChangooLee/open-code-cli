@@ -7,10 +7,10 @@ OpenAI-compatible terminal coding agent. Works with any `/chat/completions` endp
 ### Agent & sessions
 
 - Interactive REPL (default) and headless `-p` / `--print` mode
-- Session persistence, resume (`--resume`, `--continue`), fork (`--fork-session`), rename, rewind
+- Session persistence, resume (`--resume`, `--continue`), branch, rename, rewind
 - Plan mode (`/plan`, EnterPlanMode / ExitPlanMode tools)
 - Context compaction (`/compact`), file history, worktree sessions (`-w`, `--worktree`, `--tmux`)
-- Custom agents (`--agent`, `--agents`, `/agents`) and subagents (`Agent` tool, `/fork`)
+- Custom agents (`--agent`, `--agents`, `/agents`) and subagents (`Agent` tool, `/branch`)
 - Multi-agent swarms (`TeamCreate`, `TeamDelete`, `SendMessage`, `/peers`)
 - Background tasks, cron triggers (`CronCreate`, `CronDelete`, `CronList`, `RemoteTrigger`)
 - Session server (`open-code-cli server`), remote SSH (`open-code-cli ssh`), cc:// connect (`open-code-cli open`)
@@ -32,7 +32,7 @@ OpenAI-compatible terminal coding agent. Works with any `/chat/completions` endp
 
 ### Slash commands
 
-`/add-dir` `/advisor` `/agents` `/branch` `/brief` `/btw` `/buddy` `/chrome` `/clear` `/color` `/compact` `/config` `/context` `/copy` `/cost` `/desktop` `/diff` `/doctor` `/effort` `/exit` `/export` `/fast` `/feedback` `/files` `/fork` `/help` `/hooks` `/ide` `/init` `/insights` `/install` `/install-github-app` `/install-slack-app` `/keybindings` `/login` `/logout` `/mcp` `/memory` `/mobile` `/model` `/output-style` `/passes` `/peers` `/permissions` `/plan` `/plugin` `/pr-comments` `/privacy-settings` `/rate-limit-options` `/reload-plugins` `/remote-control` `/remote-env` `/rename` `/resume` `/review` `/rewind` `/sandbox` `/security-review` `/session` `/skills` `/stats` `/status` `/statusline` `/stickers` `/tag` `/tasks` `/terminal-setup` `/theme` `/think-back` `/thinkback-play` `/torch` `/ultrareview` `/ultraplan` `/upgrade` `/usage` `/vim` `/voice` `/web-setup` `/workflows`
+`/add-dir` `/advisor` `/agents` `/branch` `/brief` `/btw` `/buddy` `/chrome` `/clear` `/color` `/compact` `/config` `/context` `/copy` `/cost` `/desktop` `/diff` `/doctor` `/effort` `/exit` `/export` `/fast` `/feedback` `/files` `/help` `/hooks` `/ide` `/init` `/insights` `/install` `/install-github-app` `/install-slack-app` `/keybindings` `/login` `/logout` `/mcp` `/memory` `/mobile` `/model` `/output-style` `/passes` `/peers` `/permissions` `/plan` `/plugin` `/pr-comments` `/privacy-settings` `/rate-limit-options` `/reload-plugins` `/remote-control` `/remote-env` `/rename` `/resume` `/review` `/rewind` `/sandbox` `/security-review` `/session` `/skills` `/stats` `/status` `/statusline` `/stickers` `/tag` `/tasks` `/terminal-setup` `/theme` `/think-back` `/thinkback-play` `/torch` `/ultrareview` `/ultraplan` `/upgrade` `/usage` `/vim` `/voice` `/web-setup` `/workflows`
 
 Plus user/project skills (`/skill-name`), plugin commands, workflow commands, and bundled skills (e.g. verify, openai-compatible-api).
 

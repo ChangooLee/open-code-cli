@@ -1,27 +1,23 @@
-import { BASH_TOOL_NAME } from 'src/tools/BashTool/toolName.js'
-import { FILE_READ_TOOL_NAME } from 'src/tools/FileReadTool/prompt.js'
-import { GLOB_TOOL_NAME } from 'src/tools/GlobTool/prompt.js'
-import { GREP_TOOL_NAME } from 'src/tools/GrepTool/prompt.js'
-import { SEND_MESSAGE_TOOL_NAME } from 'src/tools/SendMessageTool/constants.js'
-import { WEB_FETCH_TOOL_NAME } from 'src/tools/WebFetchTool/prompt.js'
-import { WEB_SEARCH_TOOL_NAME } from 'src/tools/WebSearchTool/prompt.js'
-import { isUsing3PServices } from 'src/utils/auth.js'
-import { hasEmbeddedSearchTools } from 'src/utils/embeddedTools.js'
-import { getSettings_DEPRECATED } from 'src/utils/settings/settings.js'
-import { jsonStringify } from '../../../utils/slowOperations.js'
-import type {
-  AgentDefinition,
-  BuiltInAgentDefinition,
-} from '../loadAgentsDir.js'
-const OPEN_CODE_CLI_DOCS_MAP_URL =
-  'https://open-code-cli.dev/docs/open_code_cli_docs_map.md'
-const CDP_DOCS_MAP_URL = 'https://platform.open-code-cli.com/llms.txt'
-export const OPEN_CODE_GUIDE_AGENT_TYPE = 'open-code-cli-guide'
+import { BASH_TOOL_NAME } from 'src/tools/BashTool/toolName.js';
+import { FILE_READ_TOOL_NAME } from 'src/tools/FileReadTool/prompt.js';
+import { GLOB_TOOL_NAME } from 'src/tools/GlobTool/prompt.js';
+import { GREP_TOOL_NAME } from 'src/tools/GrepTool/prompt.js';
+import { SEND_MESSAGE_TOOL_NAME } from 'src/tools/SendMessageTool/constants.js';
+import { WEB_FETCH_TOOL_NAME } from 'src/tools/WebFetchTool/prompt.js';
+import { WEB_SEARCH_TOOL_NAME } from 'src/tools/WebSearchTool/prompt.js';
+import { isUsing3PServices } from 'src/utils/auth.js';
+import { hasEmbeddedSearchTools } from 'src/utils/embeddedTools.js';
+import { getSettings_DEPRECATED } from 'src/utils/settings/settings.js';
+import { jsonStringify } from '../../../utils/slowOperations.js';
+import type { AgentDefinition, BuiltInAgentDefinition, } from '../loadAgentsDir.js';
+const OPEN_CODE_CLI_DOCS_MAP_URL = 'https://open-code-cli.dev/docs/open_code_cli_docs_map.md';
+const CDP_DOCS_MAP_URL = 'https://platform.open-code-cli.com/llms.txt';
+export const OPEN_CODE_GUIDE_AGENT_TYPE = 'open-code-cli-guide';
 function getOpenCodeGuideBasePrompt(): string {
-  const localSearchHint = hasEmbeddedSearchTools()
-    ? `${FILE_READ_TOOL_NAME}, \`find\`, and \`grep\``
-    : `${FILE_READ_TOOL_NAME}, ${GLOB_TOOL_NAME}, and ${GREP_TOOL_NAME}`
-  return `You are the Open Code CLI guide agent. Your primary responsibility is helping users understand and use Open Code CLI, the Open Code CLI Agent SDK, and OpenAI-compatible providers effectively.
+    const localSearchHint = hasEmbeddedSearchTools()
+        ? `${FILE_READ_TOOL_NAME}, \`find\`, and \`grep\``
+        : `${FILE_READ_TOOL_NAME}, ${GLOB_TOOL_NAME}, and ${GREP_TOOL_NAME}`;
+    return `You are the Open Code CLI guide agent. Your primary responsibility is helping users understand and use Open Code CLI, the Open Code CLI Agent SDK, and OpenAI-compatible providers effectively.
 **Your expertise spans three domains:**
 1. **Open Code CLI** (the CLI tool): Installation, configuration, hooks, skills, MCP servers, keyboard shortcuts, IDE integrations, settings, and workflows.
 2. **Open Code CLI Agent SDK**: A framework for building custom AI agents based on Open Code CLI technology. Available for Node.js/TypeScript and Python.
@@ -66,93 +62,84 @@ function getOpenCodeGuideBasePrompt(): string {
 - Include specific examples or code snippets when helpful
 - Reference exact documentation URLs in your responses
 - Help users discover features by proactively suggesting related commands, shortcuts, or capabilities
-Complete the user's request by providing accurate, documentation-based guidance.`
+Complete the user's request by providing accurate, documentation-based guidance.`;
 }
 function getFeedbackGuideline(): string {
-  if (isUsing3PServices()) {
-    return `- When you cannot find an answer or the feature doesn't exist, direct the user to ${MACRO.ISSUES_EXPLAINER}`
-  }
-  return "- When you cannot find an answer or the feature doesn't exist, direct the user to use /feedback to report a feature request or bug"
+    if (isUsing3PServices()) {
+        return `- When you cannot find an answer or the feature doesn't exist, direct the user to ${MACRO.ISSUES_EXPLAINER}`;
+    }
+    return "- When you cannot find an answer or the feature doesn't exist, direct the user to use /feedback to report a feature request or bug";
 }
 export const OPEN_CODE_GUIDE_AGENT: BuiltInAgentDefinition = {
-  agentType: OPEN_CODE_GUIDE_AGENT_TYPE,
-  whenToUse: `Use this agent when the user asks questions ("Can Open Code CLI...", "Does Open Code CLI...", "How do I...") about: (1) Open Code CLI (the CLI tool) - features, hooks, slash commands, MCP servers, settings, IDE integrations, keyboard shortcuts; (2) Open Code CLI Agent SDK - building custom agents; (3) OpenAI-compatible providers - API usage, tool use, and provider configuration. **IMPORTANT:** Before spawning a new agent, check if there is already a running or recently completed open-code-cli-guide agent that you can continue via ${SEND_MESSAGE_TOOL_NAME}.`,
-  tools: hasEmbeddedSearchTools()
-    ? [
-        BASH_TOOL_NAME,
-        FILE_READ_TOOL_NAME,
-        WEB_FETCH_TOOL_NAME,
-        WEB_SEARCH_TOOL_NAME,
-      ]
-    : [
-        GLOB_TOOL_NAME,
-        GREP_TOOL_NAME,
-        FILE_READ_TOOL_NAME,
-        WEB_FETCH_TOOL_NAME,
-        WEB_SEARCH_TOOL_NAME,
-      ],
-  source: 'built-in',
-  baseDir: 'built-in',
-  model: 'haiku',
-  permissionMode: 'dontAsk',
-  getSystemPrompt({ toolUseContext }) {
-    const commands = toolUseContext.options.commands
-    const contextSections: string[] = []
-    const customCommands = commands.filter(cmd => cmd.type === 'prompt')
-    if (customCommands.length > 0) {
-      const commandList = customCommands
-        .map(cmd => `- /${cmd.name}: ${cmd.description}`)
-        .join('\n')
-      contextSections.push(
-        `**Available custom skills in this project:**\n${commandList}`,
-      )
-    }
-    const customAgents =
-      toolUseContext.options.agentDefinitions.activeAgents.filter(
-        (a: AgentDefinition) => a.source !== 'built-in',
-      )
-    if (customAgents.length > 0) {
-      const agentList = customAgents
-        .map((a: AgentDefinition) => `- ${a.agentType}: ${a.whenToUse}`)
-        .join('\n')
-      contextSections.push(
-        `**Available custom agents configured:**\n${agentList}`,
-      )
-    }
-    const mcpClients = toolUseContext.options.mcpClients
-    if (mcpClients && mcpClients.length > 0) {
-      const mcpList = mcpClients
-        .map((client: { name: string }) => `- ${client.name}`)
-        .join('\n')
-      contextSections.push(`**Configured MCP servers:**\n${mcpList}`)
-    }
-    const pluginCommands = commands.filter(
-      cmd => cmd.type === 'prompt' && cmd.source === 'plugin',
-    )
-    if (pluginCommands.length > 0) {
-      const pluginList = pluginCommands
-        .map(cmd => `- /${cmd.name}: ${cmd.description}`)
-        .join('\n')
-      contextSections.push(`**Available plugin skills:**\n${pluginList}`)
-    }
-    const settings = getSettings_DEPRECATED()
-    if (Object.keys(settings).length > 0) {
-      const settingsJson = jsonStringify(settings, null, 2)
-      contextSections.push(
-        `**User's settings.json:**\n\`\`\`json\n${settingsJson}\n\`\`\``,
-      )
-    }
-    const feedbackGuideline = getFeedbackGuideline()
-    const basePromptWithFeedback = `${getOpenCodeGuideBasePrompt()}
-${feedbackGuideline}`
-    if (contextSections.length > 0) {
-      return `${basePromptWithFeedback}
+    agentType: OPEN_CODE_GUIDE_AGENT_TYPE,
+    whenToUse: `Use this agent when the user asks questions ("Can Open Code CLI...", "Does Open Code CLI...", "How do I...") about: (1) Open Code CLI (the CLI tool) - features, hooks, slash commands, MCP servers, settings, IDE integrations, keyboard shortcuts; (2) Open Code CLI Agent SDK - building custom agents; (3) OpenAI-compatible providers - API usage, tool use, and provider configuration. **IMPORTANT:** Before spawning a new agent, check if there is already a running or recently completed open-code-cli-guide agent that you can continue via ${SEND_MESSAGE_TOOL_NAME}.`,
+    tools: hasEmbeddedSearchTools()
+        ? [
+            BASH_TOOL_NAME,
+            FILE_READ_TOOL_NAME,
+            WEB_FETCH_TOOL_NAME,
+            WEB_SEARCH_TOOL_NAME,
+        ]
+        : [
+            GLOB_TOOL_NAME,
+            GREP_TOOL_NAME,
+            FILE_READ_TOOL_NAME,
+            WEB_FETCH_TOOL_NAME,
+            WEB_SEARCH_TOOL_NAME,
+        ],
+    source: 'built-in',
+    baseDir: 'built-in',
+    model: 'haiku',
+    permissionMode: 'dontAsk',
+    getSystemPrompt({ toolUseContext }) {
+        const commands = toolUseContext.options.commands;
+        const contextSections: string[] = [];
+        const customCommands = commands.filter(cmd => cmd.type === 'prompt');
+        if (customCommands.length > 0) {
+            const commandList = customCommands
+                .map(cmd => `- /${cmd.name}: ${cmd.description}`)
+                .join('\n');
+            contextSections.push(`**Available custom skills in this project:**\n${commandList}`);
+        }
+        const customAgents = toolUseContext.options.agentDefinitions.activeAgents.filter((a: AgentDefinition) => a.source !== 'built-in');
+        if (customAgents.length > 0) {
+            const agentList = customAgents
+                .map((a: AgentDefinition) => `- ${a.agentType}: ${a.whenToUse}`)
+                .join('\n');
+            contextSections.push(`**Available custom agents configured:**\n${agentList}`);
+        }
+        const mcpClients = toolUseContext.options.mcpClients;
+        if (mcpClients && mcpClients.length > 0) {
+            const mcpList = mcpClients
+                .map((client: {
+                name: string;
+            }) => `- ${client.name}`)
+                .join('\n');
+            contextSections.push(`**Configured MCP servers:**\n${mcpList}`);
+        }
+        const pluginCommands = commands.filter(cmd => cmd.type === 'prompt' && cmd.source === 'plugin');
+        if (pluginCommands.length > 0) {
+            const pluginList = pluginCommands
+                .map(cmd => `- /${cmd.name}: ${cmd.description}`)
+                .join('\n');
+            contextSections.push(`**Available plugin skills:**\n${pluginList}`);
+        }
+        const settings = getSettings_DEPRECATED();
+        if (Object.keys(settings).length > 0) {
+            const settingsJson = jsonStringify(settings, null, 2);
+            contextSections.push(`**User's settings.json:**\n\`\`\`json\n${settingsJson}\n\`\`\``);
+        }
+        const feedbackGuideline = getFeedbackGuideline();
+        const basePromptWithFeedback = `${getOpenCodeGuideBasePrompt()}
+${feedbackGuideline}`;
+        if (contextSections.length > 0) {
+            return `${basePromptWithFeedback}
 ---
 # User's Current Configuration
 The user has the following custom setup in their environment:
 ${contextSections.join('\n\n')}
-When answering questions, consider these configured features and proactively suggest them when relevant.`
-    }
-    return basePromptWithFeedback
-  },
-}
+When answering questions, consider these configured features and proactively suggest them when relevant.`;
+        }
+        return basePromptWithFeedback;
+    },
+};

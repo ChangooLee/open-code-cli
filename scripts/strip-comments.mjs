@@ -1,95 +1,48 @@
-import ts from 'typescript'
-import { readdir, readFile, writeFile, stat } from 'node:fs/promises'
-import { join } from 'node:path'
-import { fileURLToPath } from 'node:url'
-
-const root = fileURLToPath(new URL('..', import.meta.url))
-const skipDirs = new Set(['node_modules', 'dist', '.git'])
-
-function scriptKindFor(filePath) {
-  if (filePath.endsWith('.tsx')) return ts.ScriptKind.TSX
-  if (filePath.endsWith('.ts')) return ts.ScriptKind.TS
-  return ts.ScriptKind.JS
-}
-
-function stripComments(source, filePath) {
-  if (!source.includes('//') && !source.includes('/*')) return source
-
-  const sourceFile = ts.createSourceFile(
-    filePath,
-    source,
-    ts.ScriptTarget.Latest,
-    true,
-    scriptKindFor(filePath),
-  )
-
-  const ranges = []
-  const seen = new Set()
-  const addRange = (pos, end) => {
-    const key = `${pos}:${end}`
-    if (seen.has(key)) return
-    seen.add(key)
-    ranges.push({ pos, end })
-  }
-
-  const visit = node => {
-    ts.forEachLeadingCommentRange(source, node.getFullStart(), addRange)
-    ts.forEachTrailingCommentRange(source, node.getEnd(), addRange)
-    ts.forEachChild(node, visit)
-  }
-
-  visit(sourceFile)
-  if (ranges.length === 0) return source
-
-  ranges.sort((a, b) => b.pos - a.pos)
-  let output = source
-  for (const range of ranges) {
-    output = output.slice(0, range.pos) + output.slice(range.end)
-  }
-
-  output = output.replace(/^[ \t]*\r?\n/gm, '')
-  if (output.length > 0 && !output.endsWith('\n')) output += '\n'
-  return output
-}
-
-function stripOrphanComments(source) {
-  let output = source.replace(/^[ \t]*\/\/[^\n]*\n/gm, '')
-  output = output.replace(/^[ \t]*\/\*[\s\S]*?\*\/[ \t]*\n/gm, '')
-  output = output.replace(/\/\*[\s\S]*?\*\//g, '')
-  output = output.replace(/\n{3,}/g, '\n\n')
-  if (output.length > 0 && !output.endsWith('\n')) output += '\n'
-  return output
-}
-
-function stripAllComments(source, filePath) {
-  return stripOrphanComments(stripComments(source, filePath))
-}
-
+import ts from 'typescript';
+import { readFile, writeFile, readdir, stat } from 'node:fs/promises';
+import { extname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+const root = resolve(fileURLToPath(new URL('.', import.meta.url)), '..');
+const exts = new Map([
+    ['.ts', ts.ScriptKind.TS],
+    ['.tsx', ts.ScriptKind.TSX],
+    ['.js', ts.ScriptKind.JS],
+    ['.mjs', ts.ScriptKind.JS],
+]);
+const skip = new Set(['node_modules', 'dist', '.git']);
+const printer = ts.createPrinter({
+    removeComments: true,
+    newLine: ts.NewLineKind.LineFeed,
+});
 async function walk(dir, files = []) {
-  for (const name of await readdir(dir)) {
-    if (skipDirs.has(name)) continue
-    const path = join(dir, name)
-    const info = await stat(path)
-    if (info.isDirectory()) {
-      await walk(path, files)
-      continue
+    const entries = await readdir(dir);
+    for (const name of entries) {
+        if (skip.has(name))
+            continue;
+        const path = join(dir, name);
+        const st = await stat(path);
+        if (st.isDirectory())
+            await walk(path, files);
+        else if (exts.has(extname(name)))
+            files.push(path);
     }
-    if (!/\.(ts|tsx|mjs|js)$/.test(name)) continue
-    files.push(path)
-  }
-  return files
+    return files;
 }
-
-const files = await walk(root)
-let changed = 0
-
-for (const filePath of files) {
-  const source = await readFile(filePath, 'utf8')
-  const stripped = stripAllComments(source, filePath)
-  if (stripped !== source) {
-    await writeFile(filePath, stripped, 'utf8')
-    changed++
-  }
+let changed = 0;
+const files = await walk(root);
+for (const path of files) {
+    const ext = extname(path);
+    const scriptKind = exts.get(ext);
+    if (!scriptKind)
+        continue;
+    const source = await readFile(path, 'utf8');
+    if (!source.includes('//') && !source.includes('/*'))
+        continue;
+    const sourceFile = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true, scriptKind);
+    const stripped = printer.printNode(ts.EmitHint.Unspecified, sourceFile, sourceFile);
+    if (stripped !== source) {
+        await writeFile(path, stripped.endsWith('\n') ? stripped : `${stripped}\n`, 'utf8');
+        changed++;
+    }
 }
-
-console.log(`strip-comments: ${changed}/${files.length} files updated`)
+console.log(`strip-comments: ${files.length} scanned, ${changed} updated`);

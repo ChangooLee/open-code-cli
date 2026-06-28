@@ -1,53 +1,40 @@
-import type { ContentBlockParam } from 'src/services/api/openaiCompatible.js'
-import type { Command } from '../commands.js'
-import type { ToolUseContext } from '../Tool.js'
+import type { ContentBlockParam } from 'src/services/api/openaiCompatible.js';
+import type { Command } from '../commands.js';
+import type { ToolUseContext } from '../Tool.js';
 type Options = {
-  name: string
-  description: string
-  progressMessage: string
-  pluginName: string
-  pluginCommand: string
-  getPromptWhileMarketplaceIsPrivate: (
-    args: string,
-    context: ToolUseContext,
-  ) => Promise<ContentBlockParam[]>
-}
-export function createMovedToPluginCommand({
-  name,
-  description,
-  progressMessage,
-  pluginName,
-  pluginCommand,
-  getPromptWhileMarketplaceIsPrivate,
-}: Options): Command {
-  return {
-    type: 'prompt',
-    name,
-    description,
-    progressMessage,
-    contentLength: 0, // Dynamic content
-    userFacingName() {
-      return name
-    },
-    source: 'builtin',
-    async getPromptForCommand(
-      args: string,
-      context: ToolUseContext,
-    ): Promise<ContentBlockParam[]> {
-      if (process.env.USER_TYPE === 'ant') {
-        return [
-          {
-            type: 'text',
-            text: `This command has been moved to a plugin. Tell the user:
+    name: string;
+    description: string;
+    progressMessage: string;
+    pluginName: string;
+    pluginCommand: string;
+    getPromptWhileMarketplaceIsPrivate: (args: string, context: ToolUseContext) => Promise<ContentBlockParam[]>;
+};
+export function createMovedToPluginCommand({ name, description, progressMessage, pluginName, pluginCommand, getPromptWhileMarketplaceIsPrivate, }: Options): Command {
+    return {
+        type: 'prompt',
+        name,
+        description,
+        progressMessage,
+        contentLength: 0,
+        userFacingName() {
+            return name;
+        },
+        source: 'builtin',
+        async getPromptForCommand(args: string, context: ToolUseContext): Promise<ContentBlockParam[]> {
+            if (process.env.USER_TYPE === 'ant') {
+                return [
+                    {
+                        type: 'text',
+                        text: `This command has been moved to a plugin. Tell the user:
 1. To install the plugin, run:
    open-code-cli plugin install ${pluginName}@open-code-cli-marketplace
 2. After installation, use /${pluginName}:${pluginCommand} to run this command
 3. For more information, see: https://github.com/open-code-cli/open-code-cli-marketplace/blob/main/${pluginName}/README.md
 Do not attempt to run the command. Simply inform the user about the plugin installation.`,
-          },
-        ]
-      }
-      return getPromptWhileMarketplaceIsPrivate(args, context)
-    },
-  }
+                    },
+                ];
+            }
+            return getPromptWhileMarketplaceIsPrivate(args, context);
+        },
+    };
 }

@@ -4,21 +4,21 @@ import { isEnvTruthy } from 'src/utils/envUtils.js';
 import { useStartupNotification } from './useStartupNotification.js';
 const NPM_DEPRECATION_MESSAGE = 'Open Code CLI has switched from npm to native installer. Run `open-code-cli install` or see https://open-code-cli.dev/docs/getting-started for more options.';
 export function useNpmDeprecationNotification() {
-  useStartupNotification(_temp);
+    useStartupNotification(_temp);
 }
 async function _temp() {
-  if (isInBundledMode() || isEnvTruthy(process.env.DISABLE_INSTALLATION_CHECKS)) {
-    return null;
-  }
-  const installationType = await getCurrentInstallationType();
-  if (installationType === "development") {
-    return null;
-  }
-  return {
-    timeoutMs: 15000,
-    key: "npm-deprecation-warning",
-    text: NPM_DEPRECATION_MESSAGE,
-    color: "warning",
-    priority: "high"
-  };
+    if (isInBundledMode() || isEnvTruthy(process.env.DISABLE_INSTALLATION_CHECKS)) {
+        return null;
+    }
+    const installationType = await getCurrentInstallationType();
+    if (installationType === "development") {
+        return null;
+    }
+    return {
+        timeoutMs: 15000,
+        key: "npm-deprecation-warning",
+        text: NPM_DEPRECATION_MESSAGE,
+        color: "warning",
+        priority: "high"
+    };
 }

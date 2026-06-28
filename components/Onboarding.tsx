@@ -21,49 +21,47 @@ import { ThemePicker } from './ThemePicker.js';
 import { OrderedList } from './ui/OrderedList.js';
 type StepId = 'preflight' | 'theme' | 'oauth' | 'api-key' | 'security' | 'terminal-setup';
 interface OnboardingStep {
-  id: StepId;
-  component: React.ReactNode;
+    id: StepId;
+    component: React.ReactNode;
 }
 type Props = {
-  onDone(): void;
+    onDone(): void;
 };
-export function Onboarding({
-  onDone
-}: Props): React.ReactNode {
-  const [currentStepIndex, setCurrentStepIndex] = useState(0);
-  const [skipOAuth, setSkipOAuth] = useState(false);
-  const [oauthEnabled] = useState(() => isOpenAICompatibleAuthEnabled());
-  const [theme, setTheme] = useTheme();
-  useEffect(() => {
-    logEvent('open_code_cli_began_setup', {
-      oauthEnabled
-    });
-  }, [oauthEnabled]);
-  function goToNextStep() {
-    if (currentStepIndex < steps.length - 1) {
-      const nextIndex = currentStepIndex + 1;
-      setCurrentStepIndex(nextIndex);
-      logEvent('open_code_cli_onboarding_step', {
-        oauthEnabled,
-        stepId: steps[nextIndex]?.id as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS
-      });
-    } else {
-      onDone();
+export function Onboarding({ onDone }: Props): React.ReactNode {
+    const [currentStepIndex, setCurrentStepIndex] = useState(0);
+    const [skipOAuth, setSkipOAuth] = useState(false);
+    const [oauthEnabled] = useState(() => isOpenAICompatibleAuthEnabled());
+    const [theme, setTheme] = useTheme();
+    useEffect(() => {
+        logEvent('open_code_cli_began_setup', {
+            oauthEnabled
+        });
+    }, [oauthEnabled]);
+    function goToNextStep() {
+        if (currentStepIndex < steps.length - 1) {
+            const nextIndex = currentStepIndex + 1;
+            setCurrentStepIndex(nextIndex);
+            logEvent('open_code_cli_onboarding_step', {
+                oauthEnabled,
+                stepId: steps[nextIndex]?.id as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS
+            });
+        }
+        else {
+            onDone();
+        }
     }
-  }
-  function handleThemeSelection(newTheme: ThemeSetting) {
-    setTheme(newTheme);
-    goToNextStep();
-  }
-  const exitState = useExitOnCtrlCDWithKeybindings();
-  const themeStep = <Box marginX={1}>
-      <ThemePicker onThemeSelect={handleThemeSelection} showIntroText={true} helpText="To change this later, run /theme" hideEscToCancel={true} skipExitHandling={true} 
-    />
+    function handleThemeSelection(newTheme: ThemeSetting) {
+        setTheme(newTheme);
+        goToNextStep();
+    }
+    const exitState = useExitOnCtrlCDWithKeybindings();
+    const themeStep = <Box marginX={1}>
+      <ThemePicker onThemeSelect={handleThemeSelection} showIntroText={true} helpText="To change this later, run /theme" hideEscToCancel={true} skipExitHandling={true}/>
     </Box>;
-  const securityStep = <Box flexDirection="column" gap={1} paddingLeft={1}>
+    const securityStep = <Box flexDirection="column" gap={1} paddingLeft={1}>
       <Text bold>Security notes:</Text>
       <Box flexDirection="column" width={70}>
-        {}
+        
         <OrderedList>
           <OrderedList.Item>
             <Text>Open Code CLI can make mistakes</Text>
@@ -81,62 +79,62 @@ export function Onboarding({
             <Text dimColor wrap="wrap">
               For more details see:
               <Newline />
-              <Link url="https://open-code-cli.dev/docs/security" />
+              <Link url="https://open-code-cli.dev/docs/security"/>
             </Text>
           </OrderedList.Item>
         </OrderedList>
       </Box>
       <PressEnterToContinue />
     </Box>;
-  const preflightStep = <PreflightStep onSuccess={goToNextStep} />;
-  const apiKeyNeedingApproval = useMemo(() => {
-    if (!process.env.OPEN_CODE_CLI_API_KEY || isRunningOnHomespace()) {
-      return '';
+    const preflightStep = <PreflightStep onSuccess={goToNextStep}/>;
+    const apiKeyNeedingApproval = useMemo(() => {
+        if (!process.env.OPEN_CODE_CLI_API_KEY || isRunningOnHomespace()) {
+            return '';
+        }
+        const customApiKeyTruncated = normalizeApiKeyForConfig(process.env.OPEN_CODE_CLI_API_KEY);
+        if (getCustomApiKeyStatus(customApiKeyTruncated) === 'new') {
+            return customApiKeyTruncated;
+        }
+    }, []);
+    function handleApiKeyDone(approved: boolean) {
+        if (approved) {
+            setSkipOAuth(true);
+        }
+        goToNextStep();
     }
-    const customApiKeyTruncated = normalizeApiKeyForConfig(process.env.OPEN_CODE_CLI_API_KEY);
-    if (getCustomApiKeyStatus(customApiKeyTruncated) === 'new') {
-      return customApiKeyTruncated;
+    const steps: OnboardingStep[] = [];
+    if (oauthEnabled) {
+        steps.push({
+            id: 'preflight',
+            component: preflightStep
+        });
     }
-  }, []);
-  function handleApiKeyDone(approved: boolean) {
-    if (approved) {
-      setSkipOAuth(true);
-    }
-    goToNextStep();
-  }
-  const steps: OnboardingStep[] = [];
-  if (oauthEnabled) {
     steps.push({
-      id: 'preflight',
-      component: preflightStep
+        id: 'theme',
+        component: themeStep
     });
-  }
-  steps.push({
-    id: 'theme',
-    component: themeStep
-  });
-  if (apiKeyNeedingApproval) {
-    steps.push({
-      id: 'api-key',
-      component: <ApproveApiKey customApiKeyTruncated={apiKeyNeedingApproval} onDone={handleApiKeyDone} />
-    });
-  }
-  if (oauthEnabled) {
-    steps.push({
-      id: 'oauth',
-      component: <SkippableStep skip={skipOAuth} onSkip={goToNextStep}>
-          <ConsoleOAuthFlow onDone={goToNextStep} />
+    if (apiKeyNeedingApproval) {
+        steps.push({
+            id: 'api-key',
+            component: <ApproveApiKey customApiKeyTruncated={apiKeyNeedingApproval} onDone={handleApiKeyDone}/>
+        });
+    }
+    if (oauthEnabled) {
+        steps.push({
+            id: 'oauth',
+            component: <SkippableStep skip={skipOAuth} onSkip={goToNextStep}>
+          <ConsoleOAuthFlow onDone={goToNextStep}/>
         </SkippableStep>
-    });
-  }
-  steps.push({
-    id: 'security',
-    component: securityStep
-  });
-  if (shouldOfferTerminalSetup()) {
+        });
+    }
     steps.push({
-      id: 'terminal-setup',
-      component: <Box flexDirection="column" gap={1} paddingLeft={1}>
+        id: 'security',
+        component: securityStep
+    });
+    if (shouldOfferTerminalSetup()) {
+        steps.push({
+            id: 'terminal-setup',
+            component: <Box flexDirection="column" gap={1} paddingLeft={1}>
           <Text bold>Use Open Code CLI&apos;s terminal setup?</Text>
           <Box flexDirection="column" width={70} gap={1}>
             <Text>
@@ -146,49 +144,51 @@ export function Onboarding({
               {env.terminal === 'Apple_Terminal' ? 'Option+Enter for newlines and visual bell' : 'Shift+Enter for newlines'}
             </Text>
             <Select options={[{
-            label: 'Yes, use recommended settings',
-            value: 'install'
-          }, {
-            label: 'No, maybe later with /terminal-setup',
-            value: 'no'
-          }]} onChange={value => {
-            if (value === 'install') {
-              void setupTerminal(theme).catch(() => {}).finally(goToNextStep);
-            } else {
-              goToNextStep();
-            }
-          }} onCancel={() => goToNextStep()} />
+                        label: 'Yes, use recommended settings',
+                        value: 'install'
+                    }, {
+                        label: 'No, maybe later with /terminal-setup',
+                        value: 'no'
+                    }]} onChange={value => {
+                    if (value === 'install') {
+                        void setupTerminal(theme).catch(() => { }).finally(goToNextStep);
+                    }
+                    else {
+                        goToNextStep();
+                    }
+                }} onCancel={() => goToNextStep()}/>
             <Text dimColor>
               {exitState.pending ? <>Press {exitState.keyName} again to exit</> : <>Enter to confirm · Esc to skip</>}
             </Text>
           </Box>
         </Box>
-    });
-  }
-  const currentStep = steps[currentStepIndex];
-  const handleSecurityContinue = useCallback(() => {
-    if (currentStepIndex === steps.length - 1) {
-      onDone();
-    } else {
-      goToNextStep();
+        });
     }
-  }, [currentStepIndex, steps.length, oauthEnabled, onDone]);
-  const handleTerminalSetupSkip = useCallback(() => {
-    goToNextStep();
-  }, [currentStepIndex, steps.length, oauthEnabled, onDone]);
-  useKeybindings({
-    'confirm:yes': handleSecurityContinue
-  }, {
-    context: 'Confirmation',
-    isActive: currentStep?.id === 'security'
-  });
-  useKeybindings({
-    'confirm:no': handleTerminalSetupSkip
-  }, {
-    context: 'Confirmation',
-    isActive: currentStep?.id === 'terminal-setup'
-  });
-  return <Box flexDirection="column">
+    const currentStep = steps[currentStepIndex];
+    const handleSecurityContinue = useCallback(() => {
+        if (currentStepIndex === steps.length - 1) {
+            onDone();
+        }
+        else {
+            goToNextStep();
+        }
+    }, [currentStepIndex, steps.length, oauthEnabled, onDone]);
+    const handleTerminalSetupSkip = useCallback(() => {
+        goToNextStep();
+    }, [currentStepIndex, steps.length, oauthEnabled, onDone]);
+    useKeybindings({
+        'confirm:yes': handleSecurityContinue
+    }, {
+        context: 'Confirmation',
+        isActive: currentStep?.id === 'security'
+    });
+    useKeybindings({
+        'confirm:no': handleTerminalSetupSkip
+    }, {
+        context: 'Confirmation',
+        isActive: currentStep?.id === 'terminal-setup'
+    });
+    return <Box flexDirection="column">
       <WelcomeV2 />
       <Box flexDirection="column" marginTop={1}>
         {currentStep?.component}
@@ -199,32 +199,29 @@ export function Onboarding({
     </Box>;
 }
 export function SkippableStep(t0) {
-  const $ = _c(4);
-  const {
-    skip,
-    onSkip,
-    children
-  } = t0;
-  let t1;
-  let t2;
-  if ($[0] !== onSkip || $[1] !== skip) {
-    t1 = () => {
-      if (skip) {
-        onSkip();
-      }
-    };
-    t2 = [skip, onSkip];
-    $[0] = onSkip;
-    $[1] = skip;
-    $[2] = t1;
-    $[3] = t2;
-  } else {
-    t1 = $[2];
-    t2 = $[3];
-  }
-  useEffect(t1, t2);
-  if (skip) {
-    return null;
-  }
-  return children;
+    const $ = _c(4);
+    const { skip, onSkip, children } = t0;
+    let t1;
+    let t2;
+    if ($[0] !== onSkip || $[1] !== skip) {
+        t1 = () => {
+            if (skip) {
+                onSkip();
+            }
+        };
+        t2 = [skip, onSkip];
+        $[0] = onSkip;
+        $[1] = skip;
+        $[2] = t1;
+        $[3] = t2;
+    }
+    else {
+        t1 = $[2];
+        t2 = $[3];
+    }
+    useEffect(t1, t2);
+    if (skip) {
+        return null;
+    }
+    return children;
 }

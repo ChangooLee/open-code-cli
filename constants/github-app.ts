@@ -1,8 +1,5 @@
-export const PR_TITLE = 'Add Open Code CLI GitHub Workflow'
-
-export const GITHUB_ACTION_SETUP_DOCS_URL =
-  'https://github.com/open-code-cli/open-code-cli-action/blob/main/docs/setup.md'
-
+export const PR_TITLE = 'Add Open Code CLI GitHub Workflow';
+export const GITHUB_ACTION_SETUP_DOCS_URL = 'https://github.com/open-code-cli/open-code-cli-action/blob/main/docs/setup.md';
 export const WORKFLOW_CONTENT = `name: Open Code CLI
 
 on:
@@ -53,8 +50,7 @@ jobs:
           # or https://open-code-cli.dev/docs/cli-reference for available options
           # open_code_cli_args: '--allowed-tools Bash(gh pr:*)'
 
-`
-
+`;
 export const PR_BODY = `## 🤖 Installing Open Code CLI GitHub App
 
 This PR adds a GitHub Actions workflow that enables Open Code CLI integration in our repository.
@@ -95,8 +91,7 @@ allowed_tools: Bash(npm install),Bash(npm run build),Bash(npm run lint),Bash(npm
 
 There's more information in the [Open Code CLI action repo](https://github.com/open-code-cli/open-code-cli-action).
 
-After merging this PR, let's try mentioning @open-code-cli (legacy GitHub App trigger) in a comment on any PR to get started!`
-
+After merging this PR, let's try mentioning @open-code-cli (legacy GitHub App trigger) in a comment on any PR to get started!`;
 export const CODE_REVIEW_PLUGIN_WORKFLOW_CONTENT = `name: Open Code CLI Review
 
 on:
@@ -141,4 +136,4 @@ jobs:
           # See https://github.com/open-code-cli/open-code-cli-action/blob/main/docs/usage.md
           # or https://open-code-cli.dev/docs/cli-reference for available options
 
-`
+`;

@@ -1,7 +1,7 @@
-import type { ContentBlockParam } from 'src/services/api/openaiCompatible.js'
-import type { Command } from '../commands.js'
-import { isUltrareviewEnabled } from './review/ultrareviewEnabled.js'
-const CCR_TERMS_URL = 'https://open-code-cli.dev/docs/open-code-cli-on-the-web'
+import type { ContentBlockParam } from 'src/services/api/openaiCompatible.js';
+import type { Command } from '../commands.js';
+import { isUltrareviewEnabled } from './review/ultrareviewEnabled.js';
+const CCR_TERMS_URL = 'https://open-code-cli.dev/docs/open-code-cli-on-the-web';
 const LOCAL_REVIEW_PROMPT = (args: string) => `
       You are an expert code reviewer. Follow these steps:
       1. If no PR number is provided in the args, run \`gh pr list\` to show open PRs
@@ -20,24 +20,24 @@ const LOCAL_REVIEW_PROMPT = (args: string) => `
       - Security considerations
       Format your review with clear sections and bullet points.
       PR number: ${args}
-    `
+    `;
 const review: Command = {
-  type: 'prompt',
-  name: 'review',
-  description: 'Review a pull request',
-  progressMessage: 'reviewing pull request',
-  contentLength: 0,
-  source: 'builtin',
-  async getPromptForCommand(args): Promise<ContentBlockParam[]> {
-    return [{ type: 'text', text: LOCAL_REVIEW_PROMPT(args) }]
-  },
-}
+    type: 'prompt',
+    name: 'review',
+    description: 'Review a pull request',
+    progressMessage: 'reviewing pull request',
+    contentLength: 0,
+    source: 'builtin',
+    async getPromptForCommand(args): Promise<ContentBlockParam[]> {
+        return [{ type: 'text', text: LOCAL_REVIEW_PROMPT(args) }];
+    },
+};
 const ultrareview: Command = {
-  type: 'local-jsx',
-  name: 'ultrareview',
-  description: `~10–20 min · Finds and verifies bugs in your branch. Runs in Open Code CLI on the web. See ${CCR_TERMS_URL}`,
-  isEnabled: () => isUltrareviewEnabled(),
-  load: () => import('./review/ultrareviewCommand.js'),
-}
-export default review
-export { ultrareview }
+    type: 'local-jsx',
+    name: 'ultrareview',
+    description: `~10–20 min · Finds and verifies bugs in your branch. Runs in Open Code CLI on the web. See ${CCR_TERMS_URL}`,
+    isEnabled: () => isUltrareviewEnabled(),
+    load: () => import('./review/ultrareviewCommand.js'),
+};
+export default review;
+export { ultrareview };

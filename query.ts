@@ -8,6 +8,8 @@ import {
   evaluateVerificationGate,
   buildVerificationDirective,
   extractBackgroundAgentSignals,
+  awaitInFlightBackgroundChildren,
+  BACKGROUND_JOIN_TIMEOUT_MS,
 } from './query/verificationGate.js'
 import { detectNoProgress } from './query/loopDetection.js'
 import { FallbackTriggeredError } from './services/api/withRetry.js'
@@ -1022,6 +1024,13 @@ async function* queryLoop(
             queryDepth: queryTracking.depth,
           })
         }
+      }
+      if (feature('VERIFY_IMPLEMENTATION_BEFORE_COMPLETION')) {
+        await awaitInFlightBackgroundChildren(
+          () => toolUseContext.getAppState().tasks,
+          () => toolUseContext.abortController?.signal.aborted ?? false,
+          BACKGROUND_JOIN_TIMEOUT_MS,
+        )
       }
       const verificationGate = evaluateVerificationGate(
         [...messagesForQuery, ...assistantMessages],

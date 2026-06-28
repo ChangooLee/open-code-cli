@@ -3,6 +3,38 @@ import {
   AGENT_TOOL_NAME,
   VERIFICATION_AGENT_TYPE,
 } from '../tools/AgentTool/constants.js'
+import { sleep } from '../utils/sleep.js'
+
+export const BACKGROUND_JOIN_TIMEOUT_MS = 120_000
+
+// Before the parent reports completion, reap in-flight background subagents so
+// their (possibly unverified) work is terminal and visible to the gate — a
+// real join barrier, not "scan whatever happens to be terminal". Bounded by a
+// timeout and the abort signal so it can never hang the parent forever.
+export async function awaitInFlightBackgroundChildren(
+  getTasks: () => Record<string, any> | undefined,
+  isAborted: () => boolean,
+  timeoutMs: number,
+  sleepMs = 100,
+): Promise<void> {
+  const start = Date.now()
+  while (Date.now() - start < timeoutMs) {
+    if (isAborted()) {
+      return
+    }
+    const tasks = getTasks() ?? {}
+    const inflight = Object.values(tasks).some(
+      (t: any) =>
+        t?.type === 'local_agent' &&
+        t?.isBackgrounded &&
+        (t?.status === 'running' || t?.status === 'pending'),
+    )
+    if (!inflight) {
+      return
+    }
+    await sleep(sleepMs)
+  }
+}
 
 const EDIT_TOOL_NAMES = new Set([
   'Edit',

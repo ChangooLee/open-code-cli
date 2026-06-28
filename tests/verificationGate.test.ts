@@ -4,6 +4,7 @@ import {
   evaluateVerificationGate,
   buildVerificationDirective,
   extractBackgroundAgentSignals,
+  awaitInFlightBackgroundChildren,
 } from '../query/verificationGate.js'
 
 const edits = (n: number) => ({
@@ -187,4 +188,44 @@ test('extractBackgroundAgentSignals ignores tasks terminal before sinceMs', () =
   })
   // A query started at 500 (before the task finished) does see it.
   assert.equal(extractBackgroundAgentSignals(tasks, 500).failed, true)
+})
+
+// --- await-join barrier (reap in-flight background children before the gate) ---
+
+test('await-join returns immediately when no background child is in flight', async () => {
+  const tasks = { a: { type: 'local_agent', isBackgrounded: true, status: 'completed' } }
+  const t0 = Date.now()
+  await awaitInFlightBackgroundChildren(() => tasks, () => false, 1000, 5)
+  assert.ok(Date.now() - t0 < 200)
+})
+
+test('await-join resolves once an in-flight child becomes terminal', async () => {
+  let polls = 0
+  const getTasks = () => {
+    polls++
+    return {
+      a: {
+        type: 'local_agent',
+        isBackgrounded: true,
+        status: polls > 3 ? 'completed' : 'running',
+      },
+    }
+  }
+  await awaitInFlightBackgroundChildren(getTasks, () => false, 2000, 1)
+  assert.ok(polls > 3)
+})
+
+test('await-join times out if a child never finishes (never hangs)', async () => {
+  const tasks = { a: { type: 'local_agent', isBackgrounded: true, status: 'running' } }
+  const t0 = Date.now()
+  await awaitInFlightBackgroundChildren(() => tasks, () => false, 120, 10)
+  const elapsed = Date.now() - t0
+  assert.ok(elapsed >= 120 && elapsed < 1000)
+})
+
+test('await-join returns immediately when aborted', async () => {
+  const tasks = { a: { type: 'local_agent', isBackgrounded: true, status: 'running' } }
+  const t0 = Date.now()
+  await awaitInFlightBackgroundChildren(() => tasks, () => true, 5000, 10)
+  assert.ok(Date.now() - t0 < 200)
 })

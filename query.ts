@@ -112,7 +112,11 @@ import {
   getTurnOutputTokens,
   incrementBudgetContinuationCount,
 } from './bootstrap/state.js'
-import { createBudgetTracker, checkTokenBudget } from './query/tokenBudget.js'
+import {
+  createBudgetTracker,
+  checkTokenBudget,
+  resolveSubagentBudget,
+} from './query/tokenBudget.js'
 import { count } from './utils/array.js'
 const snipModule = feature('HISTORY_SNIP')
   ? (require('./services/compact/snipCompact.js') as typeof import('./services/compact/snipCompact.js'))
@@ -985,6 +989,11 @@ async function* queryLoop(
           toolUseContext.agentId,
           getCurrentTurnTokenBudget(),
           getTurnOutputTokens(),
+          feature('SUBAGENT_TOKEN_BUDGET')
+            ? resolveSubagentBudget(
+                process.env.OPEN_CODE_CLI_SUBAGENT_TOKEN_BUDGET,
+              )
+            : undefined,
         )
         if (decision.action === 'continue') {
           incrementBudgetContinuationCount()

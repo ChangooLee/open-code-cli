@@ -42,16 +42,22 @@ type StopDecision = {
 
 export type TokenBudgetDecision = ContinueDecision | StopDecision
 
-export function checkTokenBudget(
+export function resolveSubagentBudget(
+  envValue: string | undefined,
+): number | null {
+  if (envValue === undefined) return null
+  const trimmed = envValue.trim()
+  if (trimmed === '') return null
+  const parsed = Number(trimmed)
+  if (!Number.isFinite(parsed) || parsed <= 0) return null
+  return Math.floor(parsed)
+}
+
+function evaluateBudget(
   tracker: BudgetTracker,
-  agentId: string | undefined,
-  budget: number | null,
+  budget: number,
   globalTurnTokens: number,
 ): TokenBudgetDecision {
-  if (agentId || budget === null || budget <= 0) {
-    return { action: 'stop', completionEvent: null }
-  }
-
   const turnTokens = globalTurnTokens
   const pct = Math.round((turnTokens / budget) * 100)
   const deltaSinceLastCheck = globalTurnTokens - tracker.lastGlobalTurnTokens
@@ -90,4 +96,25 @@ export function checkTokenBudget(
   }
 
   return { action: 'stop', completionEvent: null }
+}
+
+export function checkTokenBudget(
+  tracker: BudgetTracker,
+  agentId: string | undefined,
+  budget: number | null,
+  globalTurnTokens: number,
+  subagentBudget?: number | null,
+): TokenBudgetDecision {
+  if (agentId) {
+    if (subagentBudget !== undefined && subagentBudget !== null && subagentBudget > 0) {
+      return evaluateBudget(tracker, subagentBudget, globalTurnTokens)
+    }
+    return { action: 'stop', completionEvent: null }
+  }
+
+  if (budget === null || budget <= 0) {
+    return { action: 'stop', completionEvent: null }
+  }
+
+  return evaluateBudget(tracker, budget, globalTurnTokens)
 }

@@ -1,23 +1,15 @@
-// Shorthand (+500k) anchored to start/end to avoid false positives in natural language.
-// Verbose (use/spend 2M tokens) matches anywhere.
 const SHORTHAND_START_RE = /^\s*\+(\d+(?:\.\d+)?)\s*(k|m|b)\b/i
-// Lookbehind (?<=\s) is avoided — it defeats YARR JIT in JSC, and the
-// interpreter scans O(n) even with the $ anchor. Capture the whitespace
-// instead; callers offset match.index by 1 where position matters.
 const SHORTHAND_END_RE = /\s\+(\d+(?:\.\d+)?)\s*(k|m|b)\s*[.!?]?\s*$/i
 const VERBOSE_RE = /\b(?:use|spend)\s+(\d+(?:\.\d+)?)\s*(k|m|b)\s*tokens?\b/i
 const VERBOSE_RE_G = new RegExp(VERBOSE_RE.source, 'gi')
-
 const MULTIPLIERS: Record<string, number> = {
   k: 1_000,
   m: 1_000_000,
   b: 1_000_000_000,
 }
-
 function parseBudgetMatch(value: string, suffix: string): number {
   return parseFloat(value) * MULTIPLIERS[suffix.toLowerCase()]!
 }
-
 export function parseTokenBudget(text: string): number | null {
   const startMatch = text.match(SHORTHAND_START_RE)
   if (startMatch) return parseBudgetMatch(startMatch[1]!, startMatch[2]!)
@@ -27,7 +19,6 @@ export function parseTokenBudget(text: string): number | null {
   if (verboseMatch) return parseBudgetMatch(verboseMatch[1]!, verboseMatch[2]!)
   return null
 }
-
 export function findTokenBudgetPositions(
   text: string,
 ): Array<{ start: number; end: number }> {
@@ -45,8 +36,7 @@ export function findTokenBudgetPositions(
   }
   const endMatch = text.match(SHORTHAND_END_RE)
   if (endMatch) {
-    // Avoid double-counting when input is just "+500k"
-    const endStart = endMatch.index! + 1 // +1: regex includes leading \s
+    const endStart = endMatch.index! + 1 
     const alreadyCovered = positions.some(
       p => endStart >= p.start && endStart < p.end,
     )
@@ -62,7 +52,6 @@ export function findTokenBudgetPositions(
   }
   return positions
 }
-
 export function getBudgetContinuationMessage(
   pct: number,
   turnTokens: number,

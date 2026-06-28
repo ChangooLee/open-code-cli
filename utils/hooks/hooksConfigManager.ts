@@ -7,22 +7,15 @@ import {
   type IndividualHookConfig,
   sortMatchersByPriority,
 } from './hooksSettings.js'
-
 export type MatcherMetadata = {
   fieldToMatch: string
   values: string[]
 }
-
 export type HookEventMetadata = {
   summary: string
   description: string
   matcherMetadata?: MatcherMetadata
 }
-
-// Hook event metadata configuration.
-// Resolver uses sorted-joined string key so that callers passing a fresh
-// toolNames array each render (e.g. HooksConfigMenu) hit the cache instead
-// of leaking a new entry per call.
 export const getHookEventMetadata = memoize(
   function (toolNames: string[]): Record<HookEvent, HookEventMetadata> {
     return {
@@ -265,8 +258,6 @@ export const getHookEventMetadata = memoize(
   },
   toolNames => toolNames.slice().sort().join(','),
 )
-
-// Group hooks by event and matcher
 export function groupHooksByEventAndMatcher(
   appState: AppState,
   toolNames: string[],
@@ -300,14 +291,10 @@ export function groupHooksByEventAndMatcher(
     CwdChanged: {},
     FileChanged: {},
   }
-
   const metadata = getHookEventMetadata(toolNames)
-
-  // Include hooks from settings files
   getAllHooks(appState).forEach(hook => {
     const eventGroup = grouped[hook.event]
     if (eventGroup) {
-      // For events without matchers, use empty string as key
       const matcherKey =
         metadata[hook.event].matcherMetadata !== undefined
           ? hook.matcher || ''
@@ -318,20 +305,14 @@ export function groupHooksByEventAndMatcher(
       eventGroup[matcherKey].push(hook)
     }
   })
-
-  // Include registered hooks (e.g., plugin hooks)
   const registeredHooks = getRegisteredHooks()
   if (registeredHooks) {
     for (const [event, matchers] of Object.entries(registeredHooks)) {
       const hookEvent = event as HookEvent
       const eventGroup = grouped[hookEvent]
       if (!eventGroup) continue
-
       for (const matcher of matchers) {
         const matcherKey = matcher.matcher || ''
-
-        // Only PluginHookMatcher has pluginRoot; HookCallbackMatcher (internal
-        // callbacks like attributionHooks, sessionFileAccessHooks) does not.
         if ('pluginRoot' in matcher) {
           eventGroup[matcherKey] ??= []
           for (const hook of matcher.hooks) {
@@ -360,11 +341,8 @@ export function groupHooksByEventAndMatcher(
       }
     }
   }
-
   return grouped
 }
-
-// Get sorted matchers for a specific event
 export function getSortedMatchersForEvent(
   hooksByEventAndMatcher: Record<
     HookEvent,
@@ -375,8 +353,6 @@ export function getSortedMatchersForEvent(
   const matchers = Object.keys(hooksByEventAndMatcher[event] || {})
   return sortMatchersByPriority(matchers, hooksByEventAndMatcher, event)
 }
-
-// Get hooks for a specific event and matcher
 export function getHooksForMatcher(
   hooksByEventAndMatcher: Record<
     HookEvent,
@@ -385,13 +361,9 @@ export function getHooksForMatcher(
   event: HookEvent,
   matcher: string | null,
 ): IndividualHookConfig[] {
-  // For events without matchers, hooks are stored with empty string as key
-  // because the record keys must be strings.
   const matcherKey = matcher ?? ''
   return hooksByEventAndMatcher[event]?.[matcherKey] ?? []
 }
-
-// Get metadata for a specific event's matcher
 export function getMatcherMetadata(
   event: HookEvent,
   toolNames: string[],

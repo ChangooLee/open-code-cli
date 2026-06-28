@@ -64,8 +64,6 @@ import type { SystemPrompt } from './systemPromptType.js'
 import { getToolSchemaCache } from './toolSchemaCache.js'
 import { windowsPathToPosixPath } from './windowsPaths.js'
 import { zodToJsonSchema } from './zodToJsonSchema.js'
-
-// Extended BetaTool type with strict mode and defer_loading support
 type BetaToolWithExtras = BetaTool & {
   strict?: boolean
   defer_loading?: boolean
@@ -76,23 +74,15 @@ type BetaToolWithExtras = BetaTool & {
   }
   eager_input_streaming?: boolean
 }
-
 export type CacheScope = 'global' | 'org'
 export type SystemPromptBlock = {
   text: string
   cacheScope: CacheScope | null
 }
-
-// Fields to filter from tool schemas when swarms are not enabled
 const SWARM_FIELDS_BY_TOOL: Record<string, string[]> = {
   [EXIT_PLAN_MODE_V2_TOOL_NAME]: ['launchSwarm', 'teammateCount'],
   [AGENT_TOOL_NAME]: ['name', 'team_name', 'mode'],
 }
-
-/**
- * Filter swarm-related fields from a tool's input schema.
- * Called at runtime when isAgentSwarmsEnabled() returns false.
- */
 function filterSwarmFieldsFromSchema(
   toolName: string,
   schema: JsonObject,
@@ -101,8 +91,6 @@ function filterSwarmFieldsFromSchema(
   if (!fieldsToRemove || fieldsToRemove.length === 0) {
     return schema
   }
-
-  // Clone the schema to avoid mutating the original
   const filtered = { ...schema }
   const props = filtered.properties
   if (props && typeof props === 'object') {
@@ -112,10 +100,8 @@ function filterSwarmFieldsFromSchema(
     }
     filtered.properties = filteredProps
   }
-
   return filtered
 }
-
 export async function toolToAPISchema(
   tool: Tool,
   options: {
@@ -124,7 +110,6 @@ export async function toolToAPISchema(
     agents: AgentDefinition[]
     allowedAgentTypes?: string[]
     model?: string
-    /** When true, mark this tool with defer_loading for tool search */
     deferLoading?: boolean
     cacheControl?: {
       type: 'ephemeral'
@@ -133,17 +118,6 @@ export async function toolToAPISchema(
     }
   },
 ): Promise<BetaToolUnion> {
-  // Session-stable base schema: name, description, input_schema, strict,
-  // eager_input_streaming. These are computed once per session and cached to
-  // prevent mid-session GrowthBook flips (open_code_cli_tool_pear, open_code_cli_fgts) or
-  // tool.prompt() drift from churning the serialized tool array bytes.
-  // See toolSchemaCache.ts for rationale.
-  //
-  // Cache key includes inputJSONSchema when present. StructuredOutput instances
-  // share the name 'StructuredOutput' but carry different schemas per workflow
-  // call — name-only keying returned a stale schema (5.4% → 51% err rate, see
-  // PR#25424). MCP tools also set inputJSONSchema but each has a stable schema,
-  // so including it preserves their GB-flip cache stability.
   const cacheKey =
     'inputJSONSchema' in tool && tool.inputJSONSchema
       ? `${tool.name}:${jsonStringify(tool.inputJSONSchema)}`
@@ -153,19 +127,14 @@ export async function toolToAPISchema(
   if (!base) {
     const strictToolsEnabled =
       checkStatsigFeatureGate_CACHED_MAY_BE_STALE('open_code_cli_tool_pear')
-    // Use tool's JSON schema directly if provided, otherwise convert Zod schema
     let input_schema = (
       'inputJSONSchema' in tool && tool.inputJSONSchema
         ? tool.inputJSONSchema
         : zodToJsonSchema(tool.inputSchema)
     ) as JsonObject
-
-    // Filter out swarm-related fields when swarms are not enabled
-    // This ensures external non-EAP users don't see swarm features in the schema
     if (!isAgentSwarmsEnabled()) {
       input_schema = filterSwarmFieldsFromSchema(tool.name, input_schema)
     }
-
     base = {
       name: tool.name,
       description: await tool.prompt({
@@ -176,12 +145,6 @@ export async function toolToAPISchema(
       }),
       input_schema,
     }
-
-    // Only add strict if:
-    // 1. Feature flag is enabled
-    // 2. Tool has strict: true
-    // 3. Model is provided and supports it (not all models support it right now)
-    //    (if model is not provided, assume we can't use strict tools)
     if (
       strictToolsEnabled &&
       tool.strict === true &&
@@ -190,12 +153,6 @@ export async function toolToAPISchema(
     ) {
       base.strict = true
     }
-
-    // Enable fine-grained tool streaming via per-tool API field.
-    // Without FGTS, the API buffers entire tool input parameters before sending
-    // input_json_delta events, causing multi-minute hangs on large tool inputs.
-    // Gated to direct api.openai.com/v1: proxies (LiteLLM etc.) and OpenAICompatible/OpenAICompatible
-    // with Open Code CLI 4.5 reject this field with 400. See GH#32742, PR #21729.
     if (
       false &&
       isFirstPartyOpenAICompatibleBaseUrl() &&
@@ -204,14 +161,8 @@ export async function toolToAPISchema(
     ) {
       base.eager_input_streaming = true
     }
-
     cache.set(cacheKey, base)
   }
-
-  // Per-request overlay: defer_loading and cache_control vary by call
-  // (tool search defers different tools per turn; cache markers move).
-  // Explicit field copy avoids mutating the cached base and sidesteps
-  // BetaTool.cache_control's `| null` clashing with our narrower type.
   const schema: BetaToolWithExtras = {
     name: base.name,
     description: base.description,
@@ -219,27 +170,12 @@ export async function toolToAPISchema(
     ...(base.strict && { strict: true }),
     ...(base.eager_input_streaming && { eager_input_streaming: true }),
   }
-
-  // Add defer_loading if requested (for tool search feature)
   if (options.deferLoading) {
     schema.defer_loading = true
   }
-
   if (options.cacheControl) {
     schema.cache_control = options.cacheControl
   }
-
-  // OPEN_CODE_CLI_DISABLE_EXPERIMENTAL_BETAS is the kill switch for beta API
-  // shapes. Proxy gateways (OPEN_CODE_CLI_BASE_URL → LiteLLM → OpenAICompatible) reject
-  // fields like defer_loading with "Extra inputs are not permitted". The gates
-  // above each field are scattered and not all provider-aware, so this strips
-  // everything not in the base-tool allowlist at the one choke point all tool
-  // schemas pass through — including fields added in the future.
-  // cache_control is allowlisted: the base {type: 'ephemeral'} shape is
-  // standard prompt caching (OpenAICompatible/OpenAICompatible supported); the beta sub-fields
-  // (scope, ttl) are already gated upstream by shouldIncludeFirstPartyOnlyBetas
-  // which independently respects this kill switch.
-  // github.com/open-code-cli/open-code-cli/issues/20031
   if (isEnvTruthy(process.env.OPEN_CODE_CLI_DISABLE_EXPERIMENTAL_BETAS)) {
     const allowed = new Set([
       'name',
@@ -258,13 +194,8 @@ export async function toolToAPISchema(
       }
     }
   }
-
-  // Note: We cast to BetaTool but the extra fields are still present at runtime
-  // and will be serialized in the API request, even though they're not in the SDK's
-  // BetaTool type definition. This is intentional for beta features.
   return schema as BetaTool
 }
-
 let loggedStrip = false
 function logStripOnce(stripped: string[]): void {
   if (loggedStrip) return
@@ -273,11 +204,6 @@ function logStripOnce(stripped: string[]): void {
     `[betas] Stripped from tool schemas: [${stripped.join(', ')}] (OPEN_CODE_CLI_DISABLE_EXPERIMENTAL_BETAS=1)`,
   )
 }
-
-/**
- * Log stats about first block for analyzing prefix matching config
- * (see https://console.statsig.com/4aF3Ewatb6xPVpCwxb5nA3/dynamic_configs/open_code_cli_system_prompt_prefixes)
- */
 export function logAPIPrefix(systemPrompt: SystemPrompt): void {
   const [firstSyspromptBlock] = splitSysPromptPrefix(systemPrompt)
   const firstSystemPrompt = firstSyspromptBlock?.text
@@ -292,32 +218,6 @@ export function logAPIPrefix(systemPrompt: SystemPrompt): void {
       : '') as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
   })
 }
-
-/**
- * Split system prompt blocks by content type for API matching and cache control.
- * See https://console.statsig.com/4aF3Ewatb6xPVpCwxb5nA3/dynamic_configs/open_code_cli_system_prompt_prefixes
- *
- * Behavior depends on feature flags and options:
- *
- * 1. MCP tools present (skipGlobalCacheForSystemPrompt=true):
- *    Returns up to 3 blocks with org-level caching (no global cache on system prompt):
- *    - Attribution header (cacheScope=null)
- *    - System prompt prefix (cacheScope='org')
- *    - Everything else concatenated (cacheScope='org')
- *
- * 2. Global cache mode with boundary marker (1P only, boundary found):
- *    Returns up to 4 blocks:
- *    - Attribution header (cacheScope=null)
- *    - System prompt prefix (cacheScope=null)
- *    - Static content before boundary (cacheScope='global')
- *    - Dynamic content after boundary (cacheScope=null)
- *
- * 3. Default mode (3P providers, or boundary missing):
- *    Returns up to 3 blocks with org-level caching:
- *    - Attribution header (cacheScope=null)
- *    - System prompt prefix (cacheScope='org')
- *    - Everything else concatenated (cacheScope='org')
- */
 export function splitSysPromptPrefix(
   systemPrompt: SystemPrompt,
   options?: { skipGlobalCacheForSystemPrompt?: boolean },
@@ -327,15 +227,12 @@ export function splitSysPromptPrefix(
     logEvent('open_code_cli_sysprompt_using_tool_based_cache', {
       promptBlockCount: systemPrompt.length,
     })
-
-    // Filter out boundary marker, return blocks without global scope
     let attributionHeader: string | undefined
     let systemPromptPrefix: string | undefined
     const rest: string[] = []
-
     for (const prompt of systemPrompt) {
       if (!prompt) continue
-      if (prompt === SYSTEM_PROMPT_DYNAMIC_BOUNDARY) continue // Skip boundary
+      if (prompt === SYSTEM_PROMPT_DYNAMIC_BOUNDARY) continue 
       if (prompt.startsWith('x-openai-compatible-billing-header')) {
         attributionHeader = prompt
       } else if (CLI_SYSPROMPT_PREFIXES.has(prompt)) {
@@ -344,7 +241,6 @@ export function splitSysPromptPrefix(
         rest.push(prompt)
       }
     }
-
     const result: SystemPromptBlock[] = []
     if (attributionHeader) {
       result.push({ text: attributionHeader, cacheScope: null })
@@ -358,7 +254,6 @@ export function splitSysPromptPrefix(
     }
     return result
   }
-
   if (useGlobalCacheFeature) {
     const boundaryIndex = systemPrompt.findIndex(
       s => s === SYSTEM_PROMPT_DYNAMIC_BOUNDARY,
@@ -368,11 +263,9 @@ export function splitSysPromptPrefix(
       let systemPromptPrefix: string | undefined
       const staticBlocks: string[] = []
       const dynamicBlocks: string[] = []
-
       for (let i = 0; i < systemPrompt.length; i++) {
         const block = systemPrompt[i]
         if (!block || block === SYSTEM_PROMPT_DYNAMIC_BOUNDARY) continue
-
         if (block.startsWith('x-openai-compatible-billing-header')) {
           attributionHeader = block
         } else if (CLI_SYSPROMPT_PREFIXES.has(block)) {
@@ -383,7 +276,6 @@ export function splitSysPromptPrefix(
           dynamicBlocks.push(block)
         }
       }
-
       const result: SystemPromptBlock[] = []
       if (attributionHeader)
         result.push({ text: attributionHeader, cacheScope: null })
@@ -394,13 +286,11 @@ export function splitSysPromptPrefix(
         result.push({ text: staticJoined, cacheScope: 'global' })
       const dynamicJoined = dynamicBlocks.join('\n\n')
       if (dynamicJoined) result.push({ text: dynamicJoined, cacheScope: null })
-
       logEvent('open_code_cli_sysprompt_boundary_found', {
         blockCount: result.length,
         staticBlockLength: staticJoined.length,
         dynamicBlockLength: dynamicJoined.length,
       })
-
       return result
     } else {
       logEvent('open_code_cli_sysprompt_missing_boundary_marker', {
@@ -411,10 +301,8 @@ export function splitSysPromptPrefix(
   let attributionHeader: string | undefined
   let systemPromptPrefix: string | undefined
   const rest: string[] = []
-
   for (const block of systemPrompt) {
     if (!block) continue
-
     if (block.startsWith('x-openai-compatible-billing-header')) {
       attributionHeader = block
     } else if (CLI_SYSPROMPT_PREFIXES.has(block)) {
@@ -423,7 +311,6 @@ export function splitSysPromptPrefix(
       rest.push(block)
     }
   }
-
   const result: SystemPromptBlock[] = []
   if (attributionHeader)
     result.push({ text: attributionHeader, cacheScope: null })
@@ -433,7 +320,6 @@ export function splitSysPromptPrefix(
   if (restJoined) result.push({ text: restJoined, cacheScope: 'org' })
   return result
 }
-
 export function appendSystemContext(
   systemPrompt: SystemPrompt,
   context: { [k: string]: string },
@@ -445,7 +331,6 @@ export function appendSystemContext(
       .join('\n'),
   ].filter(Boolean)
 }
-
 export function prependUserContext(
   messages: Message[],
   context: { [k: string]: string },
@@ -453,11 +338,9 @@ export function prependUserContext(
   if (process.env.NODE_ENV === 'test') {
     return messages
   }
-
   if (Object.entries(context).length === 0) {
     return messages
   }
-
   return [
     createUserMessage({
       content: `<system-reminder>\nAs you answer the user's questions, you can use the following context:\n${Object.entries(
@@ -465,22 +348,16 @@ export function prependUserContext(
       )
         .map(([key, value]) => `# ${key}\n${value}`)
         .join('\n')}
-
       IMPORTANT: this context may or may not be relevant to your tasks. You should not respond to this context unless it is highly relevant to your task.\n</system-reminder>\n`,
       isMeta: true,
     }),
     ...messages,
   ]
 }
-
-/**
- * Log metrics about context and system prompt size
- */
 export async function logContextMetrics(
   mcpConfigs: Record<string, ScopedMcpServerConfig>,
   toolPermissionContext: ToolPermissionContext,
 ): Promise<void> {
-  // Early return if logging is disabled
   if (isAnalyticsDisabled()) {
     return
   }
@@ -491,14 +368,9 @@ export async function logContextMetrics(
       getUserContext(),
       getSystemContext(),
     ])
-  // Extract individual context sizes and calculate total
   const gitStatusSize = systemContext.gitStatus?.length ?? 0
   const openCodeMdSize = userContext.openCodeMd?.length ?? 0
-
-  // Calculate total context size
   const totalContextSize = gitStatusSize + openCodeMdSize
-
-  // Get file count using ripgrep (rounded to nearest power of 10 for privacy)
   const currentDir = getCwd()
   const ignorePatternsByRoot = getFileReadIgnorePatterns(toolPermissionContext)
   const normalizedIgnorePatterns = normalizePatternsToPath(
@@ -510,19 +382,14 @@ export async function logContextMetrics(
     AbortSignal.timeout(1000),
     normalizedIgnorePatterns,
   )
-
-  // Calculate tool metrics
   let mcpToolsCount = 0
   let mcpServersCount = 0
   let mcpToolsTokens = 0
   let nonMcpToolsCount = 0
   let nonMcpToolsTokens = 0
-
   const nonMcpTools = tools.filter(tool => !tool.isMcp)
   mcpToolsCount = mcpTools.length
   nonMcpToolsCount = nonMcpTools.length
-
-  // Extract unique server names from MCP tool names (format: mcp__servername__toolname)
   const serverNames = new Set<string>()
   for (const tool of mcpTools) {
     const parts = tool.name.split('__')
@@ -531,9 +398,6 @@ export async function logContextMetrics(
     }
   }
   mcpServersCount = serverNames.size
-
-  // Estimate tool tokens locally for analytics (avoids N API calls per session)
-  // Use inputJSONSchema (plain JSON Schema) when available, otherwise convert Zod schema
   for (const tool of mcpTools) {
     const schema =
       'inputJSONSchema' in tool && tool.inputJSONSchema
@@ -548,7 +412,6 @@ export async function logContextMetrics(
         : zodToJsonSchema(tool.inputSchema)
     nonMcpToolsTokens += roughTokenCountEstimation(jsonStringify(schema))
   }
-
   logEvent('open_code_cli_context_size', {
     git_status_size: gitStatusSize,
     openCodeCliMd_size: openCodeMdSize,
@@ -561,8 +424,6 @@ export async function logContextMetrics(
     non_mcp_tools_tokens: nonMcpToolsTokens,
   })
 }
-
-// TODO: Generalize this to all tools
 export function normalizeToolInput<T extends Tool>(
   tool: T,
   input: z.infer<T['inputSchema']>,
@@ -570,16 +431,12 @@ export function normalizeToolInput<T extends Tool>(
 ): z.infer<T['inputSchema']> {
   switch (tool.name) {
     case EXIT_PLAN_MODE_V2_TOOL_NAME: {
-      // Always inject plan content and file path for ExitPlanModeV2 so hooks/SDK get the plan.
-      // The V2 tool reads plan from file instead of input, but hooks/SDK
       const plan = getPlan(agentId)
       const planFilePath = getPlanFilePath(agentId)
-      // Persist file snapshot for CCR sessions so the plan survives pod recycling
       void persistFileSnapshotIfRemote()
       return plan !== null ? { ...input, plan, planFilePath } : input
     }
     case BashTool.name: {
-      // Validated upstream, won't throw
       const parsed = BashTool.inputSchema.parse(input)
       const { command, timeout, description } = parsed
       const cwd = getCwd()
@@ -590,23 +447,12 @@ export function normalizeToolInput<T extends Tool>(
           '',
         )
       }
-
-      // Replace \\; with \; (commonly needed for find -exec commands)
       normalizedCommand = normalizedCommand.replace(/\\\\;/g, '\\;')
-
-      // Logging for commands that are only echoing a string. This is to help us understand how often  Open Code CLI talks via bash
       if (/^echo\s+["']?[^|&;><]*["']?$/i.test(normalizedCommand.trim())) {
         logEvent('open_code_cli_bash_tool_simple_echo', {})
       }
-
-      // Check for run_in_background (may not exist in schema if OPEN_CODE_CLI_DISABLE_BACKGROUND_TASKS is set)
       const run_in_background =
         'run_in_background' in parsed ? parsed.run_in_background : undefined
-
-      // SAFETY: Cast is safe because input was validated by .parse() above.
-      // TypeScript can't narrow the generic T based on switch(tool.name), so it
-      // doesn't know the return type matches T['inputSchema']. This is a fundamental
-      // TS limitation with generics, not bypassable without major refactoring.
       return {
         command: normalizedCommand,
         description,
@@ -620,10 +466,7 @@ export function normalizeToolInput<T extends Tool>(
       } as z.infer<T['inputSchema']>
     }
     case FileEditTool.name: {
-      // Validated upstream, won't throw
       const parsedInput = FileEditTool.inputSchema.parse(input)
-
-      // This is a workaround for tokens open-code-cli can't see
       const { file_path, edits } = normalizeFileEditInput({
         file_path: parsedInput.file_path,
         edits: [
@@ -634,8 +477,6 @@ export function normalizeToolInput<T extends Tool>(
           },
         ],
       })
-
-      // SAFETY: See comment in BashTool case above
       return {
         replace_all: edits[0]!.replace_all,
         file_path,
@@ -644,13 +485,8 @@ export function normalizeToolInput<T extends Tool>(
       } as z.infer<T['inputSchema']>
     }
     case FileWriteTool.name: {
-      // Validated upstream, won't throw
       const parsedInput = FileWriteTool.inputSchema.parse(input)
-
-      // Markdown uses two trailing spaces as a hard line break — don't strip.
       const isMarkdown = /\.(md|mdx)$/i.test(parsedInput.file_path)
-
-      // SAFETY: See comment in BashTool case above
       return {
         file_path: parsedInput.file_path,
         content: isMarkdown
@@ -659,7 +495,6 @@ export function normalizeToolInput<T extends Tool>(
       } as z.infer<T['inputSchema']>
     }
     case TASK_OUTPUT_TOOL_NAME: {
-      // Normalize legacy parameter names from AgentOutputTool/BashOutputTool
       const legacyInput = input as Record<string, unknown>
       const taskId =
         legacyInput.task_id ?? legacyInput.agentId ?? legacyInput.bash_id
@@ -668,7 +503,6 @@ export function normalizeToolInput<T extends Tool>(
         (typeof legacyInput.wait_up_to === 'number'
           ? legacyInput.wait_up_to * 1000
           : undefined)
-      // SAFETY: See comment in BashTool case above
       return {
         task_id: taskId ?? '',
         block: legacyInput.block ?? true,
@@ -679,16 +513,12 @@ export function normalizeToolInput<T extends Tool>(
       return input
   }
 }
-
-// Strips fields that were added by normalizeToolInput before sending to API
-// (e.g., plan field from ExitPlanModeV2 which has an empty input schema)
 export function normalizeToolInputForAPI<T extends Tool>(
   tool: T,
   input: z.infer<T['inputSchema']>,
 ): z.infer<T['inputSchema']> {
   switch (tool.name) {
     case EXIT_PLAN_MODE_V2_TOOL_NAME: {
-      // Strip injected fields before sending to API (schema expects empty object)
       if (
         input &&
         typeof input === 'object' &&
@@ -700,11 +530,6 @@ export function normalizeToolInputForAPI<T extends Tool>(
       return input
     }
     case FileEditTool.name: {
-      // Strip synthetic old_string/new_string/replace_all from OLD sessions
-      // that were resumed from transcripts written before PR #20357, where
-      // normalizeToolInput used to synthesize these. Needed so old --resume'd
-      // transcripts don't send whole-file copies to the API. New sessions
-      // don't need this (synthesis moved to emission time).
       if (input && typeof input === 'object' && 'edits' in input) {
         const { old_string, new_string, replace_all, ...rest } =
           input as Record<string, unknown>

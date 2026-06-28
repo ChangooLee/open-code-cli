@@ -17,14 +17,11 @@ import {
   renderToolUseMessage,
   renderToolUseRejectedMessage,
 } from './UI.js'
-
 const inputSchema = lazySchema(() =>
   z.strictObject({
-    // No parameters needed
   }),
 )
 type InputSchema = ReturnType<typeof inputSchema>
-
 const outputSchema = lazySchema(() =>
   z.object({
     message: z.string().describe('Confirmation that plan mode was entered'),
@@ -32,7 +29,6 @@ const outputSchema = lazySchema(() =>
 )
 type OutputSchema = ReturnType<typeof outputSchema>
 export type Output = z.infer<OutputSchema>
-
 export const EnterPlanModeTool: Tool<InputSchema, Output> = buildTool({
   name: ENTER_PLAN_MODE_TOOL_NAME,
   searchHint: 'switch to plan mode to design an approach before coding',
@@ -54,9 +50,6 @@ export const EnterPlanModeTool: Tool<InputSchema, Output> = buildTool({
   },
   shouldDefer: true,
   isEnabled() {
-    // When --channels is active, ExitPlanMode is disabled (its approval
-    // dialog needs the terminal). Disable entry too so plan mode isn't a
-    // trap the model can enter but never leave.
     if (
       (feature('KAIROS') || feature('KAIROS_CHANNELS')) &&
       getAllowedChannels().length > 0
@@ -78,13 +71,8 @@ export const EnterPlanModeTool: Tool<InputSchema, Output> = buildTool({
     if (context.agentId) {
       throw new Error('EnterPlanMode tool cannot be used in agent contexts')
     }
-
     const appState = context.getAppState()
     handlePlanModeTransition(appState.toolPermissionContext.mode, 'plan')
-
-    // Update the permission mode to 'plan'. prepareContextForPlanMode runs
-    // the classifier activation side effects when the user's defaultMode is
-    // 'auto' — see permissionSetup.ts for the full lifecycle.
     context.setAppState(prev => ({
       ...prev,
       toolPermissionContext: applyPermissionUpdate(
@@ -92,7 +80,6 @@ export const EnterPlanModeTool: Tool<InputSchema, Output> = buildTool({
         { type: 'setMode', mode: 'plan', destination: 'session' },
       ),
     }))
-
     return {
       data: {
         message:
@@ -103,10 +90,8 @@ export const EnterPlanModeTool: Tool<InputSchema, Output> = buildTool({
   mapToolResultToToolResultBlockParam({ message }, toolUseID) {
     const instructions = isPlanModeInterviewPhaseEnabled()
       ? `${message}
-
 DO NOT write or edit any files except the plan file. Detailed workflow instructions will follow.`
       : `${message}
-
 In plan mode, you should:
 1. Thoroughly explore the codebase to understand existing patterns
 2. Identify similar features and architectural approaches
@@ -114,9 +99,7 @@ In plan mode, you should:
 4. Use AskUserQuestion if you need to clarify the approach
 5. Design a concrete implementation strategy
 6. When ready, use ExitPlanMode to present your plan for approval
-
 Remember: DO NOT write or edit any files yet. This is a read-only exploration and planning phase.`
-
     return {
       type: 'tool_result',
       content: instructions,

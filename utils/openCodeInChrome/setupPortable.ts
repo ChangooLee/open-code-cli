@@ -2,22 +2,15 @@ import { readdir } from 'fs/promises'
 import { homedir } from 'os'
 import { join } from 'path'
 import { isFsInaccessible } from '../errors.js'
-
 export const CHROME_EXTENSION_URL = 'https://Open Code CLI/chrome'
-
-// Production extension ID
 const PROD_EXTENSION_ID = 'fcoeoabgfenejglbffodgkkbkcdhcgfn'
-// Dev extension IDs (for internal use)
 const DEV_EXTENSION_ID = 'dihbgbndebgnbjfmelmegjepbnkhlgni'
 const ANT_EXTENSION_ID = 'dngcpimnedloihjnnfngkgjoidhnaolf'
-
 function getExtensionIds(): string[] {
   return process.env.USER_TYPE === 'ant'
     ? [PROD_EXTENSION_ID, DEV_EXTENSION_ID, ANT_EXTENSION_ID]
     : [PROD_EXTENSION_ID]
 }
-
-// Must match ChromiumBrowser from common.ts
 export type ChromiumBrowser =
   | 'chrome'
   | 'brave'
@@ -26,15 +19,11 @@ export type ChromiumBrowser =
   | 'edge'
   | 'vivaldi'
   | 'opera'
-
 export type BrowserPath = {
   browser: ChromiumBrowser
   path: string
 }
-
 type Logger = (message: string) => void
-
-// Browser detection order - must match BROWSER_DETECTION_ORDER from common.ts
 const BROWSER_DETECTION_ORDER: ChromiumBrowser[] = [
   'chrome',
   'brave',
@@ -44,14 +33,11 @@ const BROWSER_DETECTION_ORDER: ChromiumBrowser[] = [
   'vivaldi',
   'opera',
 ]
-
 type BrowserDataConfig = {
   macos: string[]
   linux: string[]
   windows: { path: string[]; useRoaming?: boolean }
 }
-
-// Must match CHROMIUM_BROWSERS dataPath from common.ts
 const CHROMIUM_BROWSERS: Record<ChromiumBrowser, BrowserDataConfig> = {
   chrome: {
     macos: ['Library', 'Application Support', 'Google', 'Chrome'],
@@ -89,19 +75,12 @@ const CHROMIUM_BROWSERS: Record<ChromiumBrowser, BrowserDataConfig> = {
     windows: { path: ['Opera Software', 'Opera Stable'], useRoaming: true },
   },
 }
-
-/**
- * Get all browser data paths to check for extension installation.
- * Portable version that uses process.platform directly.
- */
 export function getAllBrowserDataPathsPortable(): BrowserPath[] {
   const home = homedir()
   const paths: BrowserPath[] = []
-
   for (const browserId of BROWSER_DETECTION_ORDER) {
     const config = CHROMIUM_BROWSERS[browserId]
     let dataPath: string[] | undefined
-
     switch (process.platform) {
       case 'darwin':
         dataPath = config.macos
@@ -122,7 +101,6 @@ export function getAllBrowserDataPathsPortable(): BrowserPath[] {
         continue
       }
     }
-
     if (dataPath && dataPath.length > 0) {
       paths.push({
         browser: browserId,
@@ -130,20 +108,8 @@ export function getAllBrowserDataPathsPortable(): BrowserPath[] {
       })
     }
   }
-
   return paths
 }
-
-/**
- * Detects if the Open Code in Chrome extension is installed by checking the Extensions
- * directory across all supported Chromium-based browsers and their profiles.
- *
- * This is a portable version that can be used by both TUI and VS Code extension.
- *
- * @param browserPaths - Array of browser data paths to check (from getAllBrowserDataPaths)
- * @param log - Optional logging callback for debug messages
- * @returns Object with isInstalled boolean and the browser where the extension was found
- */
 export async function detectExtensionInstallationPortable(
   browserPaths: BrowserPath[],
   log?: Logger,
@@ -155,37 +121,28 @@ export async function detectExtensionInstallationPortable(
     log?.(`[Open Code in Chrome] No browser paths to check`)
     return { isInstalled: false, browser: null }
   }
-
   const extensionIds = getExtensionIds()
-
-  // Check each browser for the extension
   for (const { browser, path: browserBasePath } of browserPaths) {
     let browserProfileEntries = []
-
     try {
       browserProfileEntries = await readdir(browserBasePath, {
         withFileTypes: true,
       })
     } catch (e) {
-      // Browser not installed or path doesn't exist, continue to next browser
       if (isFsInaccessible(e)) continue
       throw e
     }
-
     const profileDirs = browserProfileEntries
       .filter(entry => entry.isDirectory())
       .filter(
         entry => entry.name === 'Default' || entry.name.startsWith('Profile '),
       )
       .map(entry => entry.name)
-
     if (profileDirs.length > 0) {
       log?.(
         `[Open Code in Chrome] Found ${browser} profiles: ${profileDirs.join(', ')}`,
       )
     }
-
-    // Check each profile for any of the extension IDs
     for (const profile of profileDirs) {
       for (const extensionId of extensionIds) {
         const extensionPath = join(
@@ -194,7 +151,6 @@ export async function detectExtensionInstallationPortable(
           'Extensions',
           extensionId,
         )
-
         try {
           await readdir(extensionPath)
           log?.(
@@ -202,19 +158,13 @@ export async function detectExtensionInstallationPortable(
           )
           return { isInstalled: true, browser }
         } catch {
-          // Extension not found in this profile, continue checking
         }
       }
     }
   }
-
   log?.(`[Open Code in Chrome] Extension not found in any browser`)
   return { isInstalled: false, browser: null }
 }
-
-/**
- * Simple wrapper that returns just the boolean result
- */
 export async function isChromeExtensionInstalledPortable(
   browserPaths: BrowserPath[],
   log?: Logger,
@@ -222,11 +172,6 @@ export async function isChromeExtensionInstalledPortable(
   const result = await detectExtensionInstallationPortable(browserPaths, log)
   return result.isInstalled
 }
-
-/**
- * Convenience function that gets browser paths automatically.
- * Use this when you don't need to provide custom browser paths.
- */
 export function isChromeExtensionInstalled(log?: Logger): Promise<boolean> {
   const browserPaths = getAllBrowserDataPathsPortable()
   return isChromeExtensionInstalledPortable(browserPaths, log)

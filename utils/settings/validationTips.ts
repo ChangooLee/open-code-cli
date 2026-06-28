@@ -1,13 +1,9 @@
 import type { ZodIssueCode } from 'zod/v4'
-
-// v4 ZodIssueCode is a value, not a type - use typeof to get the type
 type ZodIssueCodeType = (typeof ZodIssueCode)[keyof typeof ZodIssueCode]
-
 export type ValidationTip = {
   suggestion?: string
   docLink?: string
 }
-
 export type TipContext = {
   path: string
   code: ZodIssueCodeType | string
@@ -17,14 +13,11 @@ export type TipContext = {
   message?: string
   value?: unknown
 }
-
 type TipMatcher = {
   matches: (context: TipContext) => boolean
   tip: ValidationTip
 }
-
 const DOCUMENTATION_BASE = 'https://open-code-cli.dev/docs'
-
 const TIP_MATCHERS: TipMatcher[] = [
   {
     matches: (ctx): boolean =>
@@ -77,11 +70,6 @@ const TIP_MATCHERS: TipMatcher[] = [
       ctx.path.includes('hooks') && ctx.code === 'invalid_type',
     tip: {
       suggestion:
-        // gh-31187 / CC-282: prior example showed {"matcher": {"tools": ["BashTool"]}}
-        // — an object format that never existed in the schema (matcher is z.string(),
-        // always has been). Users copied the tip's example and got the same validation
-        // error again. See matchesPattern() in hooks.ts: matcher is exact-match,
-        // pipe-separated ("Edit|Write"), or regex. Empty/"*" matches all.
         'Hooks use a matcher + hooks array. The matcher is a string: a tool name ("Bash"), pipe-separated list ("Edit|Write"), or empty to match all. Example: {"PostToolUse": [{"matcher": "Edit|Write", "hooks": [{"type": "command", "command": "echo Done"}]}]}',
     },
   },
@@ -130,20 +118,15 @@ const TIP_MATCHERS: TipMatcher[] = [
     },
   },
 ]
-
 const PATH_DOC_LINKS: Record<string, string> = {
   permissions: `${DOCUMENTATION_BASE}/iam#configuring-permissions`,
   env: `${DOCUMENTATION_BASE}/settings#environment-variables`,
   hooks: `${DOCUMENTATION_BASE}/hooks`,
 }
-
 export function getValidationTip(context: TipContext): ValidationTip | null {
   const matcher = TIP_MATCHERS.find(m => m.matches(context))
-
   if (!matcher) return null
-
   const tip: ValidationTip = { ...matcher.tip }
-
   if (
     context.code === 'invalid_value' &&
     context.enumValues &&
@@ -151,14 +134,11 @@ export function getValidationTip(context: TipContext): ValidationTip | null {
   ) {
     tip.suggestion = `Valid values: ${context.enumValues.map(v => `"${v}"`).join(', ')}`
   }
-
-  // Add documentation link based on path prefix
   if (!tip.docLink && context.path) {
     const pathPrefix = context.path.split('.')[0]
     if (pathPrefix) {
       tip.docLink = PATH_DOC_LINKS[pathPrefix]
     }
   }
-
   return tip
 }

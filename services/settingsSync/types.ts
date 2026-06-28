@@ -1,27 +1,10 @@
-/**
- * Settings Sync Types
- *
- * Zod schemas and types for the user settings sync API.
- * Based on the backend API contract from openai-compatible/openai-compatible#218817.
- */
-
 import { z } from 'zod/v4'
 import { lazySchema } from '../../utils/lazySchema.js'
-
-/**
- * Content portion of user sync data - flat key-value storage.
- * Keys are opaque strings (typically file paths).
- * Values are UTF-8 string content (JSON, Markdown, etc).
- */
 export const UserSyncContentSchema = lazySchema(() =>
   z.object({
     entries: z.record(z.string(), z.string()),
   }),
 )
-
-/**
- * Full response from GET /api/open_code_cli/user_settings
- */
 export const UserSyncDataSchema = lazySchema(() =>
   z.object({
     userId: z.string(),
@@ -31,33 +14,20 @@ export const UserSyncDataSchema = lazySchema(() =>
     content: UserSyncContentSchema(),
   }),
 )
-
 export type UserSyncData = z.infer<ReturnType<typeof UserSyncDataSchema>>
-
-/**
- * Result from fetching user settings
- */
 export type SettingsSyncFetchResult = {
   success: boolean
   data?: UserSyncData
-  isEmpty?: boolean // true if 404 (no data exists)
+  isEmpty?: boolean 
   error?: string
   skipRetry?: boolean
 }
-
-/**
- * Result from uploading user settings
- */
 export type SettingsSyncUploadResult = {
   success: boolean
   checksum?: string
   lastModified?: string
   error?: string
 }
-
-/**
- * Keys used for sync entries
- */
 export const SYNC_KEYS = {
   USER_SETTINGS: '~/.open-code-cli/settings.json',
   USER_MEMORY: '~/.open-code-cli/OPEN_CODE.md',

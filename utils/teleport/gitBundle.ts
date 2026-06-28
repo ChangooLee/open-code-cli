@@ -1,14 +1,3 @@
-/**
- * Git bundle creation + upload for CCR seed-bundle seeding.
- *
- * Flow:
- *   1. git stash create → update-ref refs/seed/stash (makes it reachable)
- *   2. git bundle create --all (packs refs/seed/stash + its objects)
- *   3. Upload to /v1/files
- *   4. Cleanup refs/seed/stash (don't pollute user's repo)
- *   5. Caller sets seed_bundle_file_id on SessionContext
- */
-
 import { stat, unlink } from 'fs/promises'
 import {
   type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
@@ -21,12 +10,8 @@ import { logForDebugging } from '../debug.js'
 import { execFileNoThrowWithCwd } from '../execFileNoThrow.js'
 import { findGitRoot, gitExe } from '../git.js'
 import { generateTempFilePath } from '../tempfile.js'
-
-// Tunable via open_code_cli_ccr_bundle_max_bytes.
 const DEFAULT_BUNDLE_MAX_BYTES = 100 * 1024 * 1024
-
 type BundleScope = 'all' | 'head' | 'squashed'
-
 export type BundleUploadResult =
   | {
       success: true
@@ -36,17 +21,10 @@ export type BundleUploadResult =
       hasWip: boolean
     }
   | { success: false; error: string; failReason?: BundleFailReason }
-
 type BundleFailReason = 'git_error' | 'too_large' | 'empty_repo'
-
 type BundleCreateResult =
   | { ok: true; size: number; scope: BundleScope }
   | { ok: false; error: string; failReason: BundleFailReason }
-
-// Bundle --all → HEAD → squashed-root. HEAD drops side branches/tags but
-// keeps full current-branch history. Squashed-root is a single parentless
-// commit of HEAD's tree (or the stash tree if uncommitted changes exist) — no history,
-// just the snapshot. Receiver needs refs/seed/root handling for that tier.
 async function _bundleWithFallback(
   gitRoot: string,
   bundlePath: string,
@@ -54,7 +32,6 @@ async function _bundleWithFallback(
   hasStash: boolean,
   signal: AbortSignal | undefined,
 ): Promise<BundleCreateResult> {
-  // --all picks up refs/seed/stash; HEAD needs it explicit.
   const extra = hasStash ? ['refs/seed/stash'] : []
   const mkBundle = (base: string) =>
     execFileNoThrowWithCwd(
@@ -62,7 +39,6 @@ async function _bundleWithFallback(
       ['bundle', 'create', bundlePath, base, ...extra],
       { cwd: gitRoot, abortSignal: signal },
     )
-
   const allResult = await mkBundle('--all')
   if (allResult.code !== 0) {
     return {
@@ -71,13 +47,10 @@ async function _bundleWithFallback(
       failReason: 'git_error',
     }
   }
-
   const { size: allSize } = await stat(bundlePath)
   if (allSize <= maxBytes) {
     return { ok: true, size: allSize, scope: 'all' }
   }
-
-  // bundle create overwrites in place.
   logForDebugging(
     `[gitBundle] --all bundle is ${(allSize / 1024 / 1024).toFixed(1)}MB (> ${(maxBytes / 1024 / 1024).toFixed(0)}MB), retrying HEAD-only`,
   )
@@ -89,15 +62,10 @@ async function _bundleWithFallback(
       failReason: 'git_error',
     }
   }
-
   const { size: headSize } = await stat(bundlePath)
   if (headSize <= maxBytes) {
     return { ok: true, size: headSize, scope: 'head' }
   }
-
-  // Last resort: squash to a single parentless commit. Uses the stash tree
-  // when uncommitted changes exist (bakes working-tree changes in — can't bundle the stash
-  // ref separately since its parents would drag history back).
   logForDebugging(
     `[gitBundle] HEAD bundle is ${(headSize / 1024 / 1024).toFixed(1)}MB, retrying squashed-root`,
   )
@@ -136,7 +104,6 @@ async function _bundleWithFallback(
   if (squashSize <= maxBytes) {
     return { ok: true, size: squashSize, scope: 'squashed' }
   }
-
   return {
     ok: false,
     error:
@@ -144,11 +111,6 @@ async function _bundleWithFallback(
     failReason: 'too_large',
   }
 }
-
-// Bundle the repo and upload to Files API; return file_id for
-// seed_bundle_file_id. --all → HEAD → squashed-root fallback chain.
-// Tracked uncommitted changes via stash create → refs/seed/stash (or baked into the
-// squashed tree); untracked not captured.
 export async function createAndUploadGitBundle(
   config: FilesApiConfig,
   opts?: { cwd?: string; signal?: AbortSignal },
@@ -158,19 +120,11 @@ export async function createAndUploadGitBundle(
   if (!gitRoot) {
     return { success: false, error: 'Not in a git repository' }
   }
-
-  // Sweep stale refs from a crashed prior run before --all bundles them.
-  // Runs before the empty-repo check so it's never skipped by an early return.
   for (const ref of ['refs/seed/stash', 'refs/seed/root']) {
     await execFileNoThrowWithCwd(gitExe(), ['update-ref', '-d', ref], {
       cwd: gitRoot,
     })
   }
-
-  // `git bundle create` refuses to create an empty bundle (exit 128), and
-  // `stash create` fails with "You do not have the initial commit yet".
-  // Check for any refs (not just HEAD) so orphan branches with commits
-  // elsewhere still bundle — `--all` packs those refs regardless of HEAD.
   const refCheck = await execFileNoThrowWithCwd(
     gitExe(),
     ['for-each-ref', '--count=1', 'refs/'],
@@ -187,15 +141,11 @@ export async function createAndUploadGitBundle(
       failReason: 'empty_repo',
     }
   }
-
-  // stash create writes a dangling commit — doesn't touch refs/stash or
-  // the working tree. Untracked files intentionally excluded.
   const stashResult = await execFileNoThrowWithCwd(
     gitExe(),
     ['stash', 'create'],
     { cwd: gitRoot, abortSignal: opts?.signal },
   )
-  // exit 0 + empty stdout = nothing to stash. Nonzero is rare; non-fatal.
   const wipStashSha = stashResult.code === 0 ? stashResult.stdout.trim() : ''
   const hasWip = wipStashSha !== ''
   if (stashResult.code !== 0) {
@@ -204,24 +154,19 @@ export async function createAndUploadGitBundle(
     )
   } else if (hasWip) {
     logForDebugging(`[gitBundle] Captured uncommitted changes as stash ${wipStashSha}`)
-    // env-runner reads the SHA via bundle list-heads refs/seed/stash.
     await execFileNoThrowWithCwd(
       gitExe(),
       ['update-ref', 'refs/seed/stash', wipStashSha],
       { cwd: gitRoot },
     )
   }
-
   const bundlePath = generateTempFilePath('ccr-seed', '.bundle')
-
-  // git leaves a partial file on nonzero exit (e.g. empty-repo 128).
   try {
     const maxBytes =
       getFeatureValue_CACHED_MAY_BE_STALE<number | null>(
         'open_code_cli_ccr_bundle_max_bytes',
         null,
       ) ?? DEFAULT_BUNDLE_MAX_BYTES
-
     const bundle = await _bundleWithFallback(
       gitRoot,
       bundlePath,
@@ -229,7 +174,6 @@ export async function createAndUploadGitBundle(
       hasWip,
       opts?.signal,
     )
-
     if (!bundle.ok) {
       logForDebugging(`[gitBundle] ${bundle.error}`)
       logEvent('open_code_cli_ccr_bundle_upload', {
@@ -243,12 +187,9 @@ export async function createAndUploadGitBundle(
         failReason: bundle.failReason,
       }
     }
-
-    // Fixed relativePath so CCR can locate it.
     const upload = await uploadFile(bundlePath, '_source_seed.bundle', config, {
       signal: opts?.signal,
     })
-
     if (!upload.success) {
       logEvent('open_code_cli_ccr_bundle_upload', {
         outcome:
@@ -256,7 +197,6 @@ export async function createAndUploadGitBundle(
       })
       return { success: false, error: upload.error }
     }
-
     logForDebugging(
       `[gitBundle] Uploaded ${upload.size} bytes as file_id ${upload.fileId}`,
     )
@@ -281,8 +221,6 @@ export async function createAndUploadGitBundle(
     } catch {
       logForDebugging(`[gitBundle] Could not delete ${bundlePath} (non-fatal)`)
     }
-    // Always delete — also sweeps a stale ref from a crashed prior run.
-    // update-ref -d on a missing ref exits 0.
     for (const ref of ['refs/seed/stash', 'refs/seed/root']) {
       await execFileNoThrowWithCwd(gitExe(), ['update-ref', '-d', ref], {
         cwd: gitRoot,

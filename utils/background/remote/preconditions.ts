@@ -14,34 +14,16 @@ import { errorMessage } from '../../errors.js'
 import { findGitRoot, getIsClean } from '../../git.js'
 import { getOAuthHeaders } from '../../teleport/api.js'
 import { fetchEnvironments } from '../../teleport/environments.js'
-
-/**
- * Checks if user needs to log in with Open Code CLI
- * Extracted from getTeleportErrors() in TeleportError.tsx
- * @returns true if login is required, false otherwise
- */
 export async function checkNeedsOpenCodeCliLogin(): Promise<boolean> {
   if (!isOpenCodeCliSubscriber()) {
     return false
   }
   return checkAndRefreshOAuthTokenIfNeeded()
 }
-
-/**
- * Checks if git working directory is clean (no uncommitted changes)
- * Ignores untracked files since they won't be lost during branch switching
- * Extracted from getTeleportErrors() in TeleportError.tsx
- * @returns true if git is clean, false otherwise
- */
 export async function checkIsGitClean(): Promise<boolean> {
   const isClean = await getIsClean({ ignoreUntracked: true })
   return isClean
 }
-
-/**
- * Checks if user has access to at least one remote environment
- * @returns true if user has remote environments, false otherwise
- */
 export async function checkHasRemoteEnvironment(): Promise<boolean> {
   try {
     const environments = await fetchEnvironments()
@@ -51,30 +33,13 @@ export async function checkHasRemoteEnvironment(): Promise<boolean> {
     return false
   }
 }
-
-/**
- * Checks if current directory is inside a git repository (has .git/).
- * Distinct from checkHasGitRemote — a local-only repo passes this but not that.
- */
 export function checkIsInGitRepo(): boolean {
   return findGitRoot(getCwd()) !== null
 }
-
-/**
- * Checks if current repository has a GitHub remote configured.
- * Returns false for local-only repos (git init with no `origin`).
- */
 export async function checkHasGitRemote(): Promise<boolean> {
   const repository = await detectCurrentRepository()
   return repository !== null
 }
-
-/**
- * Checks if GitHub app is installed on a specific repository
- * @param owner The repository owner (e.g., "openai-compatibles")
- * @param repo The repository name (e.g., "open-code-cli-internal")
- * @returns true if GitHub app is installed, false otherwise
- */
 export async function checkGithubAppInstalled(
   owner: string,
   repo: string,
@@ -88,7 +53,6 @@ export async function checkGithubAppInstalled(
       )
       return false
     }
-
     const orgUUID = await getOrganizationUUID()
     if (!orgUUID) {
       logForDebugging(
@@ -96,15 +60,12 @@ export async function checkGithubAppInstalled(
       )
       return false
     }
-
     const url = `${getOauthConfig().BASE_API_URL}/api/oauth/organizations/${orgUUID}/code/repos/${owner}/${repo}`
     const headers = {
       ...getOAuthHeaders(accessToken),
       'x-organization-uuid': orgUUID,
     }
-
     logForDebugging(`Checking GitHub app installation for ${owner}/${repo}`)
-
     const response = await axios.get<{
       repo: {
         name: string
@@ -120,7 +81,6 @@ export async function checkGithubAppInstalled(
       timeout: 15000,
       signal,
     })
-
     if (response.status === 200) {
       if (response.data.status) {
         const installed = response.data.status.app_installed
@@ -129,19 +89,16 @@ export async function checkGithubAppInstalled(
         )
         return installed
       }
-      // status is null - app is not installed on this repo
       logForDebugging(
         `GitHub app is not installed on ${owner}/${repo} (status is null)`,
       )
       return false
     }
-
     logForDebugging(
       `checkGithubAppInstalled: Unexpected response status ${response.status}`,
     )
     return false
   } catch (error) {
-    // 4XX errors typically mean app is not installed or repo not accessible
     if (axios.isAxiosError(error)) {
       const status = error.response?.status
       if (status && status >= 400 && status < 500) {
@@ -151,16 +108,10 @@ export async function checkGithubAppInstalled(
         return false
       }
     }
-
     logForDebugging(`checkGithubAppInstalled error: ${errorMessage(error)}`)
     return false
   }
 }
-
-/**
- * Checks if the user has synced their GitHub credentials via /web-setup
- * @returns true if GitHub token is synced, false otherwise
- */
 export async function checkGithubTokenSynced(): Promise<boolean> {
   try {
     const accessToken = getOpenCodeCliOAuthTokens()?.accessToken
@@ -168,26 +119,21 @@ export async function checkGithubTokenSynced(): Promise<boolean> {
       logForDebugging('checkGithubTokenSynced: No access token found')
       return false
     }
-
     const orgUUID = await getOrganizationUUID()
     if (!orgUUID) {
       logForDebugging('checkGithubTokenSynced: No org UUID found')
       return false
     }
-
     const url = `${getOauthConfig().BASE_API_URL}/api/oauth/organizations/${orgUUID}/sync/github/auth`
     const headers = {
       ...getOAuthHeaders(accessToken),
       'x-organization-uuid': orgUUID,
     }
-
     logForDebugging('Checking if GitHub token is synced via web-setup')
-
     const response = await axios.get(url, {
       headers,
       timeout: 15000,
     })
-
     const synced =
       response.status === 200 && response.data?.is_authenticated === true
     logForDebugging(
@@ -204,20 +150,11 @@ export async function checkGithubTokenSynced(): Promise<boolean> {
         return false
       }
     }
-
     logForDebugging(`checkGithubTokenSynced error: ${errorMessage(error)}`)
     return false
   }
 }
-
 type RepoAccessMethod = 'github-app' | 'token-sync' | 'none'
-
-/**
- * Tiered check for whether a GitHub repo is accessible for remote operations.
- * 1. GitHub App installed on the repo
- * 2. GitHub token synced via /web-setup
- * 3. Neither — caller should prompt user to set up access
- */
 export async function checkRepoForRemoteAccess(
   owner: string,
   repo: string,

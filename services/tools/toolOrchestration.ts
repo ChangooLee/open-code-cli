@@ -4,18 +4,15 @@ import { findToolByName, type ToolUseContext } from '../../Tool.js'
 import type { AssistantMessage, Message } from '../../types/message.js'
 import { all } from '../../utils/generators.js'
 import { type MessageUpdateLazy, runToolUse } from './toolExecution.js'
-
 function getMaxToolUseConcurrency(): number {
   return (
     parseInt(process.env.OPEN_CODE_CLI_MAX_TOOL_USE_CONCURRENCY || '', 10) || 10
   )
 }
-
 export type MessageUpdate = {
   message?: Message
   newContext: ToolUseContext
 }
-
 export async function* runTools(
   toolUseMessages: ToolUseBlock[],
   assistantMessages: AssistantMessage[],
@@ -32,7 +29,6 @@ export async function* runTools(
         string,
         ((context: ToolUseContext) => ToolUseContext)[]
       > = {}
-      // Run read-only batch concurrently
       for await (const update of runToolsConcurrently(
         blocks,
         assistantMessages,
@@ -62,7 +58,6 @@ export async function* runTools(
       }
       yield { newContext: currentContext }
     } else {
-      // Run non-read-only batch serially
       for await (const update of runToolsSerially(
         blocks,
         assistantMessages,
@@ -80,14 +75,7 @@ export async function* runTools(
     }
   }
 }
-
 type Batch = { isConcurrencySafe: boolean; blocks: ToolUseBlock[] }
-
-/**
- * Partition tool calls into batches where each batch is either:
- * 1. A single non-read-only tool, or
- * 2. Multiple consecutive read-only tools
- */
 function partitionToolCalls(
   toolUseMessages: ToolUseBlock[],
   toolUseContext: ToolUseContext,
@@ -100,8 +88,6 @@ function partitionToolCalls(
           try {
             return Boolean(tool?.isConcurrencySafe(parsedInput.data))
           } catch {
-            // If isConcurrencySafe throws (e.g., due to shell-quote parse failure),
-            // treat as not concurrency-safe to be conservative
             return false
           }
         })()
@@ -114,7 +100,6 @@ function partitionToolCalls(
     return acc
   }, [])
 }
-
 async function* runToolsSerially(
   toolUseMessages: ToolUseBlock[],
   assistantMessages: AssistantMessage[],
@@ -122,7 +107,6 @@ async function* runToolsSerially(
   toolUseContext: ToolUseContext,
 ): AsyncGenerator<MessageUpdate, void> {
   let currentContext = toolUseContext
-
   for (const toolUse of toolUseMessages) {
     toolUseContext.setInProgressToolUseIDs(prev =>
       new Set(prev).add(toolUse.id),
@@ -148,7 +132,6 @@ async function* runToolsSerially(
     markToolUseAsComplete(toolUseContext, toolUse.id)
   }
 }
-
 async function* runToolsConcurrently(
   toolUseMessages: ToolUseBlock[],
   assistantMessages: AssistantMessage[],
@@ -175,7 +158,6 @@ async function* runToolsConcurrently(
     getMaxToolUseConcurrency(),
   )
 }
-
 function markToolUseAsComplete(
   toolUseContext: ToolUseContext,
   toolUseID: string,

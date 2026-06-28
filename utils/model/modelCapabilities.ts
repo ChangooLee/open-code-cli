@@ -7,8 +7,6 @@ import { getOpenCodeCliConfigHomeDir } from '../envUtils.js'
 import { safeParseJSON } from '../json.js'
 import { lazySchema } from '../lazySchema.js'
 import { isEssentialTrafficOnly } from '../privacyLevel.js'
-
-// .strip() — don't persist internal-only fields (mycro_deployments etc.) to disk
 const ModelCapabilitySchema = lazySchema(() =>
   z
     .object({
@@ -18,33 +16,25 @@ const ModelCapabilitySchema = lazySchema(() =>
     })
     .strip(),
 )
-
 const CacheFileSchema = lazySchema(() =>
   z.object({
     models: z.array(ModelCapabilitySchema()),
     timestamp: z.number(),
   }),
 )
-
 export type ModelCapability = z.infer<ReturnType<typeof ModelCapabilitySchema>>
-
 function getCacheDir(): string {
   return join(getOpenCodeCliConfigHomeDir(), 'cache')
 }
-
 function getCachePath(): string {
   return join(getCacheDir(), 'model-capabilities.json')
 }
-
 function isModelCapabilitiesEligible(): boolean {
   return false
 }
-
-// Keyed on cache path so tests that set OPEN_CODE_CLI_CONFIG_DIR get a fresh read
 const loadCache = memoize(
   (path: string): ModelCapability[] | null => {
     try {
-      // eslint-disable-next-line custom-rules/no-sync-fs -- memoized; called from sync getContextWindowForModel
       const raw = readFileSync(path, 'utf-8')
       const parsed = CacheFileSchema().safeParse(safeParseJSON(raw, false))
       return parsed.success ? parsed.data.models : null
@@ -54,7 +44,6 @@ const loadCache = memoize(
   },
   path => path,
 )
-
 export function getModelCapability(model: string): ModelCapability | undefined {
   if (!isModelCapabilitiesEligible()) return undefined
   const cached = loadCache(getCachePath())
@@ -64,7 +53,6 @@ export function getModelCapability(model: string): ModelCapability | undefined {
   if (exact) return exact
   return cached.find(c => m.includes(c.id.toLowerCase()))
 }
-
 export async function refreshModelCapabilities(): Promise<void> {
   if (!isModelCapabilitiesEligible()) return
   if (isEssentialTrafficOnly()) return

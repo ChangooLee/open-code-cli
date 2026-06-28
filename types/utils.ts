@@ -1,6 +1,3 @@
-// Shared utility types: `DeepImmutable<T>` (deep readonly) and
-// `Permutations<T>` (string-union permutations).
-
 export type DeepImmutable<T> = T extends (infer U)[]
   ? ReadonlyArray<DeepImmutable<U>>
   : T extends Map<infer K, infer V>
@@ -12,7 +9,6 @@ export type DeepImmutable<T> = T extends (infer U)[]
         : T extends object
           ? { readonly [K in keyof T]: DeepImmutable<T[K]> }
           : T
-
 export type Permutations<T extends string, U extends string = T> = [T] extends [
   never,
 ]

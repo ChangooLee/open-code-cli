@@ -29,11 +29,8 @@ import { writeToMailbox } from '../../utils/teammateMailbox.js'
 import { VERIFICATION_AGENT_TYPE } from '../AgentTool/constants.js'
 import { TASK_UPDATE_TOOL_NAME } from './constants.js'
 import { DESCRIPTION, PROMPT } from './prompt.js'
-
 const inputSchema = lazySchema(() => {
-  // Extended status schema that includes 'deleted' as a special action
   const TaskUpdateStatusSchema = TaskStatusSchema().or(z.literal('deleted'))
-
   return z.strictObject({
     taskId: z.string().describe('The ID of the task to update'),
     subject: z.string().optional().describe('New subject for the task'),
@@ -65,7 +62,6 @@ const inputSchema = lazySchema(() => {
   })
 })
 type InputSchema = ReturnType<typeof inputSchema>
-
 const outputSchema = lazySchema(() =>
   z.object({
     success: z.boolean(),
@@ -82,9 +78,7 @@ const outputSchema = lazySchema(() =>
   }),
 )
 type OutputSchema = ReturnType<typeof outputSchema>
-
 export type Output = z.infer<OutputSchema>
-
 export const TaskUpdateTool = buildTool({
   name: TASK_UPDATE_TOOL_NAME,
   searchHint: 'update a task',
@@ -135,14 +129,10 @@ export const TaskUpdateTool = buildTool({
     context,
   ) {
     const taskListId = getTaskListId()
-
-    // Auto-expand task list when updating tasks
     context.setAppState(prev => {
       if (prev.expandedView === 'tasks') return prev
       return { ...prev, expandedView: 'tasks' as const }
     })
-
-    // Check if task exists
     const existingTask = await getTask(taskListId, taskId)
     if (!existingTask) {
       return {
@@ -154,10 +144,7 @@ export const TaskUpdateTool = buildTool({
         },
       }
     }
-
     const updatedFields: string[] = []
-
-    // Update basic fields if provided and different from current value
     const updates: {
       subject?: string
       description?: string
@@ -182,9 +169,6 @@ export const TaskUpdateTool = buildTool({
       updates.owner = owner
       updatedFields.push('owner')
     }
-    // Auto-set owner when a teammate marks a task as in_progress without
-    // explicitly providing an owner. This ensures the task list can match
-    // todo items to teammates for showing activity status.
     if (
       isAgentSwarmsEnabled() &&
       status === 'in_progress' &&
@@ -210,7 +194,6 @@ export const TaskUpdateTool = buildTool({
       updatedFields.push('metadata')
     }
     if (status !== undefined) {
-      // Handle deletion - delete the task file and return early
       if (status === 'deleted') {
         const deleted = await deleteTask(taskListId, taskId)
         return {
@@ -225,13 +208,9 @@ export const TaskUpdateTool = buildTool({
           },
         }
       }
-
-      // For regular status updates, validate and apply if different
       if (status !== existingTask.status) {
-        // Run TaskCompleted hooks when marking a task as completed
         if (status === 'completed') {
           const blockingErrors: string[] = []
-
           const generator = executeTaskCompletedHooks(
             taskId,
             existingTask.subject,
@@ -243,7 +222,6 @@ export const TaskUpdateTool = buildTool({
             undefined,
             context,
           )
-
           for await (const result of generator) {
             if (result.blockingError) {
               blockingErrors.push(
@@ -251,7 +229,6 @@ export const TaskUpdateTool = buildTool({
               )
             }
           }
-
           if (blockingErrors.length > 0) {
             return {
               data: {
@@ -263,17 +240,13 @@ export const TaskUpdateTool = buildTool({
             }
           }
         }
-
         updates.status = status
         updatedFields.push('status')
       }
     }
-
     if (Object.keys(updates).length > 0) {
       await updateTask(taskListId, taskId, updates)
     }
-
-    // Notify new owner via mailbox when ownership changes
     if (updates.owner && isAgentSwarmsEnabled()) {
       const senderName = getAgentName() || 'team-lead'
       const senderColor = getTeammateColor()
@@ -296,8 +269,6 @@ export const TaskUpdateTool = buildTool({
         taskListId,
       )
     }
-
-    // Add blocks if provided and not already present
     if (addBlocks && addBlocks.length > 0) {
       const newBlocks = addBlocks.filter(
         id => !existingTask.blocks.includes(id),
@@ -309,8 +280,6 @@ export const TaskUpdateTool = buildTool({
         updatedFields.push('blocks')
       }
     }
-
-    // Add blockedBy if provided and not already present (reverse: the blocker blocks this task)
     if (addBlockedBy && addBlockedBy.length > 0) {
       const newBlockedBy = addBlockedBy.filter(
         id => !existingTask.blockedBy.includes(id),
@@ -322,14 +291,6 @@ export const TaskUpdateTool = buildTool({
         updatedFields.push('blockedBy')
       }
     }
-
-    // Structural verification nudge: if the main-thread agent just closed
-    // out a 3+ task list and none of those tasks was a verification step,
-    // append a reminder to the tool result. Fires at the loop-exit moment
-    // where skips happen ("when the last task closed, the loop exited").
-    // Mirrors the TodoWriteTool nudge for V1 sessions; this covers V2
-    // (interactive CLI). TaskUpdateToolOutput is @internal so this field
-    // does not touch the public SDK surface.
     let verificationNudgeNeeded = false
     if (
       feature('VERIFICATION_AGENT') &&
@@ -347,7 +308,6 @@ export const TaskUpdateTool = buildTool({
         verificationNudgeNeeded = true
       }
     }
-
     return {
       data: {
         success: true,
@@ -371,19 +331,13 @@ export const TaskUpdateTool = buildTool({
       verificationNudgeNeeded,
     } = content as Output
     if (!success) {
-      // Return as non-error so it doesn't trigger sibling tool cancellation
-      // in StreamingToolExecutor. "Task not found" is a benign condition
-      // (e.g., task list already cleaned up) that the model can handle.
       return {
         tool_use_id: toolUseID,
         type: 'tool_result',
         content: error || `Task #${taskId} not found`,
       }
     }
-
     let resultContent = `Updated task #${taskId} ${updatedFields.join(', ')}`
-
-    // Add reminder for teammates when they complete a task (supports in-process teammates)
     if (
       statusChange?.to === 'completed' &&
       getAgentId() &&
@@ -392,11 +346,9 @@ export const TaskUpdateTool = buildTool({
       resultContent +=
         '\n\nTask completed. Call TaskList now to find your next available task or see if your work unblocked others.'
     }
-
     if (verificationNudgeNeeded) {
       resultContent += `\n\nNOTE: You just closed out 3+ tasks and none of them was a verification step. Before writing your final summary, spawn the verification agent (subagent_type="${VERIFICATION_AGENT_TYPE}"). You cannot self-assign PARTIAL by listing caveats in your summary — only the verifier issues a verdict.`
     }
-
     return {
       tool_use_id: toolUseID,
       type: 'tool_result',

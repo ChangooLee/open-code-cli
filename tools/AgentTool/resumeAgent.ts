@@ -33,7 +33,6 @@ import { FORK_AGENT, isForkSubagentEnabled } from './forkSubagent.js'
 import type { AgentDefinition } from './loadAgentsDir.js'
 import { isBuiltInAgent } from './loadAgentsDir.js'
 import { runAgent } from './runAgent.js'
-
 export type ResumeAgentResult = {
   agentId: string
   description: string
@@ -54,12 +53,9 @@ export async function resumeAgentBackground({
 }): Promise<ResumeAgentResult> {
   const startTime = Date.now()
   const appState = toolUseContext.getAppState()
-  // In-process teammates get a no-op setAppState; setAppStateForTasks
-  // reaches the root store so task registration/progress/kill stay visible.
   const rootSetAppState =
     toolUseContext.setAppStateForTasks ?? toolUseContext.setAppState
   const permissionMode = appState.toolPermissionContext.mode
-
   const [transcript, meta] = await Promise.all([
     getAgentTranscript(asAgentId(agentId)),
     readAgentMetadata(asAgentId(agentId)),
@@ -77,8 +73,6 @@ export async function resumeAgentBackground({
     resumedMessages,
     transcript.contentReplacements,
   )
-  // Optional: if the original worktree was removed externally, fall back
-  // to parent cwd rather than crashing on chdir later.
   const resumedWorktreePath = meta?.worktreePath
     ? await fsp.stat(meta.worktreePath).then(
         s => (s.isDirectory() ? meta.worktreePath : undefined),
@@ -91,12 +85,9 @@ export async function resumeAgentBackground({
       )
     : undefined
   if (resumedWorktreePath) {
-    // Bump mtime so stale-worktree cleanup doesn't delete a just-resumed worktree (#22355)
     const now = new Date()
     await fsp.utimes(resumedWorktreePath, now, now)
   }
-
-  // Skip filterDeniedAgents re-gating — original spawn already passed permission checks
   let selectedAgent: AgentDefinition
   let isResumedFork = false
   if (meta?.agentType === FORK_AGENT.agentType) {
@@ -110,9 +101,7 @@ export async function resumeAgentBackground({
   } else {
     selectedAgent = GENERAL_PURPOSE_AGENT
   }
-
   const uiDescription = meta?.description ?? '(resumed)'
-
   let forkParentSystemPrompt: SystemPrompt | undefined
   if (isResumedFork) {
     if (toolUseContext.renderedSystemPrompt) {
@@ -146,15 +135,12 @@ export async function resumeAgentBackground({
       )
     }
   }
-
-  // Resolve model for analytics metadata (runAgent resolves its own internally)
   const resolvedAgentModel = getAgentModel(
     selectedAgent.model,
     toolUseContext.options.mainLoopModel,
     undefined,
     permissionMode,
   )
-
   const workerPermissionContext = {
     ...appState.toolPermissionContext,
     mode: selectedAgent.permissionMode ?? 'acceptEdits',
@@ -162,7 +148,6 @@ export async function resumeAgentBackground({
   const workerTools = isResumedFork
     ? toolUseContext.options.tools
     : assembleToolPool(workerPermissionContext, appState.mcp.tools)
-
   const runAgentParams: Parameters<typeof runAgent>[0] = {
     agentDefinition: selectedAgent,
     promptMessages: [
@@ -177,24 +162,16 @@ export async function resumeAgentBackground({
       isBuiltInAgent(selectedAgent),
     ),
     model: undefined,
-    // Fork resume: pass parent's system prompt (cache-identical prefix).
-    // Non-fork: undefined → runAgent recomputes under wrapWithCwd so
-    // getCwd() sees resumedWorktreePath.
     override: isResumedFork
       ? { systemPrompt: forkParentSystemPrompt }
       : undefined,
     availableTools: workerTools,
-    // Transcript already contains the parent context slice from the
-    // original fork. Re-supplying it would cause duplicate tool_use IDs.
     forkContextMessages: undefined,
     ...(isResumedFork && { useExactTools: true }),
-    // Re-persist so metadata survives runAgent's writeAgentMetadata overwrite
     worktreePath: resumedWorktreePath,
     description: meta?.description,
     contentReplacementState: resumedReplacementState,
   }
-
-  // Skip name-registry write — original entry persists from the initial spawn
   const agentBackgroundTask = registerAsyncAgent({
     agentId,
     description: uiDescription,
@@ -203,7 +180,6 @@ export async function resumeAgentBackground({
     setAppState: rootSetAppState,
     toolUseId: toolUseContext.toolUseId,
   })
-
   const metadata = {
     prompt,
     resolvedAgentModel,
@@ -212,7 +188,6 @@ export async function resumeAgentBackground({
     agentType: selectedAgent.agentType,
     isAsync: true,
   }
-
   const asyncAgentContext = {
     agentId,
     parentSessionId: getParentSessionId(),
@@ -223,10 +198,8 @@ export async function resumeAgentBackground({
     invocationKind: 'resume' as const,
     invocationEmitted: false,
   }
-
   const wrapWithCwd = <T>(fn: () => T): T =>
     resumedWorktreePath ? runWithCwdOverride(resumedWorktreePath, fn) : fn()
-
   void runWithAgentContext(asyncAgentContext, () =>
     wrapWithCwd(() =>
       runAsyncAgentLifecycle({
@@ -256,7 +229,6 @@ export async function resumeAgentBackground({
       }),
     ),
   )
-
   return {
     agentId,
     description: uiDescription,

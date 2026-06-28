@@ -1,12 +1,3 @@
-/**
- * Shared command prefix extraction using Haiku LLM
- *
- * This module provides a factory for creating command prefix extractors
- * that can be used by different shell tools. The core logic
- * (Haiku query, response validation) is shared, while tool-specific
- * aspects (examples, pre-checks) are configurable.
- */
-
 import chalk from 'chalk'
 import type { QuerySource } from '../../constants/querySource.js'
 import { getFeatureValue_CACHED_MAY_BE_STALE } from '../../services/analytics/growthbook.js'
@@ -19,12 +10,6 @@ import { startsWithApiErrorPrefix } from '../../services/api/errors.js'
 import { memoizeWithLRU } from '../memoize.js'
 import { jsonStringify } from '../slowOperations.js'
 import { asSystemPrompt } from '../systemPromptType.js'
-
-/**
- * Shell executables that must never be accepted as bare prefixes.
- * Allowing e.g. "bash:*" would let any command through, defeating
- * the permission system. Includes Unix shells and Windows equivalents.
- */
 const DANGEROUS_SHELL_PREFIXES = new Set([
   'sh',
   'bash',
@@ -42,56 +27,21 @@ const DANGEROUS_SHELL_PREFIXES = new Set([
   'pwsh.exe',
   'bash.exe',
 ])
-
-/**
- * Result of command prefix extraction
- */
 export type CommandPrefixResult = {
-  /** The detected command prefix, or null if no prefix could be determined */
   commandPrefix: string | null
 }
-
-/**
- * Result including subcommand prefixes for compound commands
- */
 export type CommandSubcommandPrefixResult = CommandPrefixResult & {
   subcommandPrefixes: Map<string, CommandPrefixResult>
 }
-
-/**
- * Configuration for creating a command prefix extractor
- */
 export type PrefixExtractorConfig = {
-  /** Tool name for logging and warning messages */
   toolName: string
-
-  /** The policy spec containing examples for Haiku */
   policySpec: string
-  /** Analytics event name for logging */
   eventName: string
-
-  /** Query source identifier for the API call */
   querySource: QuerySource
-
-  /** Optional pre-check function that can short-circuit the Haiku call */
   preCheck?: (command: string) => CommandPrefixResult | null
 }
-
-/**
- * Creates a memoized command prefix extractor function.
- *
- * Uses two-layer memoization: the outer memoized function creates the promise
- * and attaches a .catch handler that evicts the cache entry on rejection.
- * This prevents aborted or failed Haiku calls from poisoning future lookups.
- *
- * Bounded to 200 entries via LRU to prevent unbounded growth in heavy sessions.
- *
- * @param config - Configuration for the extractor
- * @returns A memoized async function that extracts command prefixes
- */
 export function createCommandPrefixExtractor(config: PrefixExtractorConfig) {
   const { toolName, policySpec, eventName, querySource, preCheck } = config
-
   const memoized = memoizeWithLRU(
     (
       command: string,
@@ -108,9 +58,6 @@ export function createCommandPrefixExtractor(config: PrefixExtractorConfig) {
         querySource,
         preCheck,
       )
-      // Evict on rejection so aborted calls don't poison future turns.
-      // Identity guard: after LRU eviction, a newer promise may occupy
-      // this key; a stale rejection must not delete it.
       promise.catch(() => {
         if (memoized.cache.get(command) === promise) {
           memoized.cache.delete(command)
@@ -121,20 +68,8 @@ export function createCommandPrefixExtractor(config: PrefixExtractorConfig) {
     command => command, // memoize by command only
     200,
   )
-
   return memoized
 }
-
-/**
- * Creates a memoized function to get prefixes for compound commands with subcommands.
- *
- * Uses the same two-layer memoization pattern as createCommandPrefixExtractor:
- * a .catch handler evicts the cache entry on rejection to prevent poisoning.
- *
- * @param getPrefix - The single-command prefix extractor (from createCommandPrefixExtractor)
- * @param splitCommand - Function to split a compound command into subcommands
- * @returns A memoized async function that extracts prefixes for the main command and all subcommands
- */
 export function createSubcommandPrefixExtractor(
   getPrefix: ReturnType<typeof createCommandPrefixExtractor>,
   splitCommand: (command: string) => string[] | Promise<string[]>,
@@ -152,9 +87,6 @@ export function createSubcommandPrefixExtractor(
         getPrefix,
         splitCommand,
       )
-      // Evict on rejection so aborted calls don't poison future turns.
-      // Identity guard: after LRU eviction, a newer promise may occupy
-      // this key; a stale rejection must not delete it.
       promise.catch(() => {
         if (memoized.cache.get(command) === promise) {
           memoized.cache.delete(command)
@@ -165,10 +97,8 @@ export function createSubcommandPrefixExtractor(
     command => command, // memoize by command only
     200,
   )
-
   return memoized
 }
-
 async function getCommandPrefixImpl(
   command: string,
   abortSignal: AbortSignal,
@@ -182,28 +112,22 @@ async function getCommandPrefixImpl(
   if (process.env.NODE_ENV === 'test') {
     return null
   }
-
-  // Run pre-check if provided (e.g., isHelpCommand for Bash)
   if (preCheck) {
     const preCheckResult = preCheck(command)
     if (preCheckResult !== null) {
       return preCheckResult
     }
   }
-
   let preflightCheckTimeoutId: NodeJS.Timeout | undefined
   const startTime = Date.now()
   let result: CommandPrefixResult | null = null
-
   try {
-    // Log a warning if the pre-flight check takes too long
     preflightCheckTimeoutId = setTimeout(
       (tn, nonInteractive) => {
         const message = `[${tn}Tool] Pre-flight check is taking longer than expected. Run with OPEN_CODE_CLI_LOG=debug to check for failed or slow API requests.`
         if (nonInteractive) {
           process.stderr.write(jsonStringify({ level: 'warn', message }) + '\n')
         } else {
-          // biome-ignore lint/suspicious/noConsole: intentional warning
           console.warn(chalk.yellow(`⚠️  ${message}`))
         }
       },
@@ -211,12 +135,10 @@ async function getCommandPrefixImpl(
       toolName,
       isNonInteractiveSession,
     )
-
     const useSystemPromptPolicySpec = getFeatureValue_CACHED_MAY_BE_STALE(
       'open_code_cli_cork_m4q',
       false,
     )
-
     const response = await queryHaiku({
       systemPrompt: asSystemPrompt(
         useSystemPromptPolicySpec
@@ -240,11 +162,8 @@ async function getCommandPrefixImpl(
         mcpTools: [],
       },
     })
-
-    // Clear the timeout since the query completed
     clearTimeout(preflightCheckTimeoutId)
     const durationMs = Date.now() - startTime
-
     const prefix =
       typeof response.message.content === 'string'
         ? response.message.content
@@ -252,7 +171,6 @@ async function getCommandPrefixImpl(
           ? (response.message.content.find(_ => _.type === 'text')?.text ??
             'none')
           : 'none'
-
     if (startsWithApiErrorPrefix(prefix)) {
       logEvent(eventName, {
         success: false,
@@ -262,7 +180,6 @@ async function getCommandPrefixImpl(
       })
       result = null
     } else if (prefix === 'command_injection_detected') {
-      // Haiku detected something suspicious - treat as no prefix available
       logEvent(eventName, {
         success: false,
         error:
@@ -276,7 +193,6 @@ async function getCommandPrefixImpl(
       prefix === 'git' ||
       DANGEROUS_SHELL_PREFIXES.has(prefix.toLowerCase())
     ) {
-      // Never accept bare `git` or shell executables as a prefix
       logEvent(eventName, {
         success: false,
         error:
@@ -287,7 +203,6 @@ async function getCommandPrefixImpl(
         commandPrefix: null,
       }
     } else if (prefix === 'none') {
-      // No prefix detected
       logEvent(eventName, {
         success: false,
         error:
@@ -298,10 +213,7 @@ async function getCommandPrefixImpl(
         commandPrefix: null,
       }
     } else {
-      // Validate that the prefix is actually a prefix of the command
-
       if (!command.startsWith(prefix)) {
-        // Prefix isn't actually a prefix of the command
         logEvent(eventName, {
           success: false,
           error:
@@ -321,14 +233,12 @@ async function getCommandPrefixImpl(
         }
       }
     }
-
     return result
   } catch (error) {
     clearTimeout(preflightCheckTimeoutId)
     throw error
   }
 }
-
 async function getCommandSubcommandPrefixImpl(
   command: string,
   abortSignal: AbortSignal,
@@ -337,7 +247,6 @@ async function getCommandSubcommandPrefixImpl(
   splitCommandFn: (command: string) => string[] | Promise<string[]>,
 ): Promise<CommandSubcommandPrefixResult | null> {
   const subcommands = await splitCommandFn(command)
-
   const [fullCommandPrefix, ...subcommandPrefixesResults] = await Promise.all([
     getPrefix(command, abortSignal, isNonInteractiveSession),
     ...subcommands.map(async subcommand => ({
@@ -345,11 +254,9 @@ async function getCommandSubcommandPrefixImpl(
       prefix: await getPrefix(subcommand, abortSignal, isNonInteractiveSession),
     })),
   ])
-
   if (!fullCommandPrefix) {
     return null
   }
-
   const subcommandPrefixes = subcommandPrefixesResults.reduce(
     (acc, { subcommand, prefix }) => {
       if (prefix) {
@@ -359,7 +266,6 @@ async function getCommandSubcommandPrefixImpl(
     },
     new Map<string, CommandPrefixResult>(),
   )
-
   return {
     ...fullCommandPrefix,
     subcommandPrefixes,

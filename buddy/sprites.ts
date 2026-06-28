@@ -19,10 +19,6 @@ import {
   snail,
   turtle,
 } from './types.js'
-
-// Each sprite is 5 lines tall, 12 wide (after {E}→1char substitution).
-// Multiple frames per species for idle fidget animation.
-// Line 0 is the hat slot — must be blank in frames 0-1; frame 2 may use it.
 const BODIES: Record<Species, string[][]> = {
   [duck]: [
     [
@@ -439,7 +435,6 @@ const BODIES: Record<Species, string[][]> = {
     ],
   ],
 }
-
 const HAT_LINES: Record<Hat, string> = {
   none: '',
   crown: '   \\^^^/    ',
@@ -450,28 +445,21 @@ const HAT_LINES: Record<Hat, string> = {
   beanie: '   (___)    ',
   tinyduck: '    ,>      ',
 }
-
 export function renderSprite(bones: CompanionBones, frame = 0): string[] {
   const frames = BODIES[bones.species]
   const body = frames[frame % frames.length]!.map(line =>
     line.replaceAll('{E}', bones.eye),
   )
   const lines = [...body]
-  // Only replace with hat if line 0 is empty (some fidget frames use it for smoke etc)
   if (bones.hat !== 'none' && !lines[0]!.trim()) {
     lines[0] = HAT_LINES[bones.hat]
   }
-  // Drop blank hat slot — wastes a row in the Card and ambient sprite when
-  // there's no hat and the frame isn't using it for smoke/antenna/etc.
-  // Only safe when ALL frames have blank line 0; otherwise heights oscillate.
   if (!lines[0]!.trim() && frames.every(f => !f[0]!.trim())) lines.shift()
   return lines
 }
-
 export function spriteFrameCount(species: Species): number {
   return BODIES[species].length
 }
-
 export function renderFace(bones: CompanionBones): string {
   const eye: Eye = bones.eye
   switch (bones.species) {

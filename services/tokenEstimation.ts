@@ -2,22 +2,18 @@ import type { BetaMessageParam as MessageParam } from 'src/services/api/openaiCo
 import type { Attachment } from '../utils/attachments.js'
 import { normalizeAttachmentForAPI } from '../utils/messages.js'
 import { jsonStringify } from '../utils/slowOperations.js'
-
 export async function countTokensWithAPI(content: string): Promise<number | null> {
   return roughTokenCountEstimation(content)
 }
-
 export async function countMessagesTokensWithAPI(
   messages: MessageParam[],
   attachments: Attachment[] = [],
 ): Promise<number | null> {
   return roughTokenCountEstimationForMessages(messages, attachments)
 }
-
 export function roughTokenCountEstimation(input: string): number {
   return Math.ceil((typeof input === 'string' ? input.length : 0) / 4)
 }
-
 export function bytesPerTokenForFileType(fileExtension: string): number {
   switch (fileExtension.toLowerCase()) {
     case '.json':
@@ -30,20 +26,17 @@ export function bytesPerTokenForFileType(fileExtension: string): number {
       return 4
   }
 }
-
 export function roughTokenCountEstimationForFileType(
   input: string,
   fileExtension: string,
 ): number {
   return Math.ceil(input.length / bytesPerTokenForFileType(fileExtension))
 }
-
 export async function countTokensViaHaikuFallback(
   content: string,
 ): Promise<number | null> {
   return roughTokenCountEstimation(content)
 }
-
 export function roughTokenCountEstimationForMessages(
   messages: MessageParam[],
   attachments: Attachment[] = [],
@@ -58,15 +51,11 @@ export function roughTokenCountEstimationForMessages(
   }, 0)
   return messageTokens + attachmentTokens
 }
-
 export function roughTokenCountEstimationForMessage(message: {
   content: unknown
 }): number {
   const { content } = message
   if (content == null) return 0
-  // jsonStringify(undefined) returns undefined, and JSON.stringify can return
-  // undefined for unsupported values; fall back to '' so the leaf never sees a
-  // non-string and crashes on `.length`.
   return roughTokenCountEstimation(
     typeof content === 'string' ? content : (jsonStringify(content) ?? ''),
   )

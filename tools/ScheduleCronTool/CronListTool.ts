@@ -13,10 +13,8 @@ import {
   isKairosCronEnabled,
 } from './prompt.js'
 import { renderListResultMessage, renderListToolUseMessage } from './UI.js'
-
 const inputSchema = lazySchema(() => z.strictObject({}))
 type InputSchema = ReturnType<typeof inputSchema>
-
 const outputSchema = lazySchema(() =>
   z.object({
     jobs: z.array(
@@ -33,7 +31,6 @@ const outputSchema = lazySchema(() =>
 )
 type OutputSchema = ReturnType<typeof outputSchema>
 export type ListOutput = z.infer<OutputSchema>
-
 export const CronListTool = buildTool({
   name: CRON_LIST_TOOL_NAME,
   searchHint: 'list active cron jobs',
@@ -62,7 +59,6 @@ export const CronListTool = buildTool({
   },
   async call() {
     const allTasks = await listAllCronTasks()
-    // Teammates only see their own crons; team lead (no ctx) sees all.
     const ctx = getTeammateContext()
     const tasks = ctx
       ? allTasks.filter(t => t.agentId === ctx.agentId)

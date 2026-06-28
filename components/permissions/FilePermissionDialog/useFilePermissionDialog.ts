@@ -19,11 +19,9 @@ import {
   PERMISSION_HANDLERS,
   type PermissionHandlerParams,
 } from './usePermissionHandler.js'
-
 export interface ToolInput {
   [key: string]: unknown
 }
-
 export type UseFilePermissionDialogProps<T extends ToolInput> = {
   filePath: string
   completionType: CompletionType
@@ -34,7 +32,6 @@ export type UseFilePermissionDialogProps<T extends ToolInput> = {
   parseInput: (input: unknown) => T
   operationType?: FileOperationType
 }
-
 export type UseFilePermissionDialogResult<T> = {
   options: PermissionOptionWithLabel[]
   onChange: (option: PermissionOption, input: T, feedback?: string) => void
@@ -46,10 +43,6 @@ export type UseFilePermissionDialogResult<T> = {
   yesInputMode: boolean
   noInputMode: boolean
 }
-
-/**
- * Hook for handling file permission dialogs with common logic
- */
 export function useFilePermissionDialog<T extends ToolInput>({
   filePath,
   completionType,
@@ -66,11 +59,8 @@ export function useFilePermissionDialog<T extends ToolInput>({
   const [focusedOption, setFocusedOption] = useState('yes')
   const [yesInputMode, setYesInputMode] = useState(false)
   const [noInputMode, setNoInputMode] = useState(false)
-  // Track whether user ever entered feedback mode (persists after collapse)
   const [yesFeedbackModeEntered, setYesFeedbackModeEntered] = useState(false)
   const [noFeedbackModeEntered, setNoFeedbackModeEntered] = useState(false)
-
-  // Generate options based on context
   const options = useMemo(
     () =>
       getFilePermissionOptions({
@@ -84,8 +74,6 @@ export function useFilePermissionDialog<T extends ToolInput>({
       }),
     [filePath, toolPermissionContext, operationType, yesInputMode, noInputMode],
   )
-
-  // Handle option selection using shared handlers
   const onChange = useCallback(
     (option: PermissionOption, input: T, feedback?: string) => {
       const params: PermissionHandlerParams = {
@@ -99,8 +87,6 @@ export function useFilePermissionDialog<T extends ToolInput>({
         languageName,
         operationType,
       }
-
-      // Override the input in toolUseConfirm to pass the parsed input
       const originalOnAllow = toolUseConfirm.onAllow
       toolUseConfirm.onAllow = (
         _input: unknown,
@@ -109,7 +95,6 @@ export function useFilePermissionDialog<T extends ToolInput>({
       ) => {
         originalOnAllow(input, permissionUpdates, feedback)
       }
-
       const handler = PERMISSION_HANDLERS[option.type]
       handler(params, {
         feedback,
@@ -134,8 +119,6 @@ export function useFilePermissionDialog<T extends ToolInput>({
       noFeedbackModeEntered,
     ],
   )
-
-  // Handler for confirm:cycleMode - select accept-session option
   const handleCycleMode = useCallback(() => {
     const sessionOption = options.find(o => o.option.type === 'accept-session')
     if (sessionOption) {
@@ -143,17 +126,12 @@ export function useFilePermissionDialog<T extends ToolInput>({
       onChange(sessionOption.option, parsedInput)
     }
   }, [options, parseInput, toolUseConfirm.input, onChange])
-
-  // Register keyboard shortcut handler via keybindings system
   useKeybindings(
     { 'confirm:cycleMode': handleCycleMode },
     { context: 'Confirmation' },
   )
-
-  // Wrap setFocusedOption and reset input mode when navigating away
   const handleFocusedOptionChange = useCallback(
     (value: string) => {
-      // Reset input mode when navigating away, but only if no text typed
       if (value !== 'yes' && yesInputMode && !acceptFeedback.trim()) {
         setYesInputMode(false)
       }
@@ -164,8 +142,6 @@ export function useFilePermissionDialog<T extends ToolInput>({
     },
     [yesInputMode, noInputMode, acceptFeedback, rejectFeedback],
   )
-
-  // Handle Tab key toggling input mode for Yes/No options
   const handleInputModeToggle = useCallback(
     (value: string) => {
       const analyticsProps = {
@@ -174,7 +150,6 @@ export function useFilePermissionDialog<T extends ToolInput>({
         ) as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
         isMcp: toolUseConfirm.tool.isMcp ?? false,
       }
-
       if (value === 'yes') {
         if (yesInputMode) {
           setYesInputMode(false)
@@ -197,7 +172,6 @@ export function useFilePermissionDialog<T extends ToolInput>({
     },
     [yesInputMode, noInputMode, toolUseConfirm],
   )
-
   return {
     options,
     onChange,

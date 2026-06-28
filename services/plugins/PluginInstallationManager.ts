@@ -1,10 +1,3 @@
-/**
- * Background plugin and marketplace installation manager
- *
- * This module handles automatic installation of plugins and marketplaces
- * from trusted sources (repository and user settings) without blocking startup.
- */
-
 import type { AppState } from '../../state/AppState.js'
 import { logForDebugging } from '../../utils/debug.js'
 import { logForDiagnosticsNoPII } from '../../utils/diagLogs.js'
@@ -21,12 +14,7 @@ import {
 } from '../../utils/plugins/reconciler.js'
 import { refreshActivePlugins } from '../../utils/plugins/refresh.js'
 import { logEvent } from '../analytics/index.js'
-
 type SetAppState = (f: (prevState: AppState) => AppState) => void
-
-/**
- * Update marketplace installation status in app state
- */
 function updateMarketplaceStatus(
   setAppState: SetAppState,
   name: string,
@@ -46,36 +34,18 @@ function updateMarketplaceStatus(
     },
   }))
 }
-
-/**
- * Perform background plugin startup checks and installations.
- *
- * This is a thin wrapper around reconcileMarketplaces() that maps onProgress
- * events to AppState updates for the REPL UI. After marketplaces are
- * reconciled:
- * - New installs → auto-refresh plugins (fixes "plugin-not-found" errors
- *   from the initial cache-only load on fresh homespace/cleared cache)
- * - Updates only → set needsRefresh, show notification for /reload-plugins
- */
 export async function performBackgroundPluginInstallations(
   setAppState: SetAppState,
 ): Promise<void> {
   logForDebugging('performBackgroundPluginInstallations called')
-
   try {
-    // Compute diff upfront for initial UI status (pending spinners)
     const declared = getDeclaredMarketplaces()
     const materialized = await loadKnownMarketplacesConfig().catch(() => ({}))
     const diff = diffMarketplaces(declared, materialized)
-
     const pendingNames = [
       ...diff.missing,
       ...diff.sourceChanged.map(c => c.name),
     ]
-
-    // Initialize AppState with pending status. No per-plugin pending status —
-    // plugin load is fast (cache hit or local copy); marketplace clone is the
-    // slow part worth showing progress for.
     setAppState(prev => ({
       ...prev,
       plugins: {
@@ -89,15 +59,12 @@ export async function performBackgroundPluginInstallations(
         },
       },
     }))
-
     if (pendingNames.length === 0) {
       return
     }
-
     logForDebugging(
       `Installing ${pendingNames.length} marketplace(s) in background`,
     )
-
     const result = await reconcileMarketplaces({
       onProgress: event => {
         switch (event.type) {
@@ -118,7 +85,6 @@ export async function performBackgroundPluginInstallations(
         }
       },
     })
-
     const metrics = {
       installed_count: result.installed.length,
       updated_count: result.updated.length,
@@ -131,13 +97,7 @@ export async function performBackgroundPluginInstallations(
       'open_code_cli_marketplace_background_install',
       metrics,
     )
-
     if (result.installed.length > 0) {
-      // New marketplaces were installed — auto-refresh plugins. This fixes
-      // "Plugin not found in marketplace" errors from the initial cache-only
-      // load (e.g., fresh homespace where marketplace cache was empty).
-      // refreshActivePlugins clears all caches, reloads plugins, and bumps
-      // pluginReconnectKey so MCP connections are re-established.
       clearMarketplacesCache()
       logForDebugging(
         `Auto-refreshing plugins after ${result.installed.length} new marketplace(s) installed`,
@@ -145,8 +105,6 @@ export async function performBackgroundPluginInstallations(
       try {
         await refreshActivePlugins(setAppState)
       } catch (refreshError) {
-        // If auto-refresh fails, fall back to needsRefresh notification so
-        // the user can manually run /reload-plugins to recover.
         logError(refreshError)
         logForDebugging(
           `Auto-refresh failed, falling back to needsRefresh: ${refreshError}`,
@@ -164,8 +122,6 @@ export async function performBackgroundPluginInstallations(
         })
       }
     } else if (result.updated.length > 0) {
-      // Existing marketplaces updated — notify user to run /reload-plugins.
-      // Updates are less urgent and the user should choose when to apply them.
       clearMarketplacesCache()
       clearPluginCache(
         'performBackgroundPluginInstallations: marketplaces reconciled',

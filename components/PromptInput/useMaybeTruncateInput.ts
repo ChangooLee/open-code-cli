@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { PastedContent } from 'src/utils/config.js'
 import { maybeTruncateInput } from './inputPaste.js'
-
 type Props = {
   input: string
   pastedContents: Record<number, PastedContent>
@@ -9,7 +8,6 @@ type Props = {
   setCursorOffset: (offset: number) => void
   setPastedContents: (contents: Record<number, PastedContent>) => void
 }
-
 export function useMaybeTruncateInput({
   input,
   pastedContents,
@@ -17,25 +15,19 @@ export function useMaybeTruncateInput({
   setCursorOffset,
   setPastedContents,
 }: Props) {
-  // Track if we've initialized this specific input value
   const [hasAppliedTruncationToInput, setHasAppliedTruncationToInput] =
     useState(false)
-
-  // Process input for truncation and pasted images from MessageSelector.
   useEffect(() => {
     if (hasAppliedTruncationToInput) {
       return
     }
-
     if (input.length <= 10_000) {
       return
     }
-
     const { newInput, newPastedContents } = maybeTruncateInput(
       input,
       pastedContents,
     )
-
     onInputChange(newInput)
     setCursorOffset(newInput.length)
     setPastedContents(newPastedContents)
@@ -48,8 +40,6 @@ export function useMaybeTruncateInput({
     setPastedContents,
     setCursorOffset,
   ])
-
-  // Reset hasInitializedInput when input is cleared (e.g., after submission)
   useEffect(() => {
     if (input === '') {
       setHasAppliedTruncationToInput(false)

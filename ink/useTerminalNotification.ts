@@ -2,26 +2,16 @@ import { createContext, useCallback, useContext, useMemo } from 'react'
 import { isProgressReportingAvailable, type Progress } from './terminal.js'
 import { BEL } from './termio/ansi.js'
 import { ITERM2, OSC, osc, PROGRESS, wrapForMultiplexer } from './termio/osc.js'
-
 type WriteRaw = (data: string) => void
-
 export const TerminalWriteContext = createContext<WriteRaw | null>(null)
-
 export const TerminalWriteProvider = TerminalWriteContext.Provider
-
 export type TerminalNotification = {
   notifyITerm2: (opts: { message: string; title?: string }) => void
   notifyKitty: (opts: { message: string; title: string; id: number }) => void
   notifyGhostty: (opts: { message: string; title: string }) => void
   notifyBell: () => void
-  /**
-   * Report progress to the terminal via OSC 9;4 sequences.
-   * Supported terminals: ConEmu, Ghostty 1.2.0+, iTerm2 3.6.6+
-   * Pass state=null to clear progress.
-   */
   progress: (state: Progress['state'] | null, percentage?: number) => void
 }
-
 export function useTerminalNotification(): TerminalNotification {
   const writeRaw = useContext(TerminalWriteContext)
   if (!writeRaw) {
@@ -29,7 +19,6 @@ export function useTerminalNotification(): TerminalNotification {
       'useTerminalNotification must be used within TerminalWriteProvider',
     )
   }
-
   const notifyITerm2 = useCallback(
     ({ message, title }: { message: string; title?: string }) => {
       const displayString = title ? `${title}:\n${message}` : message
@@ -37,7 +26,6 @@ export function useTerminalNotification(): TerminalNotification {
     },
     [writeRaw],
   )
-
   const notifyKitty = useCallback(
     ({
       message,
@@ -54,20 +42,15 @@ export function useTerminalNotification(): TerminalNotification {
     },
     [writeRaw],
   )
-
   const notifyGhostty = useCallback(
     ({ message, title }: { message: string; title: string }) => {
       writeRaw(wrapForMultiplexer(osc(OSC.GHOSTTY, 'notify', title, message)))
     },
     [writeRaw],
   )
-
   const notifyBell = useCallback(() => {
-    // Raw BEL — inside tmux this triggers tmux's bell-action (window flag).
-    // Wrapping would make it opaque DCS payload and lose that fallback.
     writeRaw(BEL)
   }, [writeRaw])
-
   const progress = useCallback(
     (state: Progress['state'] | null, percentage?: number) => {
       if (!isProgressReportingAvailable()) {
@@ -112,13 +95,11 @@ export function useTerminalNotification(): TerminalNotification {
           )
           break
         case null:
-          // Handled by the if guard above
           break
       }
     },
     [writeRaw],
   )
-
   return useMemo(
     () => ({ notifyITerm2, notifyKitty, notifyGhostty, notifyBell, progress }),
     [notifyITerm2, notifyKitty, notifyGhostty, notifyBell, progress],

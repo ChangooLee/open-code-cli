@@ -1,13 +1,5 @@
-/**
- * SGR (Select Graphic Rendition) Parser
- *
- * Parses SGR parameters and applies them to a TextStyle.
- * Handles both semicolon (;) and colon (:) separated parameters.
- */
-
 import type { NamedColor, TextStyle, UnderlineStyle } from './types.js'
 import { defaultStyle } from './types.js'
-
 const NAMED_COLORS: NamedColor[] = [
   'black',
   'red',
@@ -26,7 +18,6 @@ const NAMED_COLORS: NamedColor[] = [
   'brightCyan',
   'brightWhite',
 ]
-
 const UNDERLINE_STYLES: UnderlineStyle[] = [
   'none',
   'single',
@@ -35,17 +26,13 @@ const UNDERLINE_STYLES: UnderlineStyle[] = [
   'dotted',
   'dashed',
 ]
-
 type Param = { value: number | null; subparams: number[]; colon: boolean }
-
 function parseParams(str: string): Param[] {
   if (str === '') return [{ value: 0, subparams: [], colon: false }]
-
   const result: Param[] = []
   let current: Param = { value: null, subparams: [], colon: false }
   let num = ''
   let inSub = false
-
   for (let i = 0; i <= str.length; i++) {
     const c = str[i]
     if (c === ';' || c === undefined) {
@@ -75,14 +62,12 @@ function parseParams(str: string): Param[] {
   }
   return result
 }
-
 function parseExtendedColor(
   params: Param[],
   idx: number,
 ): { r: number; g: number; b: number } | { index: number } | null {
   const p = params[idx]
   if (!p) return null
-
   if (p.colon && p.subparams.length >= 1) {
     if (p.subparams[0] === 5 && p.subparams.length >= 2) {
       return { index: p.subparams[1]! }
@@ -96,7 +81,6 @@ function parseExtendedColor(
       }
     }
   }
-
   const next = params[idx + 1]
   if (!next) return null
   if (
@@ -123,16 +107,13 @@ function parseExtendedColor(
   }
   return null
 }
-
 export function applySGR(paramStr: string, style: TextStyle): TextStyle {
   const params = parseParams(paramStr)
   let s = { ...style }
   let i = 0
-
   while (i < params.length) {
     const p = params[i]!
     const code = p.value ?? 0
-
     if (code === 0) {
       s = defaultStyle()
       i++
@@ -231,7 +212,6 @@ export function applySGR(paramStr: string, style: TextStyle): TextStyle {
       i++
       continue
     }
-
     if (code >= 30 && code <= 37) {
       s.fg = { type: 'named', name: NAMED_COLORS[code - 30]! }
       i++
@@ -262,7 +242,6 @@ export function applySGR(paramStr: string, style: TextStyle): TextStyle {
       i++
       continue
     }
-
     if (code === 38) {
       const c = parseExtendedColor(params, i)
       if (c) {
@@ -301,7 +280,6 @@ export function applySGR(paramStr: string, style: TextStyle): TextStyle {
       i++
       continue
     }
-
     i++
   }
   return s

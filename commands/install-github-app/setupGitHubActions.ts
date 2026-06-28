@@ -13,7 +13,6 @@ import { openBrowser } from '../../utils/browser.js'
 import { execFileNoThrow } from '../../utils/execFileNoThrow.js'
 import { logError } from '../../utils/log.js'
 import type { Workflow } from './types.js'
-
 async function createWorkflowFile(
   repoName: string,
   branchName: string,
@@ -27,35 +26,29 @@ async function createWorkflowFile(
     secretExists?: boolean
   },
 ): Promise<void> {
-  // Check if workflow file already exists
   const checkFileResult = await execFileNoThrow('gh', [
     'api',
     `repos/${repoName}/contents/${workflowPath}`,
     '--jq',
     '.sha',
   ])
-
   let fileSha: string | null = null
   if (checkFileResult.code === 0) {
     fileSha = checkFileResult.stdout.trim()
   }
-
   let content = workflowContent
   if (secretName === 'OPEN_CODE_CLI_OAUTH_TOKEN') {
-    // For OAuth tokens, use the open_code_cli_oauth_token parameter
     content = workflowContent.replace(
       /open_code_cli_api_key: \$\{\{ secrets\.OPEN_CODE_CLI_API_KEY \}\}/g,
       `open_code_cli_oauth_token: \${{ secrets.OPEN_CODE_CLI_OAUTH_TOKEN }}`,
     )
   } else if (secretName !== 'OPEN_CODE_CLI_API_KEY') {
-    // For other custom secret names, keep using open_code_cli_api_key parameter
     content = workflowContent.replace(
       /open_code_cli_api_key: \$\{\{ secrets\.OPEN_CODE_CLI_API_KEY \}\}/g,
       `open_code_cli_api_key: \${{ secrets.${secretName} }}`,
     )
   }
   const base64Content = Buffer.from(content).toString('base64')
-
   const apiParams = [
     'api',
     '--method',
@@ -68,11 +61,9 @@ async function createWorkflowFile(
     '-f',
     `branch=${branchName}`,
   ]
-
   if (fileSha) {
     apiParams.push('-f', `sha=${fileSha}`)
   }
-
   const createFileResult = await execFileNoThrow('gh', apiParams)
   if (createFileResult.code !== 0) {
     if (
@@ -89,26 +80,22 @@ async function createWorkflowFile(
         `Failed to create workflow file ${workflowPath}: an Open Code CLI workflow file already exists in this repository. Please remove it first or update it manually.`,
       )
     }
-
     logEvent('open_code_cli_setup_github_actions_failed', {
       reason:
         'failed_to_create_workflow_file' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
       exit_code: createFileResult.code,
       ...context,
     })
-
     const helpText =
       '\n\nNeed help? Common issues:\n' +
       '· Permission denied → Run: gh auth refresh -h github.com -s repo,workflow\n' +
       '· Not authorized → Ensure you have admin access to the repository\n' +
       '· For manual setup → Visit: https://github.com/open-code-cli/open-code-cli-action'
-
     throw new Error(
       `Failed to create workflow file ${workflowPath}: ${createFileResult.stderr}${helpText}`,
     )
   }
 }
-
 export async function setupGitHubActions(
   repoName: string,
   apiKeyOrOAuthToken: string | null,
@@ -133,8 +120,6 @@ export async function setupGitHubActions(
         selectedWorkflows.includes('open-code-cli-review'),
       ...context,
     })
-
-    // Check if repository exists
     const repoCheckResult = await execFileNoThrow('gh', [
       'api',
       `repos/${repoName}`,
@@ -152,8 +137,6 @@ export async function setupGitHubActions(
         `Failed to access repository ${repoName}: ${repoCheckResult.stderr}`,
       )
     }
-
-    // Get default branch
     const defaultBranchResult = await execFileNoThrow('gh', [
       'api',
       `repos/${repoName}`,
@@ -172,8 +155,6 @@ export async function setupGitHubActions(
       )
     }
     const defaultBranch = defaultBranchResult.stdout.trim()
-
-    // Get SHA of default branch
     const shaResult = await execFileNoThrow('gh', [
       'api',
       `repos/${repoName}/git/ref/heads/${defaultBranch}`,
@@ -190,12 +171,9 @@ export async function setupGitHubActions(
       throw new Error(`Failed to get branch SHA: ${shaResult.stderr}`)
     }
     const sha = shaResult.stdout.trim()
-
     let branchName: string | null = null
-
     if (!skipWorkflow) {
       updateProgress()
-      // Create new branch
       branchName = `add-open-code-cli-github-actions-${Date.now()}`
       const createBranchResult = await execFileNoThrow('gh', [
         'api',
@@ -216,11 +194,8 @@ export async function setupGitHubActions(
         })
         throw new Error(`Failed to create branch: ${createBranchResult.stderr}`)
       }
-
       updateProgress()
-      // Create selected workflow files
       const workflows = []
-
       if (selectedWorkflows.includes('open-code-cli')) {
         workflows.push({
           path: '.github/workflows/open-code-cli.yml',
@@ -228,7 +203,6 @@ export async function setupGitHubActions(
           message: 'Open Code CLI PR Assistant workflow',
         })
       }
-
       if (selectedWorkflows.includes('open-code-cli-review')) {
         workflows.push({
           path: '.github/workflows/open-code-cli-review.yml',
@@ -236,7 +210,6 @@ export async function setupGitHubActions(
           message: 'Open Code CLI Review workflow',
         })
       }
-
       for (const workflow of workflows) {
         await createWorkflowFile(
           repoName,
@@ -249,9 +222,7 @@ export async function setupGitHubActions(
         )
       }
     }
-
     updateProgress()
-    // Set the API key as a secret if provided
     if (apiKeyOrOAuthToken) {
       const setSecretResult = await execFileNoThrow('gh', [
         'secret',
@@ -269,27 +240,21 @@ export async function setupGitHubActions(
           exit_code: setSecretResult.code,
           ...context,
         })
-
         const helpText =
           '\n\nNeed help? Common issues:\n' +
           '· Permission denied → Run: gh auth refresh -h github.com -s repo\n' +
           '· Not authorized → Ensure you have admin access to the repository\n' +
           '· For manual setup → Visit: https://github.com/open-code-cli/open-code-cli-action'
-
         throw new Error(
           `Failed to set API key secret: ${setSecretResult.stderr || 'Unknown error'}${helpText}`,
         )
       }
     }
-
     if (!skipWorkflow && branchName) {
       updateProgress()
-      // Create PR template URL instead of creating PR directly
       const compareUrl = `https://github.com/${repoName}/compare/${defaultBranch}...${branchName}?quick_pull=1&title=${encodeURIComponent(PR_TITLE)}&body=${encodeURIComponent(PR_BODY)}`
-
       await openBrowser(compareUrl)
     }
-
     logEvent('open_code_cli_setup_github_actions_completed', {
       skip_workflow: skipWorkflow,
       has_api_key: !!apiKeyOrOAuthToken,

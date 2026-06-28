@@ -26,10 +26,6 @@ import {
   type LayoutPositionType,
   type LayoutWrap,
 } from './node.js'
-
-// --
-// Edge/Gutter mapping
-
 const EDGE_MAP: Record<LayoutEdge, Edge> = {
   all: Edge.All,
   horizontal: Edge.Horizontal,
@@ -41,48 +37,32 @@ const EDGE_MAP: Record<LayoutEdge, Edge> = {
   start: Edge.Start,
   end: Edge.End,
 }
-
 const GUTTER_MAP: Record<LayoutGutter, Gutter> = {
   all: Gutter.All,
   column: Gutter.Column,
   row: Gutter.Row,
 }
-
-// --
-// Yoga adapter
-
 export class YogaLayoutNode implements LayoutNode {
   readonly yoga: YogaNode
-
   constructor(yoga: YogaNode) {
     this.yoga = yoga
   }
-
-  // Tree
-
   insertChild(child: LayoutNode, index: number): void {
     this.yoga.insertChild((child as YogaLayoutNode).yoga, index)
   }
-
   removeChild(child: LayoutNode): void {
     this.yoga.removeChild((child as YogaLayoutNode).yoga)
   }
-
   getChildCount(): number {
     return this.yoga.getChildCount()
   }
-
   getParent(): LayoutNode | null {
     const p = this.yoga.getParent()
     return p ? new YogaLayoutNode(p) : null
   }
-
-  // Layout
-
   calculateLayout(width?: number, _height?: number): void {
     this.yoga.calculateLayout(width, undefined, Direction.LTR)
   }
-
   setMeasureFunc(fn: LayoutMeasureFunc): void {
     this.yoga.setMeasureFunc((w, wMode) => {
       const mode =
@@ -94,43 +74,30 @@ export class YogaLayoutNode implements LayoutNode {
       return fn(w, mode)
     })
   }
-
   unsetMeasureFunc(): void {
     this.yoga.unsetMeasureFunc()
   }
-
   markDirty(): void {
     this.yoga.markDirty()
   }
-
-  // Computed layout
-
   getComputedLeft(): number {
     return this.yoga.getComputedLeft()
   }
-
   getComputedTop(): number {
     return this.yoga.getComputedTop()
   }
-
   getComputedWidth(): number {
     return this.yoga.getComputedWidth()
   }
-
   getComputedHeight(): number {
     return this.yoga.getComputedHeight()
   }
-
   getComputedBorder(edge: LayoutEdge): number {
     return this.yoga.getComputedBorder(EDGE_MAP[edge]!)
   }
-
   getComputedPadding(edge: LayoutEdge): number {
     return this.yoga.getComputedPadding(EDGE_MAP[edge]!)
   }
-
-  // Style setters
-
   setWidth(value: number): void {
     this.yoga.setWidth(value)
   }
@@ -173,7 +140,6 @@ export class YogaLayoutNode implements LayoutNode {
   setMaxHeightPercent(value: number): void {
     this.yoga.setMaxHeightPercent(value)
   }
-
   setFlexDirection(dir: LayoutFlexDirection): void {
     const map: Record<LayoutFlexDirection, FlexDirection> = {
       row: FlexDirection.Row,
@@ -183,7 +149,6 @@ export class YogaLayoutNode implements LayoutNode {
     }
     this.yoga.setFlexDirection(map[dir]!)
   }
-
   setFlexGrow(value: number): void {
     this.yoga.setFlexGrow(value)
   }
@@ -196,7 +161,6 @@ export class YogaLayoutNode implements LayoutNode {
   setFlexBasisPercent(value: number): void {
     this.yoga.setFlexBasisPercent(value)
   }
-
   setFlexWrap(wrap: LayoutWrap): void {
     const map: Record<LayoutWrap, Wrap> = {
       nowrap: Wrap.NoWrap,
@@ -205,7 +169,6 @@ export class YogaLayoutNode implements LayoutNode {
     }
     this.yoga.setFlexWrap(map[wrap]!)
   }
-
   setAlignItems(align: LayoutAlign): void {
     const map: Record<LayoutAlign, Align> = {
       auto: Align.Auto,
@@ -216,7 +179,6 @@ export class YogaLayoutNode implements LayoutNode {
     }
     this.yoga.setAlignItems(map[align]!)
   }
-
   setAlignSelf(align: LayoutAlign): void {
     const map: Record<LayoutAlign, Align> = {
       auto: Align.Auto,
@@ -227,7 +189,6 @@ export class YogaLayoutNode implements LayoutNode {
     }
     this.yoga.setAlignSelf(map[align]!)
   }
-
   setJustifyContent(justify: LayoutJustify): void {
     const map: Record<LayoutJustify, Justify> = {
       'flex-start': Justify.FlexStart,
@@ -239,31 +200,25 @@ export class YogaLayoutNode implements LayoutNode {
     }
     this.yoga.setJustifyContent(map[justify]!)
   }
-
   setDisplay(display: LayoutDisplay): void {
     this.yoga.setDisplay(display === 'flex' ? Display.Flex : Display.None)
   }
-
   getDisplay(): LayoutDisplay {
     return this.yoga.getDisplay() === Display.None
       ? LayoutDisplay.None
       : LayoutDisplay.Flex
   }
-
   setPositionType(type: LayoutPositionType): void {
     this.yoga.setPositionType(
       type === 'absolute' ? PositionType.Absolute : PositionType.Relative,
     )
   }
-
   setPosition(edge: LayoutEdge, value: number): void {
     this.yoga.setPosition(EDGE_MAP[edge]!, value)
   }
-
   setPositionPercent(edge: LayoutEdge, value: number): void {
     this.yoga.setPositionPercent(EDGE_MAP[edge]!, value)
   }
-
   setOverflow(overflow: LayoutOverflow): void {
     const map: Record<LayoutOverflow, Overflow> = {
       visible: Overflow.Visible,
@@ -272,7 +227,6 @@ export class YogaLayoutNode implements LayoutNode {
     }
     this.yoga.setOverflow(map[overflow]!)
   }
-
   setMargin(edge: LayoutEdge, value: number): void {
     this.yoga.setMargin(EDGE_MAP[edge]!, value)
   }
@@ -285,9 +239,6 @@ export class YogaLayoutNode implements LayoutNode {
   setGap(gutter: LayoutGutter, value: number): void {
     this.yoga.setGap(GUTTER_MAP[gutter]!, value)
   }
-
-  // Lifecycle
-
   free(): void {
     this.yoga.free()
   }
@@ -295,14 +246,6 @@ export class YogaLayoutNode implements LayoutNode {
     this.yoga.freeRecursive()
   }
 }
-
-// --
-// Instance management
-//
-// The TS yoga-layout port is synchronous — no WASM loading, no linear memory
-// growth, so no preload/swap/reset machinery is needed. The Yoga instance is
-// just a plain JS object available at import time.
-
 export function createYogaLayoutNode(): LayoutNode {
   return new YogaLayoutNode(Yoga.Node.create())
 }

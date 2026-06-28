@@ -1,13 +1,3 @@
-/**
- * Transforms SDK messages for streamlined output mode.
- *
- * Streamlined mode is a "distillation-resistant" output format that:
- * - Keeps text messages intact
- * - Summarizes tool calls with cumulative counts (resets when text appears)
- * - Omits thinking content
- * - Strips tool list and model info from init messages
- */
-
 import type { SDKAssistantMessage } from 'src/entrypoints/agentSdkTypes.js'
 import type { StdoutMessage } from 'src/entrypoints/sdk/controlTypes.js'
 import { FILE_EDIT_TOOL_NAME } from 'src/tools/FileEditTool/constants.js'
@@ -23,7 +13,6 @@ import { WEB_SEARCH_TOOL_NAME } from 'src/tools/WebSearchTool/prompt.js'
 import { extractTextContent } from 'src/utils/messages.js'
 import { SHELL_TOOL_NAMES } from 'src/utils/shell/shellToolUtils.js'
 import { capitalize } from 'src/utils/stringUtils.js'
-
 type ToolCounts = {
   searches: number
   reads: number
@@ -31,10 +20,6 @@ type ToolCounts = {
   commands: number
   other: number
 }
-
-/**
- * Tool categories for summarization.
- */
 const SEARCH_TOOLS = [
   GREP_TOOL_NAME,
   GLOB_TOOL_NAME,
@@ -48,7 +33,6 @@ const WRITE_TOOLS = [
   NOTEBOOK_EDIT_TOOL_NAME,
 ]
 const COMMAND_TOOLS = [...SHELL_TOOL_NAMES, 'Tmux', TASK_STOP_TOOL_NAME]
-
 function categorizeToolName(toolName: string): keyof ToolCounts {
   if (SEARCH_TOOLS.some(t => toolName.startsWith(t))) return 'searches'
   if (READ_TOOLS.some(t => toolName.startsWith(t))) return 'reads'
@@ -56,7 +40,6 @@ function categorizeToolName(toolName: string): keyof ToolCounts {
   if (COMMAND_TOOLS.some(t => toolName.startsWith(t))) return 'commands'
   return 'other'
 }
-
 function createEmptyToolCounts(): ToolCounts {
   return {
     searches: 0,
@@ -66,14 +49,8 @@ function createEmptyToolCounts(): ToolCounts {
     other: 0,
   }
 }
-
-/**
- * Generate a summary text for tool counts.
- */
 function getToolSummaryText(counts: ToolCounts): string | undefined {
   const parts: string[] = []
-
-  // Use similar phrasing to collapseReadSearch.ts
   if (counts.searches > 0) {
     parts.push(
       `searched ${counts.searches} ${counts.searches === 1 ? 'pattern' : 'patterns'}`,
@@ -95,17 +72,11 @@ function getToolSummaryText(counts: ToolCounts): string | undefined {
   if (counts.other > 0) {
     parts.push(`${counts.other} other ${counts.other === 1 ? 'tool' : 'tools'}`)
   }
-
   if (parts.length === 0) {
     return undefined
   }
-
   return capitalize(parts.join(', '))
 }
-
-/**
- * Count tool uses in an assistant message and add to existing counts.
- */
 function accumulateToolUses(
   message: SDKAssistantMessage,
   counts: ToolCounts,
@@ -114,7 +85,6 @@ function accumulateToolUses(
   if (!Array.isArray(content)) {
     return
   }
-
   for (const block of content) {
     if (block.type === 'tool_use' && 'name' in block) {
       const category = categorizeToolName(block.name as string)
@@ -122,16 +92,10 @@ function accumulateToolUses(
     }
   }
 }
-
-/**
- * Create a stateful transformer that accumulates tool counts between text messages.
- * Tool counts reset when a message with text content is encountered.
- */
 export function createStreamlinedTransformer(): (
   message: StdoutMessage,
 ) => StdoutMessage | null {
   let cumulativeCounts = createEmptyToolCounts()
-
   return function transformToStreamlined(
     message: StdoutMessage,
   ): StdoutMessage | null {
@@ -141,12 +105,8 @@ export function createStreamlinedTransformer(): (
         const text = Array.isArray(content)
           ? extractTextContent(content, '\n').trim()
           : ''
-
-        // Accumulate tool counts from this message
         accumulateToolUses(message, cumulativeCounts)
-
         if (text.length > 0) {
-          // Text message: emit text only, reset counts
           cumulativeCounts = createEmptyToolCounts()
           return {
             type: 'streamlined_text',
@@ -155,13 +115,10 @@ export function createStreamlinedTransformer(): (
             uuid: message.uuid,
           }
         }
-
-        // Tool-only message: emit cumulative tool summary
         const toolSummary = getToolSummaryText(cumulativeCounts)
         if (!toolSummary) {
           return null
         }
-
         return {
           type: 'streamlined_tool_use_summary',
           tool_summary: toolSummary,
@@ -169,11 +126,8 @@ export function createStreamlinedTransformer(): (
           uuid: message.uuid,
         }
       }
-
       case 'result':
-        // Keep result messages as-is (they have structured_output, permission_denials)
         return message
-
       case 'system':
       case 'user':
       case 'stream_event':
@@ -185,17 +139,11 @@ export function createStreamlinedTransformer(): (
       case 'control_cancel_request':
       case 'keep_alive':
         return null
-
       default:
         return null
     }
   }
 }
-
-/**
- * Check if a message should be included in streamlined output.
- * Useful for filtering before transformation.
- */
 export function shouldIncludeInStreamlined(message: StdoutMessage): boolean {
   return message.type === 'assistant' || message.type === 'result'
 }

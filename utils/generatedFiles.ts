@@ -1,11 +1,4 @@
 import { basename, extname, posix, sep } from 'path'
-
-/**
- * File patterns that should be excluded from attribution.
- * Based on GitHub Linguist vendored patterns and common generated file patterns.
- */
-
-// Exact file name matches (case-insensitive)
 const EXCLUDED_FILENAMES = new Set([
   'package-lock.json',
   'yarn.lock',
@@ -20,8 +13,6 @@ const EXCLUDED_FILENAMES = new Set([
   'shrinkwrap.json',
   'npm-shrinkwrap.json',
 ])
-
-// File extension patterns (case-insensitive)
 const EXCLUDED_EXTENSIONS = new Set([
   '.lock',
   '.min.js',
@@ -33,8 +24,6 @@ const EXCLUDED_EXTENSIONS = new Set([
   '.generated.js',
   '.d.ts', // TypeScript declaration files
 ])
-
-// Directory patterns that indicate generated/vendored content
 const EXCLUDED_DIRECTORIES = [
   '/dist/',
   '/build/',
@@ -57,8 +46,6 @@ const EXCLUDED_DIRECTORIES = [
   '/target/release/',
   '/target/debug/',
 ]
-
-// Filename patterns using regex for more complex matching
 const EXCLUDED_FILENAME_PATTERNS = [
   /^.*\.min\.[a-z]+$/i, // *.min.*
   /^.*-min\.[a-z]+$/i, // *-min.*
@@ -75,31 +62,17 @@ const EXCLUDED_FILENAME_PATTERNS = [
   /^.*\.swagger\.[a-z]+$/i, // Swagger generated files
   /^.*\.openapi\.[a-z]+$/i, // OpenAPI generated files
 ]
-
-/**
- * Check if a file should be excluded from attribution based on Linguist-style rules.
- *
- * @param filePath - Relative file path from repository root
- * @returns true if the file should be excluded from attribution
- */
 export function isGeneratedFile(filePath: string): boolean {
-  // Normalize path separators for consistent pattern matching (patterns use posix-style /)
   const normalizedPath =
     posix.sep + filePath.split(sep).join(posix.sep).replace(/^\/+/, '')
   const fileName = basename(filePath).toLowerCase()
   const ext = extname(filePath).toLowerCase()
-
-  // Check exact filename matches
   if (EXCLUDED_FILENAMES.has(fileName)) {
     return true
   }
-
-  // Check extension matches
   if (EXCLUDED_EXTENSIONS.has(ext)) {
     return true
   }
-
-  // Check for compound extensions like .min.js
   const parts = fileName.split('.')
   if (parts.length > 2) {
     const compoundExt = '.' + parts.slice(-2).join('.')
@@ -107,30 +80,18 @@ export function isGeneratedFile(filePath: string): boolean {
       return true
     }
   }
-
-  // Check directory patterns
   for (const dir of EXCLUDED_DIRECTORIES) {
     if (normalizedPath.includes(dir)) {
       return true
     }
   }
-
-  // Check filename patterns
   for (const pattern of EXCLUDED_FILENAME_PATTERNS) {
     if (pattern.test(fileName)) {
       return true
     }
   }
-
   return false
 }
-
-/**
- * Filter a list of files to exclude generated files.
- *
- * @param files - Array of file paths
- * @returns Array of files that are not generated
- */
 export function filterGeneratedFiles(files: string[]): string[] {
   return files.filter(file => !isGeneratedFile(file))
 }

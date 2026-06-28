@@ -1,4 +1,3 @@
-// Types extracted to src/types/permissions.ts to break import cycles
 import type {
   PermissionAllowDecision,
   PermissionAskDecision,
@@ -8,8 +7,6 @@ import type {
   PermissionMetadata,
   PermissionResult,
 } from '../../types/permissions.js'
-
-// Re-export for backwards compatibility
 export type {
   PermissionAllowDecision,
   PermissionAskDecision,
@@ -19,8 +16,6 @@ export type {
   PermissionMetadata,
   PermissionResult,
 }
-
-// Helper function to get the appropriate prose description for rule behavior
 export function getRuleBehaviorDescription(
   permissionResult: PermissionResult['behavior'],
 ): string {

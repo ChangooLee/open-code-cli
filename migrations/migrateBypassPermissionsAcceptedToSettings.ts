@@ -5,28 +5,18 @@ import {
   hasSkipDangerousModePermissionPrompt,
   updateSettingsForSource,
 } from '../utils/settings/settings.js'
-
-/**
- * Migration: Move bypassPermissionsModeAccepted from global config to settings.json
- * as skipDangerousModePermissionPrompt. This is a better home since settings.json
- * is the user-configurable settings file.
- */
 export function migrateBypassPermissionsAcceptedToSettings(): void {
   const globalConfig = getGlobalConfig()
-
   if (!globalConfig.bypassPermissionsModeAccepted) {
     return
   }
-
   try {
     if (!hasSkipDangerousModePermissionPrompt()) {
       updateSettingsForSource('userSettings', {
         skipDangerousModePermissionPrompt: true,
       })
     }
-
     logEvent('open_code_cli_migrate_bypass_permissions_accepted', {})
-
     saveGlobalConfig(current => {
       if (!('bypassPermissionsModeAccepted' in current)) return current
       const { bypassPermissionsModeAccepted: _, ...updatedConfig } = current

@@ -9,14 +9,12 @@ import { TodoListSchema } from '../../utils/todo/types.js'
 import { VERIFICATION_AGENT_TYPE } from '../AgentTool/constants.js'
 import { TODO_WRITE_TOOL_NAME } from './constants.js'
 import { DESCRIPTION, PROMPT } from './prompt.js'
-
 const inputSchema = lazySchema(() =>
   z.strictObject({
     todos: TodoListSchema().describe('The updated todo list'),
   }),
 )
 type InputSchema = ReturnType<typeof inputSchema>
-
 const outputSchema = lazySchema(() =>
   z.object({
     oldTodos: TodoListSchema().describe('The todo list before the update'),
@@ -25,9 +23,7 @@ const outputSchema = lazySchema(() =>
   }),
 )
 type OutputSchema = ReturnType<typeof outputSchema>
-
 export type Output = z.infer<OutputSchema>
-
 export const TodoWriteTool = buildTool({
   name: TODO_WRITE_TOOL_NAME,
   searchHint: 'manage the session task checklist',
@@ -56,7 +52,6 @@ export const TodoWriteTool = buildTool({
     return `${input.todos.length} items`
   },
   async checkPermissions(input) {
-    // No permission checks required for todo operations
     return { behavior: 'allow', updatedInput: input }
   },
   renderToolUseMessage() {
@@ -68,11 +63,6 @@ export const TodoWriteTool = buildTool({
     const oldTodos = appState.todos[todoKey] ?? []
     const allDone = todos.every(_ => _.status === 'completed')
     const newTodos = allDone ? [] : todos
-
-    // Structural nudge: if the main-thread agent is closing out a 3+ item
-    // list and none of those items was a verification step, append a reminder
-    // to the tool result. Fires at the exact loop-exit moment where skips
-    // happen ("when the last task closed, the loop exited").
     let verificationNudgeNeeded = false
     if (
       feature('VERIFICATION_AGENT') &&
@@ -84,7 +74,6 @@ export const TodoWriteTool = buildTool({
     ) {
       verificationNudgeNeeded = true
     }
-
     context.setAppState(prev => ({
       ...prev,
       todos: {
@@ -92,7 +81,6 @@ export const TodoWriteTool = buildTool({
         [todoKey]: newTodos,
       },
     }))
-
     return {
       data: {
         oldTodos,

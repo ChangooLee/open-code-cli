@@ -1,30 +1,13 @@
-/**
- * Terminal Launcher
- *
- * Detects the user's preferred terminal emulator and launches Open Code CLI
- * inside it. Used by the deep link protocol handler when invoked by the OS
- * (i.e., not already running inside a terminal).
- *
- * Platform support:
- *   macOS  — Terminal.app, iTerm2, Ghostty, Kitty, Alacritty, WezTerm
- *   Linux  — $TERMINAL, x-terminal-emulator, gnome-terminal, konsole, etc.
- *   Windows — Windows Terminal (wt.exe), PowerShell, cmd.exe
- */
-
 import { spawn } from 'child_process'
 import { basename } from 'path'
 import { getGlobalConfig } from '../config.js'
 import { logForDebugging } from '../debug.js'
 import { execFileNoThrow } from '../execFileNoThrow.js'
 import { which } from '../which.js'
-
 export type TerminalInfo = {
   name: string
   command: string
 }
-
-// macOS terminals in preference order.
-// Each entry: [display name, app bundle name or CLI command, detection method]
 const MACOS_TERMINALS: Array<{
   name: string
   bundleId: string
@@ -41,8 +24,6 @@ const MACOS_TERMINALS: Array<{
     app: 'Terminal',
   },
 ]
-
-// Linux terminals in preference order (command name)
 const LINUX_TERMINALS = [
   'ghostty',
   'kitty',
@@ -55,16 +36,7 @@ const LINUX_TERMINALS = [
   'tilix',
   'xterm',
 ]
-
-/**
- * Detect the user's preferred terminal on macOS.
- * Checks running processes first (most likely to be what the user prefers),
- * then falls back to checking installed .app bundles.
- */
 async function detectMacosTerminal(): Promise<TerminalInfo> {
-  // Stored preference from a previous interactive session. This is the only
-  // signal that survives into the headless LaunchServices context — the env
-  // var check below never hits when we're launched from a browser link.
   const stored = getGlobalConfig().deepLinkTerminal
   if (stored) {
     const match = MACOS_TERMINALS.find(t => t.app === stored)
@@ -72,9 +44,6 @@ async function detectMacosTerminal(): Promise<TerminalInfo> {
       return { name: match.name, command: match.app }
     }
   }
-
-  // Check the TERM_PROGRAM env var — if set, the user has a clear preference.
-  // TERM_PROGRAM may include a .app suffix (e.g., "iTerm.app"), so strip it.
   const termProgram = process.env.TERM_PROGRAM
   if (termProgram) {
     const normalized = termProgram.replace(/\.app$/i, '').toLowerCase()
@@ -87,11 +56,6 @@ async function detectMacosTerminal(): Promise<TerminalInfo> {
       return { name: match.name, command: match.app }
     }
   }
-
-  // Check which terminals are installed by looking for .app bundles.
-  // Try mdfind first (Spotlight), but fall back to checking /Applications
-  // directly since mdfind can return empty results if Spotlight is disabled
-  // or hasn't indexed the app yet.
   for (const terminal of MACOS_TERMINALS) {
     const { code, stdout } = await execFileNoThrow(
       'mdfind',
@@ -102,9 +66,6 @@ async function detectMacosTerminal(): Promise<TerminalInfo> {
       return { name: terminal.name, command: terminal.app }
     }
   }
-
-  // Fallback: check /Applications directly (mdfind may not work if
-  // Spotlight indexing is disabled or incomplete)
   for (const terminal of MACOS_TERMINALS) {
     const { code: lsCode } = await execFileNoThrow(
       'ls',
@@ -115,17 +76,9 @@ async function detectMacosTerminal(): Promise<TerminalInfo> {
       return { name: terminal.name, command: terminal.app }
     }
   }
-
-  // Terminal.app is always available on macOS
   return { name: 'Terminal.app', command: 'Terminal' }
 }
-
-/**
- * Detect the user's preferred terminal on Linux.
- * Checks $TERMINAL, then x-terminal-emulator, then walks a priority list.
- */
 async function detectLinuxTerminal(): Promise<TerminalInfo | null> {
-  // Check $TERMINAL env var
   const termEnv = process.env.TERMINAL
   if (termEnv) {
     const resolved = await which(termEnv)
@@ -133,53 +86,33 @@ async function detectLinuxTerminal(): Promise<TerminalInfo | null> {
       return { name: basename(termEnv), command: resolved }
     }
   }
-
-  // Check x-terminal-emulator (Debian/Ubuntu alternative)
   const xte = await which('x-terminal-emulator')
   if (xte) {
     return { name: 'x-terminal-emulator', command: xte }
   }
-
-  // Walk the priority list
   for (const terminal of LINUX_TERMINALS) {
     const resolved = await which(terminal)
     if (resolved) {
       return { name: terminal, command: resolved }
     }
   }
-
   return null
 }
-
-/**
- * Detect the user's preferred terminal on Windows.
- */
 async function detectWindowsTerminal(): Promise<TerminalInfo> {
-  // Check for Windows Terminal first
   const wt = await which('wt.exe')
   if (wt) {
     return { name: 'Windows Terminal', command: wt }
   }
-
-  // PowerShell 7+ (separate install)
   const pwsh = await which('pwsh.exe')
   if (pwsh) {
     return { name: 'PowerShell', command: pwsh }
   }
-
-  // Windows PowerShell 5.1 (built into Windows)
   const powershell = await which('powershell.exe')
   if (powershell) {
     return { name: 'PowerShell', command: powershell }
   }
-
-  // cmd.exe is always available
   return { name: 'Command Prompt', command: 'cmd.exe' }
 }
-
-/**
- * Detect the user's preferred terminal emulator.
- */
 export async function detectTerminal(): Promise<TerminalInfo | null> {
   switch (process.platform) {
     case 'darwin':
@@ -192,25 +125,6 @@ export async function detectTerminal(): Promise<TerminalInfo | null> {
       return null
   }
 }
-
-/**
- * Launch Open Code CLI in the detected terminal emulator.
- *
- * Pure argv paths (no shell, user input never touches an interpreter):
- *   macOS — Ghostty, Alacritty, Kitty, WezTerm (via open -na --args)
- *   Linux — all ten in LINUX_TERMINALS
- *   Windows — Windows Terminal
- *
- * Shell-string paths (user input is shell-quoted and relied upon):
- *   macOS — iTerm2, Terminal.app (AppleScript `write text` / `do script`
- *           are inherently shell-interpreted; no argv interface exists)
- *   Windows — PowerShell -Command, cmd.exe /k (no argv exec mode)
- *
- * For pure-argv paths: openCodeCliPath, --prefill, query, cwd travel as distinct
- * argv elements end-to-end. No sh -c. No shellQuote(). The terminal does
- * chdir(cwd) and execvp(Open Code CLI, argv). Spaces/quotes/metacharacters in
- * query or cwd are preserved by argv boundaries with zero interpretation.
- */
 export async function launchInTerminal(
   openCodeCliPath: string,
   action: {
@@ -225,7 +139,6 @@ export async function launchInTerminal(
     logForDebugging('No terminal emulator detected', { level: 'error' })
     return false
   }
-
   logForDebugging(
     `Launching in terminal: ${terminal.name} (${terminal.command})`,
   )
@@ -239,7 +152,6 @@ export async function launchInTerminal(
   if (action.query) {
     openCodeCliArgs.push('--prefill', action.query)
   }
-
   switch (process.platform) {
     case 'darwin':
       return launchMacosTerminal(terminal, openCodeCliPath, openCodeCliArgs, action.cwd)
@@ -251,7 +163,6 @@ export async function launchInTerminal(
       return false
   }
 }
-
 async function launchMacosTerminal(
   terminal: TerminalInfo,
   openCodeCliPath: string,
@@ -259,17 +170,8 @@ async function launchMacosTerminal(
   cwd?: string,
 ): Promise<boolean> {
   switch (terminal.command) {
-    // --- SHELL-STRING PATHS (AppleScript has no argv interface) ---
-    // User input is shell-quoted via shellQuote(). These two are the only
-    // macOS paths where shellQuote() correctness is load-bearing.
-
     case 'iTerm': {
       const shCmd = buildShellCommand(openCodeCliPath, openCodeCliArgs, cwd)
-      // If iTerm isn't running, `tell application` launches it and iTerm's
-      // default startup behavior opens a window — so `create window` would
-      // make a second one. Check `running` first: if already running (even
-      // with zero windows), create a window; if not, `activate` lets iTerm's
-      // startup create the first window.
       const script = `tell application "iTerm"
   if running then
     create window with default profile
@@ -286,7 +188,6 @@ end tell`
       if (code === 0) return true
       break
     }
-
     case 'Terminal': {
       const shCmd = buildShellCommand(openCodeCliPath, openCodeCliArgs, cwd)
       const script = `tell application "Terminal"
@@ -298,11 +199,6 @@ end tell`
       })
       return code === 0
     }
-
-    // --- PURE ARGV PATHS (no shell, no shellQuote) ---
-    // open -na <App> --args <argv> → app receives argv verbatim →
-    // terminal's native --working-directory + -e exec the command directly.
-
     case 'Ghostty': {
       const args = [
         '-na',
@@ -316,7 +212,6 @@ end tell`
       if (code === 0) return true
       break
     }
-
     case 'Alacritty': {
       const args = ['-na', terminal.command, '--args']
       if (cwd) args.push('--working-directory', cwd)
@@ -325,7 +220,6 @@ end tell`
       if (code === 0) return true
       break
     }
-
     case 'kitty': {
       const args = ['-na', terminal.command, '--args']
       if (cwd) args.push('--directory', cwd)
@@ -334,7 +228,6 @@ end tell`
       if (code === 0) return true
       break
     }
-
     case 'WezTerm': {
       const args = ['-na', terminal.command, '--args', 'start']
       if (cwd) args.push('--cwd', cwd)
@@ -344,7 +237,6 @@ end tell`
       break
     }
   }
-
   logForDebugging(
     `Failed to launch ${terminal.name}, falling back to Terminal.app`,
   )
@@ -355,22 +247,14 @@ end tell`
     cwd,
   )
 }
-
 async function launchLinuxTerminal(
   terminal: TerminalInfo,
   openCodeCliPath: string,
   openCodeCliArgs: string[],
   cwd?: string,
 ): Promise<boolean> {
-  // All Linux paths are pure argv. Each terminal's --working-directory
-  // (or equivalent) sets cwd natively; the command is exec'd directly.
-  // For the few terminals without a cwd flag (xterm, and the opaque
-  // x-terminal-emulator / $TERMINAL), spawn({cwd}) sets the terminal
-  // process's cwd — most inherit it for the child.
-
   let args: string[]
   let spawnCwd: string | undefined
-
   switch (terminal.name) {
     case 'gnome-terminal':
       args = cwd ? [`--working-directory=${cwd}`, '--'] : ['--']
@@ -406,16 +290,12 @@ async function launchLinuxTerminal(
       args.push(openCodeCliPath, ...openCodeCliArgs)
       break
     default:
-      // xterm, x-terminal-emulator, $TERMINAL — no reliable cwd flag.
-      // spawn({cwd}) sets the terminal's own cwd; most inherit.
       args = ['-e', openCodeCliPath, ...openCodeCliArgs]
       spawnCwd = cwd
       break
   }
-
   return spawnDetached(terminal.command, args, { cwd: spawnCwd })
 }
-
 async function launchWindowsTerminal(
   terminal: TerminalInfo,
   openCodeCliPath: string,
@@ -423,24 +303,12 @@ async function launchWindowsTerminal(
   cwd?: string,
 ): Promise<boolean> {
   const args: string[] = []
-
   switch (terminal.name) {
-    // --- PURE ARGV PATH ---
     case 'Windows Terminal':
       if (cwd) args.push('-d', cwd)
       args.push('--', openCodeCliPath, ...openCodeCliArgs)
       break
-
-    // --- SHELL-STRING PATHS ---
-    // PowerShell -Command and cmd /k take a command string. No argv exec
-    // mode that also keeps the session interactive after open-code-cli exits.
-    // User input is escaped per-shell; correctness of that escaping is
-    // load-bearing here.
-
     case 'PowerShell': {
-      // Single-quoted PowerShell strings have NO escape sequences (only
-      // '' for a literal quote). Double-quoted strings interpret backtick
-      // escapes — a query containing `" could break out.
       const cdCmd = cwd ? `Set-Location ${psQuote(cwd)}; ` : ''
       args.push(
         '-NoExit',
@@ -449,7 +317,6 @@ async function launchWindowsTerminal(
       )
       break
     }
-
     default: {
       const cdCmd = cwd ? `cd /d ${cmdQuote(cwd)} && ` : ''
       args.push(
@@ -459,20 +326,10 @@ async function launchWindowsTerminal(
       break
     }
   }
-
-  // cmd.exe does NOT use MSVCRT-style argument parsing. libuv's default
-  // quoting for spawn() on Windows assumes MSVCRT rules and would double-
-  // escape our already-cmdQuote'd string. Bypass it for cmd.exe only.
   return spawnDetached(terminal.command, args, {
     windowsVerbatimArguments: terminal.name === 'Command Prompt',
   })
 }
-
-/**
- * Spawn a terminal detached so the handler process can exit without
- * waiting for the terminal to close. Resolves false on spawn failure
- * (ENOENT, EACCES) rather than crashing.
- */
 function spawnDetached(
   command: string,
   args: string[],
@@ -497,11 +354,6 @@ function spawnDetached(
     })
   })
 }
-
-/**
- * Build a single-quoted POSIX shell command string. ONLY used by the
- * AppleScript paths (iTerm, Terminal.app) which have no argv interface.
- */
 function buildShellCommand(
   openCodeCliPath: string,
   openCodeCliArgs: string[],
@@ -510,46 +362,15 @@ function buildShellCommand(
   const cdPrefix = cwd ? `cd ${shellQuote(cwd)} && ` : ''
   return `${cdPrefix}${[openCodeCliPath, ...openCodeCliArgs].map(shellQuote).join(' ')}`
 }
-
-/**
- * POSIX single-quote escaping. Single-quoted strings have zero
- * interpretation except for the closing single quote itself.
- * Only used by buildShellCommand() for the AppleScript paths.
- */
 function shellQuote(s: string): string {
   return `'${s.replace(/'/g, "'\\''")}'`
 }
-
-/**
- * AppleScript string literal escaping (backslash then double-quote).
- */
 function appleScriptQuote(s: string): string {
   return `"${s.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
 }
-
-/**
- * PowerShell single-quoted string. The ONLY special sequence is '' for a
- * literal single quote — no backtick escapes, no variable expansion, no
- * subexpressions. This is the safe PowerShell quoting; double-quoted
- * strings interpret `n `t `" etc. and can be escaped out of.
- */
 function psQuote(s: string): string {
   return `'${s.replace(/'/g, "''")}'`
 }
-
-/**
- * cmd.exe argument quoting. cmd.exe does NOT use CommandLineToArgvW-style
- * backslash escaping — it toggles its quoting state on every raw "
- * character, so an embedded " breaks out of the quoted region and exposes
- * metacharacters (& | < > ^) to cmd.exe interpretation = command injection.
- *
- * Strategy: strip " from the input (it cannot be safely represented in a
- * cmd.exe double-quoted string). Escape % as %% to prevent environment
- * variable expansion (%PATH% etc.) which cmd.exe performs even inside
- * double quotes. Trailing backslashes are still doubled because the
- * *child process* (open-code-cli.exe) uses CommandLineToArgvW, where a trailing
- * \ before our closing " would eat the close-quote.
- */
 function cmdQuote(arg: string): string {
   const stripped = arg.replace(/"/g, '').replace(/%/g, '%%')
   const escaped = stripped.replace(/(\\+)$/, '$1$1')

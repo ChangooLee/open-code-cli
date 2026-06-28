@@ -8,7 +8,6 @@ import type { AgentDefinition } from 'src/tools/AgentTool/loadAgentsDir.js'
 import { truncateToWidth } from 'src/utils/format.js'
 import { logError } from 'src/utils/log.js'
 import type { Theme } from 'src/utils/theme.js'
-
 type FileSuggestionSource = {
   type: 'file'
   displayText: string
@@ -17,7 +16,6 @@ type FileSuggestionSource = {
   filename: string
   score?: number
 }
-
 type McpResourceSuggestionSource = {
   type: 'mcp_resource'
   displayText: string
@@ -26,7 +24,6 @@ type McpResourceSuggestionSource = {
   uri: string
   name: string
 }
-
 type AgentSuggestionSource = {
   type: 'agent'
   displayText: string
@@ -34,15 +31,10 @@ type AgentSuggestionSource = {
   agentType: string
   color?: keyof Theme
 }
-
 type SuggestionSource =
   | FileSuggestionSource
   | McpResourceSuggestionSource
   | AgentSuggestionSource
-
-/**
- * Creates a unified suggestion item from a source
- */
 function createSuggestionFromSource(source: SuggestionSource): SuggestionItem {
   switch (source.type) {
     case 'file':
@@ -66,14 +58,11 @@ function createSuggestionFromSource(source: SuggestionSource): SuggestionItem {
       }
   }
 }
-
 const MAX_UNIFIED_SUGGESTIONS = 15
 const DESCRIPTION_MAX_LENGTH = 60
-
 function truncateDescription(description: string): string {
   return truncateToWidth(description, DESCRIPTION_MAX_LENGTH)
 }
-
 function generateAgentSuggestions(
   agents: AgentDefinition[],
   query: string,
@@ -82,7 +71,6 @@ function generateAgentSuggestions(
   if (!query && !showOnEmpty) {
     return []
   }
-
   try {
     const agentSources: AgentSuggestionSource[] = agents.map(agent => ({
       type: 'agent' as const,
@@ -91,11 +79,9 @@ function generateAgentSuggestions(
       agentType: agent.agentType,
       color: getAgentColor(agent.agentType),
     }))
-
     if (!query) {
       return agentSources
     }
-
     const queryLower = query.toLowerCase()
     return agentSources.filter(
       agent =>
@@ -107,7 +93,6 @@ function generateAgentSuggestions(
     return []
   }
 }
-
 export async function generateUnifiedSuggestions(
   query: string,
   mcpResources: Record<string, ServerResource[]>,
@@ -117,12 +102,10 @@ export async function generateUnifiedSuggestions(
   if (!query && !showOnEmpty) {
     return []
   }
-
   const [fileSuggestions, agentSources] = await Promise.all([
     generateFileSuggestions(query, showOnEmpty),
     Promise.resolve(generateAgentSuggestions(agents, query, showOnEmpty)),
   ])
-
   const fileSources: FileSuggestionSource[] = fileSuggestions.map(
     suggestion => ({
       type: 'file' as const,
@@ -133,7 +116,6 @@ export async function generateUnifiedSuggestions(
       score: (suggestion.metadata as { score?: number } | undefined)?.score,
     }),
   )
-
   const mcpSources: McpResourceSuggestionSource[] = Object.values(mcpResources)
     .flat()
     .map(resource => ({
@@ -146,30 +128,21 @@ export async function generateUnifiedSuggestions(
       uri: resource.uri,
       name: resource.name || resource.uri,
     }))
-
   if (!query) {
     const allSources = [...fileSources, ...mcpSources, ...agentSources]
     return allSources
       .slice(0, MAX_UNIFIED_SUGGESTIONS)
       .map(createSuggestionFromSource)
   }
-
   const nonFileSources: SuggestionSource[] = [...mcpSources, ...agentSources]
-
-  // Score non-file sources with Fuse.js
-  // File sources are already scored by Rust/nucleo
   type ScoredSource = { source: SuggestionSource; score: number }
   const scoredResults: ScoredSource[] = []
-
-  // Add file sources with their nucleo scores (already 0-1, lower is better)
   for (const fileSource of fileSources) {
     scoredResults.push({
       source: fileSource,
       score: fileSource.score ?? 0.5, // Default to middle score if missing
     })
   }
-
-  // Score non-file sources with Fuse.js and add them
   if (nonFileSources.length > 0) {
     const fuse = new Fuse(nonFileSources, {
       includeScore: true,
@@ -182,7 +155,6 @@ export async function generateUnifiedSuggestions(
         { name: 'agentType', weight: 3 },
       ],
     })
-
     const fuseResults = fuse.search(query, { limit: MAX_UNIFIED_SUGGESTIONS })
     for (const result of fuseResults) {
       scoredResults.push({
@@ -191,10 +163,7 @@ export async function generateUnifiedSuggestions(
       })
     }
   }
-
-  // Sort all results by score (lower is better) and return top results
   scoredResults.sort((a, b) => a.score - b.score)
-
   return scoredResults
     .slice(0, MAX_UNIFIED_SUGGESTIONS)
     .map(r => r.source)

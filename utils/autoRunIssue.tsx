@@ -9,11 +9,6 @@ type Props = {
   onCancel: () => void;
   reason: string;
 };
-
-/**
- * Component that shows a notification about running /issue command
- * with the ability to cancel via ESC key
- */
 export function AutoRunIssueNotification(t0) {
   const $ = _c(8);
   const {
@@ -75,12 +70,7 @@ export function AutoRunIssueNotification(t0) {
   return t6;
 }
 export type AutoRunIssueReason = 'feedback_survey_bad' | 'feedback_survey_good';
-
-/**
- * Determines if /issue should auto-run for Ant users
- */
 export function shouldAutoRunIssue(reason: AutoRunIssueReason): boolean {
-  // Only for Ant users
   if ("external" !== 'ant') {
     return false;
   }
@@ -93,22 +83,12 @@ export function shouldAutoRunIssue(reason: AutoRunIssueReason): boolean {
       return false;
   }
 }
-
-/**
- * Returns the appropriate command to auto-run based on the reason
- * ANT-ONLY: good-open-code-cli command only exists in ant builds
- */
 export function getAutoRunCommand(reason: AutoRunIssueReason): string {
-  // Only ant builds have the /good-open-code-cli command
   if ("external" === 'ant' && reason === 'feedback_survey_good') {
     return '/good-open-code-cli';
   }
   return '/issue';
 }
-
-/**
- * Gets a human-readable description of why /issue is being auto-run
- */
 export function getAutoRunIssueReasonText(reason: AutoRunIssueReason): string {
   switch (reason) {
     case 'feedback_survey_bad':

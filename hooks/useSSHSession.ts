@@ -1,14 +1,3 @@
-/**
- * REPL integration hook for `open-code-cli ssh` sessions.
- *
- * Sibling to useDirectConnect — same shape (isRemoteMode/sendMessage/
- * cancelRequest/disconnect), same REPL wiring, but drives an SSH child
- * process instead of a WebSocket. Kept separate rather than generalizing
- * useDirectConnect because the lifecycle differs: the ssh process and auth
- * proxy are created BEFORE this hook runs (during startup, in main.tsx) and
- * handed in; useDirectConnect creates its WebSocket inside the effect.
- */
-
 import { randomUUID } from 'crypto'
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import type { ToolUseConfirm } from '../components/permissions/PermissionRequest.js'
@@ -29,14 +18,12 @@ import type { PermissionAskDecision } from '../types/permissions.js'
 import { logForDebugging } from '../utils/debug.js'
 import { gracefulShutdown } from '../utils/gracefulShutdown.js'
 import type { RemoteMessageContent } from '../utils/teleport/api.js'
-
 type UseSSHSessionResult = {
   isRemoteMode: boolean
   sendMessage: (content: RemoteMessageContent) => Promise<boolean>
   cancelRequest: () => void
   disconnect: () => void
 }
-
 type UseSSHSessionProps = {
   session: SSHSession | undefined
   setMessages: React.Dispatch<React.SetStateAction<MessageType[]>>
@@ -44,7 +31,6 @@ type UseSSHSessionProps = {
   setToolUseConfirmQueue: React.Dispatch<React.SetStateAction<ToolUseConfirm[]>>
   tools: Tool[]
 }
-
 export function useSSHSession({
   session,
   setMessages,
@@ -53,34 +39,26 @@ export function useSSHSession({
   tools,
 }: UseSSHSessionProps): UseSSHSessionResult {
   const isRemoteMode = !!session
-
   const managerRef = useRef<SSHSessionManager | null>(null)
   const hasReceivedInitRef = useRef(false)
   const isConnectedRef = useRef(false)
-
   const toolsRef = useRef(tools)
   useEffect(() => {
     toolsRef.current = tools
   }, [tools])
-
   useEffect(() => {
     if (!session) return
-
     hasReceivedInitRef.current = false
     logForDebugging('[useSSHSession] wiring SSH session manager')
-
     const manager = session.createManager({
       onMessage: sdkMessage => {
         if (isSessionEndMessage(sdkMessage)) {
           setIsLoading(false)
         }
-
-        // Skip duplicate init messages (one per turn from stream-json mode).
         if (sdkMessage.type === 'system' && sdkMessage.subtype === 'init') {
           if (hasReceivedInitRef.current) return
           hasReceivedInitRef.current = true
         }
-
         const converted = convertSDKMessage(sdkMessage, {
           convertToolResults: true,
         })
@@ -92,16 +70,13 @@ export function useSSHSession({
         logForDebugging(
           `[useSSHSession] permission request: ${request.tool_name}`,
         )
-
         const tool =
           findToolByName(toolsRef.current, request.tool_name) ??
           createToolStub(request.tool_name)
-
         const syntheticMessage = createSyntheticAssistantMessage(
           request,
           requestId,
         )
-
         const permissionResult: PermissionAskDecision = {
           behavior: 'ask',
           message:
@@ -109,7 +84,6 @@ export function useSSHSession({
           suggestions: request.permission_suggestions,
           blockedPath: request.blocked_path,
         }
-
         const toolUseConfirm: ToolUseConfirm = {
           assistantMessage: syntheticMessage,
           tool,
@@ -151,7 +125,6 @@ export function useSSHSession({
           },
           async recheckPermission() {},
         }
-
         setToolUseConfirmQueue(q => [...q, toolUseConfirm])
         setIsLoading(false)
       },
@@ -164,10 +137,6 @@ export function useSSHSession({
           `[useSSHSession] ssh dropped, reconnecting (${attempt}/${max})`,
         )
         isConnectedRef.current = false
-        // Surface a transient system message in the transcript so the user
-        // knows what's happening — the next onConnected clears the state.
-        // Any in-flight request is lost; the remote's --continue reloads
-        // history but there's no turn in progress to resume.
         setIsLoading(false)
         const msg: MessageType = {
           type: 'system',
@@ -186,12 +155,9 @@ export function useSSHSession({
         const exitCode = session.proc.exitCode
         isConnectedRef.current = false
         setIsLoading(false)
-
         let msg = connected
           ? 'Remote session ended.'
           : 'SSH session failed before connecting.'
-        // Surface remote stderr if it looks like an error (pre-connect always,
-        // post-connect only on nonzero exit — normal --verbose noise otherwise).
         if (stderr && (!connected || exitCode !== 0)) {
           msg += `\nRemote stderr (exit ${exitCode ?? 'signal ' + session.proc.signalCode}):\n${stderr}`
         }
@@ -201,10 +167,8 @@ export function useSSHSession({
         logForDebugging(`[useSSHSession] error: ${error.message}`)
       },
     })
-
     managerRef.current = manager
     manager.connect()
-
     return () => {
       logForDebugging('[useSSHSession] cleanup')
       manager.disconnect()
@@ -212,7 +176,6 @@ export function useSSHSession({
       managerRef.current = null
     }
   }, [session, setMessages, setIsLoading, setToolUseConfirmQueue])
-
   const sendMessage = useCallback(
     async (content: RemoteMessageContent): Promise<boolean> => {
       const m = managerRef.current
@@ -222,18 +185,15 @@ export function useSSHSession({
     },
     [setIsLoading],
   )
-
   const cancelRequest = useCallback(() => {
     managerRef.current?.sendInterrupt()
     setIsLoading(false)
   }, [setIsLoading])
-
   const disconnect = useCallback(() => {
     managerRef.current?.disconnect()
     managerRef.current = null
     isConnectedRef.current = false
   }, [])
-
   return useMemo(
     () => ({ isRemoteMode, sendMessage, cancelRequest, disconnect }),
     [isRemoteMode, sendMessage, cancelRequest, disconnect],

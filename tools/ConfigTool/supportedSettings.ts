@@ -8,10 +8,7 @@ import {
 import { getModelOptions } from '../../utils/model/modelOptions.js'
 import { validateModel } from '../../utils/model/validateModel.js'
 import { THEME_NAMES, THEME_SETTINGS } from '../../utils/theme.js'
-
-/** AppState keys that can be synced for immediate UI effect */
 type SyncableAppStateKey = 'verbose' | 'mainLoopModel' | 'thinkingEnabled'
-
 type SettingConfig = {
   source: 'global' | 'settings'
   type: 'boolean' | 'string'
@@ -20,12 +17,9 @@ type SettingConfig = {
   options?: readonly string[]
   getOptions?: () => string[]
   appStateKey?: SyncableAppStateKey
-  /** Async validation called when writing/setting a value */
   validateOnWrite?: (v: unknown) => Promise<{ valid: boolean; error?: string }>
-  /** Format value when reading/getting for display */
   formatOnRead?: (v: unknown) => unknown
 }
-
 export const SUPPORTED_SETTINGS: Record<string, SettingConfig> = {
   theme: {
     source: 'global',
@@ -184,19 +178,15 @@ export const SUPPORTED_SETTINGS: Record<string, SettingConfig> = {
       }
     : {}),
 }
-
 export function isSupported(key: string): boolean {
   return key in SUPPORTED_SETTINGS
 }
-
 export function getConfig(key: string): SettingConfig | undefined {
   return SUPPORTED_SETTINGS[key]
 }
-
 export function getAllKeys(): string[] {
   return Object.keys(SUPPORTED_SETTINGS)
 }
-
 export function getOptionsForSetting(key: string): string[] | undefined {
   const config = SUPPORTED_SETTINGS[key]
   if (!config) return undefined
@@ -204,7 +194,6 @@ export function getOptionsForSetting(key: string): string[] | undefined {
   if (config.getOptions) return config.getOptions()
   return undefined
 }
-
 export function getPath(key: string): string[] {
   const config = SUPPORTED_SETTINGS[key]
   return config?.path ?? key.split('.')

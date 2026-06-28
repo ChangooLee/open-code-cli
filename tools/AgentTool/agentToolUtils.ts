@@ -66,7 +66,6 @@ export type ResolvedAgentTools = {
   resolvedTools: Tools
   allowedAgentTypes?: string[]
 }
-
 export function filterToolsForAgent({
   tools,
   isBuiltIn,
@@ -79,12 +78,9 @@ export function filterToolsForAgent({
   permissionMode?: PermissionMode
 }): Tools {
   return tools.filter(tool => {
-    // Allow MCP tools for all agents
     if (tool.name.startsWith('mcp__')) {
       return true
     }
-    // Allow ExitPlanMode for agents in plan mode (e.g., in-process teammates)
-    // This bypasses both the ALL_AGENT_DISALLOWED_TOOLS and async tool filters
     if (
       toolMatchesName(tool, EXIT_PLAN_MODE_V2_TOOL_NAME) &&
       permissionMode === 'plan'
@@ -99,12 +95,9 @@ export function filterToolsForAgent({
     }
     if (isAsync && !ASYNC_AGENT_ALLOWED_TOOLS.has(tool.name)) {
       if (isAgentSwarmsEnabled() && isInProcessTeammate()) {
-        // Allow AgentTool for in-process teammates to spawn sync subagents.
-        // Validation in AgentTool.call() prevents background agents and teammate spawning.
         if (toolMatchesName(tool, AGENT_TOOL_NAME)) {
           return true
         }
-        // Allow task tools for in-process teammates to coordinate via shared task list
         if (IN_PROCESS_TEAMMATE_ALLOWED_TOOLS.has(tool.name)) {
           return true
         }
@@ -114,11 +107,6 @@ export function filterToolsForAgent({
     return true
   })
 }
-
-/**
- * Resolves and validates agent tools against available tools
- * Handles wildcard expansion and validation in one place
- */
 export function resolveAgentTools(
   agentDefinition: Pick<
     AgentDefinition,
@@ -134,9 +122,6 @@ export function resolveAgentTools(
     source,
     permissionMode,
   } = agentDefinition
-  // When isMainThread is true, skip filterToolsForAgent entirely — the main
-  // thread's tool pool is already properly assembled by useMergedTools(), so
-  // the sub-agent disallow lists shouldn't apply.
   const filteredAvailableTools = isMainThread
     ? availableTools
     : filterToolsForAgent({
@@ -145,21 +130,15 @@ export function resolveAgentTools(
         isAsync,
         permissionMode,
       })
-
-  // Create a set of disallowed tool names for quick lookup
   const disallowedToolSet = new Set(
     disallowedTools?.map(toolSpec => {
       const { toolName } = permissionRuleValueFromString(toolSpec)
       return toolName
     }) ?? [],
   )
-
-  // Filter available tools based on disallowed list
   const allowedAvailableTools = filteredAvailableTools.filter(
     tool => !disallowedToolSet.has(tool.name),
   )
-
-  // If tools is undefined or ['*'], allow all tools (after filtering disallowed)
   const hasWildcard =
     agentTools === undefined ||
     (agentTools.length === 1 && agentTools[0] === '*')
@@ -171,38 +150,26 @@ export function resolveAgentTools(
       resolvedTools: allowedAvailableTools,
     }
   }
-
   const availableToolMap = new Map<string, Tool>()
   for (const tool of allowedAvailableTools) {
     availableToolMap.set(tool.name, tool)
   }
-
   const validTools: string[] = []
   const invalidTools: string[] = []
   const resolved: Tool[] = []
   const resolvedToolsSet = new Set<Tool>()
   let allowedAgentTypes: string[] | undefined
-
   for (const toolSpec of agentTools) {
-    // Parse the tool spec to extract the base tool name and any permission pattern
     const { toolName, ruleContent } = permissionRuleValueFromString(toolSpec)
-
-    // Special case: Agent tool carries allowedAgentTypes metadata in its spec
     if (toolName === AGENT_TOOL_NAME) {
       if (ruleContent) {
-        // Parse comma-separated agent types: "worker, researcher" → ["worker", "researcher"]
         allowedAgentTypes = ruleContent.split(',').map(s => s.trim())
       }
-      // For sub-agents, Agent is excluded by filterToolsForAgent — mark the spec
-      // valid for allowedAgentTypes tracking but skip tool resolution.
       if (!isMainThread) {
         validTools.push(toolSpec)
         continue
       }
-      // For main thread, filtering was skipped so Agent is in availableToolMap —
-      // fall through to normal resolution below.
     }
-
     const tool = availableToolMap.get(toolName)
     if (tool) {
       validTools.push(toolSpec)
@@ -214,7 +181,6 @@ export function resolveAgentTools(
       invalidTools.push(toolSpec)
     }
   }
-
   return {
     hasWildcard: false,
     validTools,
@@ -223,13 +189,9 @@ export function resolveAgentTools(
     allowedAgentTypes,
   }
 }
-
 export const agentToolResultSchema = lazySchema(() =>
   z.object({
     agentId: z.string(),
-    // Optional: older persisted sessions won't have this (resume replays
-    // results verbatim without re-validation). Used to gate the sync
-    // result trailer — one-shot built-ins skip the SendMessage hint.
     agentType: z.string().optional(),
     content: z.array(z.object({ type: z.literal('text'), text: z.string() })),
     totalToolUseCount: z.number(),
@@ -256,9 +218,7 @@ export const agentToolResultSchema = lazySchema(() =>
     }),
   }),
 )
-
 export type AgentToolResult = z.input<ReturnType<typeof agentToolResultSchema>>
-
 export function countToolUses(messages: MessageType[]): number {
   let count = 0
   for (const m of messages) {
@@ -272,7 +232,6 @@ export function countToolUses(messages: MessageType[]): number {
   }
   return count
 }
-
 export function finalizeAgentTool(
   agentMessages: MessageType[],
   agentId: string,
@@ -293,14 +252,10 @@ export function finalizeAgentTool(
     agentType,
     isAsync,
   } = metadata
-
   const lastAssistantMessage = getLastAssistantMessage(agentMessages)
   if (lastAssistantMessage === undefined) {
     throw new Error('No assistant messages found')
   }
-  // Extract text content from the agent's response. If the final assistant
-  // message is a pure tool_use block (loop exited mid-turn), fall back to
-  // the most recent assistant message that has text content.
   let content = lastAssistantMessage.message.content.filter(
     _ => _.type === 'text',
   )
@@ -315,10 +270,8 @@ export function finalizeAgentTool(
       }
     }
   }
-
   const totalTokens = getTokenCountFromUsage(lastAssistantMessage.message.usage)
   const totalToolUseCount = countToolUses(agentMessages)
-
   logEvent('open_code_cli_agent_tool_completed', {
     agent_type:
       agentType as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
@@ -333,8 +286,6 @@ export function finalizeAgentTool(
     is_built_in_agent: isBuiltInAgent,
     is_async: isAsync,
   })
-
-  // Signal to the provider that this subagent's cache chain can be evicted.
   const lastRequestId = lastAssistantMessage.requestId
   if (lastRequestId) {
     logEvent('open_code_cli_cache_eviction_hint', {
@@ -344,7 +295,6 @@ export function finalizeAgentTool(
         lastRequestId as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
     })
   }
-
   return {
     agentId,
     agentType,
@@ -355,17 +305,11 @@ export function finalizeAgentTool(
     usage: lastAssistantMessage.message.usage,
   }
 }
-
-/**
- * Returns the name of the last tool_use block in an assistant message,
- * or undefined if the message is not an assistant message with tool_use.
- */
 export function getLastToolUseName(message: MessageType): string | undefined {
   if (message.type !== 'assistant') return undefined
   const block = message.message.content.findLast(b => b.type === 'tool_use')
   return block?.type === 'tool_use' ? block.name : undefined
 }
-
 export function emitTaskProgress(
   tracker: ProgressTracker,
   taskId: string,
@@ -385,7 +329,6 @@ export function emitTaskProgress(
     lastToolName,
   })
 }
-
 export async function classifyHandoffIfNeeded({
   agentMessages,
   tools,
@@ -403,10 +346,8 @@ export async function classifyHandoffIfNeeded({
 }): Promise<string | null> {
   if (feature('TRANSCRIPT_CLASSIFIER')) {
     if (toolPermissionContext.mode !== 'auto') return null
-
     const agentTranscript = buildTranscriptForClassifier(agentMessages, tools)
     if (!agentTranscript) return null
-
     const classifierResult = await classifyYoloAction(
       agentMessages,
       {
@@ -422,7 +363,6 @@ export async function classifyHandoffIfNeeded({
       toolPermissionContext as ToolPermissionContext,
       abortSignal,
     )
-
     const handoffDecision = classifierResult.unavailable
       ? 'unavailable'
       : classifierResult.shouldBlock
@@ -432,7 +372,6 @@ export async function classifyHandoffIfNeeded({
       decision:
         handoffDecision as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
       toolName:
-        // Use legacy name for analytics continuity across the Task→Agent rename
         LEGACY_AGENT_TOOL_NAME as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
       inProtectedNamespace: isInProtectedNamespace(),
       classifierModel:
@@ -441,9 +380,6 @@ export async function classifyHandoffIfNeeded({
         subagentType as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
       toolUseCount: totalToolUseCount,
       isHandoff: true,
-      // For handoff, the relevant agent completion is the subagent's final
-      // assistant message — the last thing the classifier transcript shows
-      // before the handoff review prompt.
       agentMsgId: getLastAssistantMessage(agentMessages)?.message
         .id as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
       classifierStage:
@@ -457,10 +393,7 @@ export async function classifyHandoffIfNeeded({
       classifierStage2MsgId:
         classifierResult.stage2MsgId as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
     })
-
     if (classifierResult.shouldBlock) {
-      // When classifier is unavailable, still propagate the sub-agent's
-      // results but with a warning so the parent agent can verify the work.
       if (classifierResult.unavailable) {
         logForDebugging(
           'Handoff classifier unavailable, allowing sub-agent output with warning',
@@ -468,7 +401,6 @@ export async function classifyHandoffIfNeeded({
         )
         return `Note: The safety classifier was unavailable when reviewing this sub-agent's work. Please carefully verify the sub-agent's actions and output before acting on them.`
       }
-
       logForDebugging(
         `Handoff classifier flagged sub-agent output: ${classifierResult.reason}`,
         { level: 'warn' },
@@ -476,15 +408,8 @@ export async function classifyHandoffIfNeeded({
       return `SECURITY WARNING: This sub-agent performed actions that may violate security policy. Reason: ${classifierResult.reason}. Review the sub-agent's actions carefully before acting on its output.`
     }
   }
-
   return null
 }
-
-/**
- * Extract a partial result string from an agent's accumulated messages.
- * Used when an async agent is killed to preserve what it accomplished.
- * Returns undefined if no text content is found.
- */
 export function extractPartialResult(
   messages: MessageType[],
 ): string | undefined {
@@ -498,13 +423,7 @@ export function extractPartialResult(
   }
   return undefined
 }
-
 type SetAppState = (f: (prev: AppState) => AppState) => void
-
-/**
- * Drives a background agent from spawn to terminal notification.
- * Shared between AgentTool's async-from-start path and resumeAgentBackground.
- */
 export async function runAsyncAgentLifecycle({
   taskId,
   abortController,
@@ -553,9 +472,6 @@ export async function runAsyncAgentLifecycle({
       : undefined
     for await (const message of makeStream(onCacheSafeParams)) {
       agentMessages.push(message)
-      // Append immediately when UI holds the task (retain). Bootstrap reads
-      // disk in parallel and UUID-merges the prefix — disk-write-before-yield
-      // means live is always a suffix of disk, so merge is order-correct.
       rootSetAppState(prev => {
         const t = prev.tasks[taskId]
         if (!isLocalAgentTask(t) || !t.retain) return prev
@@ -591,19 +507,10 @@ export async function runAsyncAgentLifecycle({
         )
       }
     }
-
     stopSummarization?.()
-
     const agentResult = finalizeAgentTool(agentMessages, taskId, metadata)
-
-    // Mark task completed FIRST so TaskOutput(block=true) unblocks
-    // immediately. classifyHandoffIfNeeded (API call) and getWorktreeResult
-    // (git exec) are notification embellishments that can hang — they must
-    // not gate the status transition (gh-20236).
     completeAsyncAgent(agentResult, rootSetAppState)
-
     let finalMessage = extractTextContent(agentResult.content, '\n')
-
     if (feature('TRANSCRIPT_CLASSIFIER')) {
       const handoffWarning = await classifyHandoffIfNeeded({
         agentMessages,
@@ -618,9 +525,7 @@ export async function runAsyncAgentLifecycle({
         finalMessage = `${handoffWarning}\n\n${finalMessage}`
       }
     }
-
     const worktreeResult = await getWorktreeResult()
-
     enqueueAgentNotification({
       taskId,
       description,
@@ -638,10 +543,6 @@ export async function runAsyncAgentLifecycle({
   } catch (error) {
     stopSummarization?.()
     if (error instanceof AbortError) {
-      // killAsyncAgent is a no-op if TaskStop already set status='killed' —
-      // but only this catch handler has agentMessages, so the notification
-      // must fire unconditionally. Transition status BEFORE worktree cleanup
-      // so TaskOutput unblocks even if git hangs (gh-20236).
       killAsyncAgent(taskId, rootSetAppState)
       logEvent('open_code_cli_agent_tool_terminated', {
         agent_type:

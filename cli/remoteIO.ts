@@ -27,11 +27,6 @@ import { CCRClient, CCRInitError } from './transports/ccrClient.js'
 import { SSETransport } from './transports/SSETransport.js'
 import type { Transport } from './transports/Transport.js'
 import { getTransportForUrl } from './transports/transportUtils.js'
-
-/**
- * Bidirectional streaming for SDK mode with session tracking
- * Supports WebSocket transport
- */
 export class RemoteIO extends StructuredIO {
   private url: URL
   private transport: Transport
@@ -40,7 +35,6 @@ export class RemoteIO extends StructuredIO {
   private readonly isDebug: boolean = false
   private ccrClient: CCRClient | null = null
   private keepAliveTimer: ReturnType<typeof setInterval> | null = null
-
   constructor(
     streamUrl: string,
     initialPrompt?: AsyncIterable<string>,
@@ -50,8 +44,6 @@ export class RemoteIO extends StructuredIO {
     super(inputStream, replayUserMessages)
     this.inputStream = inputStream
     this.url = new URL(streamUrl)
-
-    // Prepare headers with session token if available
     const headers: Record<string, string> = {}
     const sessionToken = getSessionIngressAuthToken()
     if (sessionToken) {
@@ -61,16 +53,10 @@ export class RemoteIO extends StructuredIO {
         level: 'error',
       })
     }
-
-    // Add environment runner version if available (set by Environment Manager)
     const erVersion = process.env.OPEN_CODE_CLI_ENVIRONMENT_RUNNER_VERSION
     if (erVersion) {
       headers['x-environment-runner-version'] = erVersion
     }
-
-    // Provide a callback that re-reads the session token dynamically.
-    // When the parent process refreshes the token (via token file or env var),
-    // the transport can pick it up on reconnection.
     const refreshHeaders = (): Record<string, string> => {
       const h: Record<string, string> = {}
       const freshToken = getSessionIngressAuthToken()
@@ -83,16 +69,12 @@ export class RemoteIO extends StructuredIO {
       }
       return h
     }
-
-    // Get appropriate transport based on URL protocol
     this.transport = getTransportForUrl(
       this.url,
       headers,
       getSessionId(),
       refreshHeaders,
     )
-
-    // Set up data callback
     this.isBridge = process.env.OPEN_CODE_CLI_ENVIRONMENT_KIND === 'bridge'
     this.isDebug = isDebugMode()
     this.transport.setOnData((data: string) => {
@@ -101,23 +83,10 @@ export class RemoteIO extends StructuredIO {
         writeToStdout(data.endsWith('\n') ? data : data + '\n')
       }
     })
-
-    // Set up close callback to handle connection failures
     this.transport.setOnClose(() => {
-      // End the input stream to trigger graceful shutdown
       this.inputStream.end()
     })
-
-    // Initialize CCR v2 client (heartbeats, epoch, state reporting, event writes).
-    // The CCRClient constructor wires the SSE received-ack handler
-    // synchronously, so new CCRClient() MUST run before transport.connect() —
-    // otherwise early SSE frames hit an unwired onEventCallback and their
-    // 'received' delivery acks are silently dropped.
     if (isEnvTruthy(process.env.OPEN_CODE_CLI_USE_CCR_V2)) {
-      // CCR v2 is SSE+POST by definition. getTransportForUrl returns
-      // SSETransport under the same env var, but the two checks live in
-      // different files — assert the invariant so a future decoupling
-      // fails loudly here instead of confusingly inside CCRClient.
       if (!(this.transport instanceof SSETransport)) {
         throw new Error(
           'CCR v2 requires SSETransport; check getTransportForUrl',
@@ -136,22 +105,13 @@ export class RemoteIO extends StructuredIO {
         void gracefulShutdown(1, 'other')
       })
       registerCleanup(async () => this.ccrClient?.close())
-
-      // Register internal event writer for transcript persistence.
-      // When set, sessionStorage writes transcript messages as CCR v2
-      // internal events instead of v1 Session Ingress.
       setInternalEventWriter((eventType, payload, options) =>
         this.ccrClient!.writeInternalEvent(eventType, payload, options),
       )
-
-      // Register internal event readers for session resume.
-      // When set, hydrateFromCCRv2InternalEvents() can fetch foreground
-      // and subagent internal events to restore conversation state.
       setInternalEventReader(
         () => this.ccrClient!.readInternalEvents(),
         () => this.ccrClient!.readSubagentInternalEvents(),
       )
-
       const LIFECYCLE_TO_DELIVERY = {
         started: 'processing',
         completed: 'processed',
@@ -166,21 +126,7 @@ export class RemoteIO extends StructuredIO {
         this.ccrClient?.reportMetadata(metadata)
       })
     }
-
-    // Start connection only after all callbacks are wired (setOnData above,
-    // setOnEvent inside new CCRClient() when CCR v2 is enabled).
     void this.transport.connect()
-
-    // Push a silent keep_alive frame on a fixed interval so upstream
-    // proxies and the session-ingress layer don't GC an otherwise-idle
-    // remote control session. The keep_alive type is filtered before
-    // reaching any client UI (Query.ts drops it; structuredIO.ts drops it;
-    // web/iOS/Android never see it in their message loop). Interval comes
-    // from GrowthBook (open_code_cli_bridge_poll_interval_config
-    // session_keepalive_interval_v2_ms, default 120s); 0 = disabled.
-    // Bridge-only: fixes Envoy idle timeout on bridge-topology sessions
-    // (#21931). byoc workers ran without this before #21931 and do not
-    // need it — different network path.
     const keepAliveIntervalMs =
       getPollIntervalConfig().session_keepalive_interval_v2_ms
     if (this.isBridge && keepAliveIntervalMs > 0) {
@@ -194,17 +140,8 @@ export class RemoteIO extends StructuredIO {
       }, keepAliveIntervalMs)
       this.keepAliveTimer.unref?.()
     }
-
-    // Register for graceful shutdown cleanup
     registerCleanup(async () => this.close())
-
-    // If initial prompt is provided, send it through the input stream
     if (initialPrompt) {
-      // Convert the initial prompt to the input stream format.
-      // Chunks from stdin may already contain trailing newlines, so strip
-      // them before appending our own to avoid double-newline issues that
-      // cause structuredIO to parse empty lines. String() handles both
-      // string chunks and Buffer objects from process.stdin.
       const stream = this.inputStream
       void (async () => {
         for await (const chunk of initialPrompt) {
@@ -213,21 +150,12 @@ export class RemoteIO extends StructuredIO {
       })()
     }
   }
-
   override flushInternalEvents(): Promise<void> {
     return this.ccrClient?.flushInternalEvents() ?? Promise.resolve()
   }
-
   override get internalEventsPending(): number {
     return this.ccrClient?.internalEventsPending ?? 0
   }
-
-  /**
-   * Send output to the transport.
-   * In bridge mode, control_request messages are always echoed to stdout so the
-   * bridge parent can detect permission requests. Other messages are echoed only
-   * in debug mode.
-   */
   async write(message: StdoutMessage): Promise<void> {
     if (this.ccrClient) {
       await this.ccrClient.writeEvent(message)
@@ -240,10 +168,6 @@ export class RemoteIO extends StructuredIO {
       }
     }
   }
-
-  /**
-   * Clean up connections gracefully
-   */
   close(): void {
     if (this.keepAliveTimer) {
       clearInterval(this.keepAliveTimer)

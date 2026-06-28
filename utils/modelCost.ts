@@ -8,8 +8,6 @@ import {
   getDefaultMainLoopModelSetting,
   type ModelShortName,
 } from './model/model.js'
-
-// Generic OpenAI-compatible pricing estimates; override when provider-specific pricing is needed.
 export type ModelCosts = {
   inputTokens: number
   outputTokens: number
@@ -17,8 +15,6 @@ export type ModelCosts = {
   promptCacheReadTokens: number
   webSearchRequests: number
 }
-
-// Generic balanced pricing tier: $3 input / $15 output per Mtok
 export const COST_TIER_3_15 = {
   inputTokens: 3,
   outputTokens: 15,
@@ -26,8 +22,6 @@ export const COST_TIER_3_15 = {
   promptCacheReadTokens: 0.3,
   webSearchRequests: 0.01,
 } as const satisfies ModelCosts
-
-// Generic high-capability pricing tier: $15 input / $75 output per Mtok
 export const COST_TIER_15_75 = {
   inputTokens: 15,
   outputTokens: 75,
@@ -35,8 +29,6 @@ export const COST_TIER_15_75 = {
   promptCacheReadTokens: 1.5,
   webSearchRequests: 0.01,
 } as const satisfies ModelCosts
-
-// Generic default pricing tier: $5 input / $25 output per Mtok
 export const COST_TIER_5_25 = {
   inputTokens: 5,
   outputTokens: 25,
@@ -44,8 +36,6 @@ export const COST_TIER_5_25 = {
   promptCacheReadTokens: 0.5,
   webSearchRequests: 0.01,
 } as const satisfies ModelCosts
-
-// Fast mode pricing for best model: $30 input / $150 output per Mtok
 export const COST_TIER_30_150 = {
   inputTokens: 30,
   outputTokens: 150,
@@ -53,8 +43,6 @@ export const COST_TIER_30_150 = {
   promptCacheReadTokens: 3,
   webSearchRequests: 0.01,
 } as const satisfies ModelCosts
-
-// Generic small-model pricing tier: $0.80 input / $4 output per Mtok
 export const COST_HAIKU_35 = {
   inputTokens: 0.8,
   outputTokens: 4,
@@ -62,8 +50,6 @@ export const COST_HAIKU_35 = {
   promptCacheReadTokens: 0.08,
   webSearchRequests: 0.01,
 } as const satisfies ModelCosts
-
-// Generic small fast-model pricing tier: $1 input / $5 output per Mtok
 export const COST_HAIKU_45 = {
   inputTokens: 1,
   outputTokens: 5,
@@ -71,41 +57,22 @@ export const COST_HAIKU_45 = {
   promptCacheReadTokens: 0.1,
   webSearchRequests: 0.01,
 } as const satisfies ModelCosts
-
 const DEFAULT_UNKNOWN_MODEL_COST = COST_TIER_5_25
-
-/**
- * Get the cost tier for best model based on fast mode.
- */
 export function getBestModelCostTier(fastMode: boolean): ModelCosts {
   if (isFastModeEnabled() && fastMode) {
     return COST_TIER_30_150
   }
   return COST_TIER_5_25
 }
-
-/**
- * Pricing tier shown for the flagship ("Opus 4.6"-class) model.
- * Used in commands/fast and utils/model/model.ts (display pricing only):
- * delegates to the best-model tier so fast-mode pricing stays consistent.
- */
 export function getOpus46CostTier(fastMode: boolean): ModelCosts {
   return getBestModelCostTier(fastMode)
 }
-
-// @[MODEL LAUNCH]: Add a pricing entry for the new model below.
-// Costs from https://platform.open-code-cli.com/docs/en/openai-compatible-pricing
-// Web search cost: $10 per 1000 requests = $0.01 per request
 export const MODEL_COSTS: Record<ModelShortName, ModelCosts> = {
   'openai/gpt-4o-mini': COST_HAIKU_45,
   'openai/gpt-4o': COST_TIER_3_15,
   'openai/gpt-4.1-mini': COST_TIER_3_15,
   'openai/gpt-4.1': COST_TIER_5_25,
 }
-
-/**
- * Calculates the USD cost based on token usage and model cost configuration
- */
 function tokensToUSDCost(modelCosts: ModelCosts, usage: Usage): number {
   return (
     (usage.input_tokens / 1_000_000) * modelCosts.inputTokens +
@@ -118,10 +85,8 @@ function tokensToUSDCost(modelCosts: ModelCosts, usage: Usage): number {
       modelCosts.webSearchRequests
   )
 }
-
 export function getModelCosts(model: string, usage: Usage): ModelCosts {
   const shortName = getCanonicalName(model)
-
   const costs = MODEL_COSTS[shortName]
   if (!costs) {
     trackUnknownModelCost(model, shortName)
@@ -132,7 +97,6 @@ export function getModelCosts(model: string, usage: Usage): ModelCosts {
   }
   return costs
 }
-
 function trackUnknownModelCost(model: string, shortName: ModelShortName): void {
   logEvent('open_code_cli_unknown_model_cost', {
     model: model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
@@ -141,18 +105,10 @@ function trackUnknownModelCost(model: string, shortName: ModelShortName): void {
   })
   setHasUnknownModelCost()
 }
-
-// Calculate the cost of a query in US dollars.
-// If the model's costs are not found, use the default model's costs.
 export function calculateUSDCost(resolvedModel: string, usage: Usage): number {
   const modelCosts = getModelCosts(resolvedModel, usage)
   return tokensToUSDCost(modelCosts, usage)
 }
-
-/**
- * Calculate cost from raw token counts without requiring a full BetaUsage object.
- * Useful for side queries (e.g. classifier) that track token counts independently.
- */
 export function calculateCostFromTokens(
   model: string,
   tokens: {
@@ -170,29 +126,15 @@ export function calculateCostFromTokens(
   } as Usage
   return calculateUSDCost(model, usage)
 }
-
 function formatPrice(price: number): string {
-  // Format price: integers without decimals, others with 2 decimal places
-  // e.g., 3 -> "$3", 0.8 -> "$0.80", 22.5 -> "$22.50"
   if (Number.isInteger(price)) {
     return `$${price}`
   }
   return `$${price.toFixed(2)}`
 }
-
-/**
- * Format model costs as a pricing string for display
- * e.g., "$3/$15 per Mtok"
- */
 export function formatModelPricing(costs: ModelCosts): string {
   return `${formatPrice(costs.inputTokens)}/${formatPrice(costs.outputTokens)} per Mtok`
 }
-
-/**
- * Get formatted pricing string for a model
- * Accepts either a short name or full model name
- * Returns undefined if model is not found
- */
 export function getModelPricingString(model: string): string | undefined {
   const shortName = getCanonicalName(model)
   const costs = MODEL_COSTS[shortName]

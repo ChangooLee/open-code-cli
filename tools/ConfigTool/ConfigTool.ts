@@ -32,7 +32,6 @@ import {
   renderToolUseMessage,
   renderToolUseRejectedMessage,
 } from './UI.js'
-
 const inputSchema = lazySchema(() =>
   z.strictObject({
     setting: z
@@ -47,7 +46,6 @@ const inputSchema = lazySchema(() =>
   }),
 )
 type InputSchema = ReturnType<typeof inputSchema>
-
 const outputSchema = lazySchema(() =>
   z.object({
     success: z.boolean(),
@@ -60,10 +58,8 @@ const outputSchema = lazySchema(() =>
   }),
 )
 type OutputSchema = ReturnType<typeof outputSchema>
-
 export type Input = z.infer<InputSchema>
 export type Output = z.infer<OutputSchema>
-
 export const ConfigTool = buildTool({
   name: CONFIG_TOOL_NAME,
   searchHint: 'get or set Open Code CLI settings (theme, model)',
@@ -96,7 +92,6 @@ export const ConfigTool = buildTool({
       : `${input.setting} = ${input.value}`
   },
   async checkPermissions(input: Input) {
-    // Auto-allow reading configs
     if (input.value === undefined) {
       return { behavior: 'allow' as const, updatedInput: input }
     }
@@ -109,10 +104,6 @@ export const ConfigTool = buildTool({
   renderToolResultMessage,
   renderToolUseRejectedMessage,
   async call({ setting, value }: Input, context): Promise<{ data: Output }> {
-    // 1. Check if setting is supported
-    // Voice settings are registered at build-time (feature('VOICE_MODE')), but
-    // must also be gated at runtime. When the kill-switch is on, treat
-    // voiceEnabled as an unknown setting so no voice-specific strings leak.
     if (feature('VOICE_MODE') && setting === 'voiceEnabled') {
       const { isVoiceGrowthBookEnabled } = await import(
         '../../voice/voiceModeEnabled.js'
@@ -128,11 +119,8 @@ export const ConfigTool = buildTool({
         data: { success: false, error: `Unknown setting: "${setting}"` },
       }
     }
-
     const config = getConfig(setting)!
     const path = getPath(setting)
-
-    // 2. GET operation
     if (value === undefined) {
       const currentValue = getValue(config.source, path)
       const displayValue = config.formatOnRead
@@ -142,11 +130,6 @@ export const ConfigTool = buildTool({
         data: { success: true, operation: 'get', setting, value: displayValue },
       }
     }
-
-    // 3. SET operation
-
-    // Handle "default" — unset the config key so it falls back to the
-    // platform-aware default (determined by the bridge feature gate).
     if (
       setting === 'remoteControlAtStartup' &&
       typeof value === 'string' &&
@@ -159,7 +142,6 @@ export const ConfigTool = buildTool({
         return next
       })
       const resolved = getRemoteControlAtStartup()
-      // Sync to AppState so useReplBridge reacts immediately
       context.setAppState(prev => {
         if (prev.replBridgeEnabled === resolved && !prev.replBridgeOutboundOnly)
           return prev
@@ -178,10 +160,7 @@ export const ConfigTool = buildTool({
         },
       }
     }
-
     let finalValue: unknown = value
-
-    // Coerce and validate boolean values
     if (config.type === 'boolean') {
       if (typeof value === 'string') {
         const lower = value.toLowerCase().trim()
@@ -199,8 +178,6 @@ export const ConfigTool = buildTool({
         }
       }
     }
-
-    // Check options
     const options = getOptionsForSetting(setting)
     if (options && !options.includes(String(finalValue))) {
       return {
@@ -212,8 +189,6 @@ export const ConfigTool = buildTool({
         },
       }
     }
-
-    // Async validation (e.g., model API check)
     if (config.validateOnWrite) {
       const result = await config.validateOnWrite(finalValue)
       if (!result.valid) {
@@ -227,8 +202,6 @@ export const ConfigTool = buildTool({
         }
       }
     }
-
-    // Pre-flight checks for voice mode
     if (
       feature('VOICE_MODE') &&
       setting === 'voiceEnabled' &&
@@ -256,7 +229,6 @@ export const ConfigTool = buildTool({
         checkVoiceDependencies,
         requestMicrophonePermission,
       } = await import('../../services/voice.js')
-
       const recording = await checkRecordingAvailability()
       if (!recording.available) {
         return {
@@ -306,10 +278,7 @@ export const ConfigTool = buildTool({
         }
       }
     }
-
     const previousValue = getValue(config.source, path)
-
-    // 4. Write to storage
     try {
       if (config.source === 'global') {
         const key = path[0]
@@ -341,18 +310,12 @@ export const ConfigTool = buildTool({
           }
         }
       }
-
-      // 5a. Voice needs notifyChange so applySettingsChange resyncs
-      // AppState.settings (useVoiceEnabled reads settings.voiceEnabled)
-      // and the settings cache resets for the next /voice read.
       if (feature('VOICE_MODE') && setting === 'voiceEnabled') {
         const { settingsChangeDetector } = await import(
           '../../utils/settings/changeDetector.js'
         )
         settingsChangeDetector.notifyChange('userSettings')
       }
-
-      // 5b. Sync to AppState if needed for immediate UI effect
       if (config.appStateKey) {
         const appKey = config.appStateKey
         context.setAppState(prev => {
@@ -360,10 +323,6 @@ export const ConfigTool = buildTool({
           return { ...prev, [appKey]: finalValue }
         })
       }
-
-      // Sync remoteControlAtStartup to AppState so the bridge reacts
-      // immediately (the config key differs from the AppState field name,
-      // so the generic appStateKey mechanism can't handle this).
       if (setting === 'remoteControlAtStartup') {
         const resolved = getRemoteControlAtStartup()
         context.setAppState(prev => {
@@ -379,7 +338,6 @@ export const ConfigTool = buildTool({
           }
         })
       }
-
       logEvent('open_code_cli_config_tool_changed', {
         setting:
           setting as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
@@ -387,7 +345,6 @@ export const ConfigTool = buildTool({
           finalValue,
         ) as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
       })
-
       return {
         data: {
           success: true,
@@ -432,7 +389,6 @@ export const ConfigTool = buildTool({
     }
   },
 } satisfies ToolDef<InputSchema, Output>)
-
 function getValue(source: 'global' | 'settings', path: string[]): unknown {
   if (source === 'global') {
     const config = getGlobalConfig()
@@ -451,7 +407,6 @@ function getValue(source: 'global' | 'settings', path: string[]): unknown {
   }
   return current
 }
-
 function buildNestedObject(
   path: string[],
   value: unknown,

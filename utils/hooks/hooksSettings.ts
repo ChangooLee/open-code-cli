@@ -11,14 +11,12 @@ import {
 import type { HookCommand, HookMatcher } from '../settings/types.js'
 import { DEFAULT_HOOK_SHELL } from '../shell/shellProvider.js'
 import { getSessionHooks } from './sessionHooks.js'
-
 export type HookSource =
   | EditableSettingSource
   | 'policySettings'
   | 'pluginHook'
   | 'sessionHook'
   | 'builtinHook'
-
 export interface IndividualHookConfig {
   event: HookEvent
   config: HookCommand
@@ -26,26 +24,15 @@ export interface IndividualHookConfig {
   source: HookSource
   pluginName?: string
 }
-
-/**
- * Check if two hooks are equal (comparing only command/prompt content, not timeout)
- */
 export function isHookEqual(
   a: HookCommand | { type: 'function'; timeout?: number },
   b: HookCommand | { type: 'function'; timeout?: number },
 ): boolean {
   if (a.type !== b.type) return false
-
-  // Use switch for exhaustive type checking
-  // Note: We only compare command/prompt content, not timeout
-  // `if` is part of identity: same command with different `if` conditions
-  // are distinct hooks (e.g., setup.sh if=Bash(git *) vs if=Bash(npm *)).
   const sameIf = (x: { if?: string }, y: { if?: string }) =>
     (x.if ?? '') === (y.if ?? '')
   switch (a.type) {
     case 'command':
-      // shell is part of identity: same command string with different
-      // shells are distinct hooks. Default 'bash' so undefined === 'bash'.
       return (
         b.type === 'command' &&
         a.command === b.command &&
@@ -59,20 +46,15 @@ export function isHookEqual(
     case 'http':
       return b.type === 'http' && a.url === b.url && sameIf(a, b)
     case 'function':
-      // Function hooks can't be compared (no stable identifier)
       return false
   }
 }
-
-/** Get the display text for a hook */
 export function getHookDisplayText(
   hook: HookCommand | { type: 'callback' | 'function'; statusMessage?: string },
 ): string {
-  // Return custom status message if provided
   if ('statusMessage' in hook && hook.statusMessage) {
     return hook.statusMessage
   }
-
   switch (hook.type) {
     case 'command':
       return hook.command
@@ -88,29 +70,17 @@ export function getHookDisplayText(
       return 'function'
   }
 }
-
 export function getAllHooks(appState: AppState): IndividualHookConfig[] {
   const hooks: IndividualHookConfig[] = []
-
-  // Check if restricted to managed hooks only
   const policySettings = getSettingsForSource('policySettings')
   const restrictedToManagedOnly = policySettings?.allowManagedHooksOnly === true
-
-  // If allowManagedHooksOnly is set, don't show any hooks in the UI
-  // (user/project/local are blocked, and managed hooks are intentionally hidden)
   if (!restrictedToManagedOnly) {
-    // Get hooks from all editable sources
     const sources = [
       'userSettings',
       'projectSettings',
       'localSettings',
     ] as EditableSettingSource[]
-
-    // Track which settings files we've already processed to avoid duplicates
-    // (e.g., when running from home directory, userSettings and projectSettings
-    // both resolve to ~/.open-code-cli/settings.json)
     const seenFiles = new Set<string>()
-
     for (const source of sources) {
       const filePath = getSettingsFilePathForSource(source)
       if (filePath) {
@@ -120,12 +90,10 @@ export function getAllHooks(appState: AppState): IndividualHookConfig[] {
         }
         seenFiles.add(resolvedPath)
       }
-
       const sourceSettings = getSettingsForSource(source)
       if (!sourceSettings?.hooks) {
         continue
       }
-
       for (const [event, matchers] of Object.entries(sourceSettings.hooks)) {
         for (const matcher of matchers as HookMatcher[]) {
           for (const hookCommand of matcher.hooks) {
@@ -140,8 +108,6 @@ export function getAllHooks(appState: AppState): IndividualHookConfig[] {
       }
     }
   }
-
-  // Get session hooks
   const sessionId = getSessionId()
   const sessionHooks = getSessionHooks(appState, sessionId)
   for (const [event, matchers] of sessionHooks.entries()) {
@@ -156,17 +122,14 @@ export function getAllHooks(appState: AppState): IndividualHookConfig[] {
       }
     }
   }
-
   return hooks
 }
-
 export function getHooksForEvent(
   appState: AppState,
   event: HookEvent,
 ): IndividualHookConfig[] {
   return getAllHooks(appState).filter(hook => hook.event === event)
 }
-
 export function hookSourceDescriptionDisplayString(source: HookSource): string {
   switch (source) {
     case 'userSettings':
@@ -176,9 +139,6 @@ export function hookSourceDescriptionDisplayString(source: HookSource): string {
     case 'localSettings':
       return 'Local settings (.open-code-cli/settings.local.json)'
     case 'pluginHook':
-      // TODO: Get the actual plugin hook file paths instead of using glob pattern
-      // We should capture the specific plugin paths during hook registration and display them here
-      // e.g., "Plugin hooks (~/.open-code-cli/plugins/repos/source/example-plugin/example-plugin/hooks/hooks.json)"
       return 'Plugin hooks (~/.open-code-cli/plugins/*/hooks/hooks.json)'
     case 'sessionHook':
       return 'Session hooks (in-memory, temporary)'
@@ -188,7 +148,6 @@ export function hookSourceDescriptionDisplayString(source: HookSource): string {
       return source as string
   }
 }
-
 export function hookSourceHeaderDisplayString(source: HookSource): string {
   switch (source) {
     case 'userSettings':
@@ -207,7 +166,6 @@ export function hookSourceHeaderDisplayString(source: HookSource): string {
       return source as string
   }
 }
-
 export function hookSourceInlineDisplayString(source: HookSource): string {
   switch (source) {
     case 'userSettings':
@@ -226,7 +184,6 @@ export function hookSourceInlineDisplayString(source: HookSource): string {
       return source as string
   }
 }
-
 export function sortMatchersByPriority(
   matchers: string[],
   hooksByEventAndMatcher: Record<
@@ -235,7 +192,6 @@ export function sortMatchersByPriority(
   >,
   selectedEvent: HookEvent,
 ): string[] {
-  // Create a priority map based on SOURCES order (lower index = higher priority)
   const sourcePriority = SOURCES.reduce(
     (acc, source, index) => {
       acc[source] = index
@@ -243,29 +199,20 @@ export function sortMatchersByPriority(
     },
     {} as Record<EditableSettingSource, number>,
   )
-
   return [...matchers].sort((a, b) => {
     const aHooks = hooksByEventAndMatcher[selectedEvent]?.[a] || []
     const bHooks = hooksByEventAndMatcher[selectedEvent]?.[b] || []
-
     const aSources = Array.from(new Set(aHooks.map(h => h.source)))
     const bSources = Array.from(new Set(bHooks.map(h => h.source)))
-
-    // Sort by highest priority source first (lowest priority number)
-    // Plugin hooks get lowest priority (highest number)
     const getSourcePriority = (source: HookSource) =>
       source === 'pluginHook' || source === 'builtinHook'
         ? 999
         : sourcePriority[source as EditableSettingSource]
-
     const aHighestPriority = Math.min(...aSources.map(getSourcePriority))
     const bHighestPriority = Math.min(...bSources.map(getSourcePriority))
-
     if (aHighestPriority !== bHighestPriority) {
       return aHighestPriority - bHighestPriority
     }
-
-    // If same priority, sort by matcher name
     return a.localeCompare(b)
   })
 }

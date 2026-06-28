@@ -15,7 +15,6 @@ import {
   matchesKeepGoingKeyword,
   matchesNegativeKeyword,
 } from '../userPromptKeywords.js'
-
 export function processTextPrompt(
   input: string | Array<ContentBlockParam>,
   imageContentBlocks: ContentBlockParam[],
@@ -30,20 +29,11 @@ export function processTextPrompt(
 } {
   const promptId = randomUUID()
   setPromptId(promptId)
-
   const userPromptText =
     typeof input === 'string'
       ? input
       : input.find(block => block.type === 'text')?.text || ''
   startInteractionSpan(userPromptText)
-
-  // Emit user_prompt OTEL event for both string (CLI) and array (SDK/VS Code)
-  // input shapes. Previously gated on `typeof input === 'string'`, so VS Code
-  // sessions never emitted user_prompt (open-code-cli/open-code-cli#33301).
-  // For array input, use the LAST text block: createUserContent pushes the
-  // user's message last (after any <ide_selection>/attachment context blocks),
-  // so .findLast gets the actual prompt. userPromptText (first block) is kept
-  // unchanged for startInteractionSpan to preserve existing span attributes.
   const otelPromptText =
     typeof input === 'string'
       ? input
@@ -55,17 +45,13 @@ export function processTextPrompt(
       'prompt.id': promptId,
     })
   }
-
   const isNegative = matchesNegativeKeyword(userPromptText)
   const isKeepGoing = matchesKeepGoingKeyword(userPromptText)
   logEvent('open_code_cli_input_prompt', {
     is_negative: isNegative,
     is_keep_going: isKeepGoing,
   })
-
-  // If we have pasted images, create a message with image content
   if (imageContentBlocks.length > 0) {
-    // Build content: text first, then images below
     const textContent =
       typeof input === 'string'
         ? input.trim()
@@ -79,20 +65,17 @@ export function processTextPrompt(
       permissionMode,
       isMeta: isMeta || undefined,
     })
-
     return {
       messages: [userMessage, ...attachmentMessages],
       shouldQuery: true,
     }
   }
-
   const userMessage = createUserMessage({
     content: input,
     uuid,
     permissionMode,
     isMeta: isMeta || undefined,
   })
-
   return {
     messages: [userMessage, ...attachmentMessages],
     shouldQuery: true,

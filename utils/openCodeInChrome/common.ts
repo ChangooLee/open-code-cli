@@ -8,15 +8,9 @@ import { isFsInaccessible } from '../errors.js'
 import { execFileNoThrow } from '../execFileNoThrow.js'
 import { getPlatform } from '../platform.js'
 import { which } from '../which.js'
-
 export const OPEN_CODE_IN_CHROME_MCP_SERVER_NAME = 'open-code-in-chrome'
-
-// Re-export ChromiumBrowser type for setup.ts
 export type { ChromiumBrowser } from './setupPortable.js'
-
-// Import for local use
 import type { ChromiumBrowser } from './setupPortable.js'
-
 type BrowserConfig = {
   name: string
   macos: {
@@ -32,10 +26,9 @@ type BrowserConfig = {
   windows: {
     dataPath: string[]
     registryKey: string
-    useRoaming?: boolean // Opera uses Roaming instead of Local
+    useRoaming?: boolean 
   }
 }
-
 export const CHROMIUM_BROWSERS: Record<ChromiumBrowser, BrowserConfig> = {
   chrome: {
     name: 'Google Chrome',
@@ -108,13 +101,11 @@ export const CHROMIUM_BROWSERS: Record<ChromiumBrowser, BrowserConfig> = {
       ],
     },
     linux: {
-      // Arc is not available on Linux
       binaries: [],
       dataPath: [],
       nativeMessagingPath: [],
     },
     windows: {
-      // Arc Windows is Chromium-based
       dataPath: ['Arc', 'User Data'],
       registryKey: 'HKCU\\Software\\ArcBrowser\\Arc\\NativeMessagingHosts',
     },
@@ -214,8 +205,6 @@ export const CHROMIUM_BROWSERS: Record<ChromiumBrowser, BrowserConfig> = {
     },
   },
 }
-
-// Priority order for browser detection (most common first)
 export const BROWSER_DETECTION_ORDER: ChromiumBrowser[] = [
   'chrome',
   'brave',
@@ -225,10 +214,6 @@ export const BROWSER_DETECTION_ORDER: ChromiumBrowser[] = [
   'vivaldi',
   'opera',
 ]
-
-/**
- * Get all browser data paths to check for extension installation
- */
 export function getAllBrowserDataPaths(): {
   browser: ChromiumBrowser
   path: string
@@ -236,11 +221,9 @@ export function getAllBrowserDataPaths(): {
   const platform = getPlatform()
   const home = homedir()
   const paths: { browser: ChromiumBrowser; path: string }[] = []
-
   for (const browserId of BROWSER_DETECTION_ORDER) {
     const config = CHROMIUM_BROWSERS[browserId]
     let dataPath: string[] | undefined
-
     switch (platform) {
       case 'macos':
         dataPath = config.macos.dataPath
@@ -262,7 +245,6 @@ export function getAllBrowserDataPaths(): {
         continue
       }
     }
-
     if (dataPath && dataPath.length > 0) {
       paths.push({
         browser: browserId,
@@ -270,13 +252,8 @@ export function getAllBrowserDataPaths(): {
       })
     }
   }
-
   return paths
 }
-
-/**
- * Get native messaging host directories for all supported browsers
- */
 export function getAllNativeMessagingHostsDirs(): {
   browser: ChromiumBrowser
   path: string
@@ -284,10 +261,8 @@ export function getAllNativeMessagingHostsDirs(): {
   const platform = getPlatform()
   const home = homedir()
   const paths: { browser: ChromiumBrowser; path: string }[] = []
-
   for (const browserId of BROWSER_DETECTION_ORDER) {
     const config = CHROMIUM_BROWSERS[browserId]
-
     switch (platform) {
       case 'macos':
         if (config.macos.nativeMessagingPath.length > 0) {
@@ -307,24 +282,16 @@ export function getAllNativeMessagingHostsDirs(): {
         }
         break
       case 'windows':
-        // Windows uses registry, not file paths for native messaging
-        // We'll use a common location for the manifest file
         break
     }
   }
-
   return paths
 }
-
-/**
- * Get Windows registry keys for all supported browsers
- */
 export function getAllWindowsRegistryKeys(): {
   browser: ChromiumBrowser
   key: string
 }[] {
   const keys: { browser: ChromiumBrowser; key: string }[] = []
-
   for (const browserId of BROWSER_DETECTION_ORDER) {
     const config = CHROMIUM_BROWSERS[browserId]
     if (config.windows.registryKey) {
@@ -334,23 +301,14 @@ export function getAllWindowsRegistryKeys(): {
       })
     }
   }
-
   return keys
 }
-
-/**
- * Detect which browser to use for opening URLs
- * Returns the first available browser, or null if none found
- */
 export async function detectAvailableBrowser(): Promise<ChromiumBrowser | null> {
   const platform = getPlatform()
-
   for (const browserId of BROWSER_DETECTION_ORDER) {
     const config = CHROMIUM_BROWSERS[browserId]
-
     switch (platform) {
       case 'macos': {
-        // Check if the .app bundle (a directory) exists
         const appPath = `/Applications/${config.macos.appName}.app`
         try {
           const stats = await stat(appPath)
@@ -362,13 +320,11 @@ export async function detectAvailableBrowser(): Promise<ChromiumBrowser | null> 
           }
         } catch (e) {
           if (!isFsInaccessible(e)) throw e
-          // App not found, continue checking
         }
         break
       }
       case 'wsl':
       case 'linux': {
-        // Check if any binary exists
         for (const binary of config.linux.binaries) {
           if (await which(binary).catch(() => null)) {
             logForDebugging(
@@ -380,7 +336,6 @@ export async function detectAvailableBrowser(): Promise<ChromiumBrowser | null> 
         break
       }
       case 'windows': {
-        // Check if data path exists (indicates browser is installed)
         const home = homedir()
         if (config.windows.dataPath.length > 0) {
           const appDataBase = config.windows.useRoaming
@@ -397,48 +352,36 @@ export async function detectAvailableBrowser(): Promise<ChromiumBrowser | null> 
             }
           } catch (e) {
             if (!isFsInaccessible(e)) throw e
-            // Browser not found, continue checking
           }
         }
         break
       }
     }
   }
-
   return null
 }
-
 export function isOpenCodeInChromeMCPServer(name: string): boolean {
   return normalizeNameForMCP(name) === OPEN_CODE_IN_CHROME_MCP_SERVER_NAME
 }
-
 const MAX_TRACKED_TABS = 200
 const trackedTabIds = new Set<number>()
-
 export function trackOpenCodeInChromeTabId(tabId: number): void {
   if (trackedTabIds.size >= MAX_TRACKED_TABS && !trackedTabIds.has(tabId)) {
     trackedTabIds.clear()
   }
   trackedTabIds.add(tabId)
 }
-
 export function isTrackedOpenCodeInChromeTabId(tabId: number): boolean {
   return trackedTabIds.has(tabId)
 }
-
 export async function openInChrome(url: string): Promise<boolean> {
   const currentPlatform = getPlatform()
-
-  // Detect the best available browser
   const browser = await detectAvailableBrowser()
-
   if (!browser) {
     logForDebugging('[Open Code in Chrome] No compatible browser found')
     return false
   }
-
   const config = CHROMIUM_BROWSERS[browser]
-
   switch (currentPlatform) {
     case 'macos': {
       const { code } = await execFileNoThrow('open', [
@@ -449,7 +392,6 @@ export async function openInChrome(url: string): Promise<boolean> {
       return code === 0
     }
     case 'windows': {
-      // Use rundll32 to avoid cmd.exe metacharacter issues with URLs containing & | > <
       const { code } = await execFileNoThrow('rundll32', ['url,OpenURL', url])
       return code === 0
     }
@@ -467,40 +409,22 @@ export async function openInChrome(url: string): Promise<boolean> {
       return false
   }
 }
-
-/**
- * Get the socket directory path (Unix only)
- */
 export function getSocketDir(): string {
   return `/tmp/open-code-cli-mcp-browser-bridge-${getUsername()}`
 }
-
-/**
- * Get the socket path (Unix) or pipe name (Windows)
- */
 export function getSecureSocketPath(): string {
   if (platform() === 'win32') {
     return `\\\\.\\pipe\\${getSocketName()}`
   }
   return join(getSocketDir(), `${process.pid}.sock`)
 }
-
-/**
- * Get all socket paths including PID-based sockets in the directory
- * and legacy fallback paths
- */
 export function getAllSocketPaths(): string[] {
-  // Windows uses named pipes, not Unix sockets
   if (platform() === 'win32') {
     return [`\\\\.\\pipe\\${getSocketName()}`]
   }
-
   const paths: string[] = []
   const socketDir = getSocketDir()
-
-  // Scan for *.sock files in the socket directory
   try {
-    // eslint-disable-next-line custom-rules/no-sync-fs -- Open Code CLIForChromeContext.getSocketPaths (external @ant/open-code-cli-for-chrome-mcp) requires a sync () => string[] callback
     const files = readdirSync(socketDir)
     for (const file of files) {
       if (file.endsWith('.sock')) {
@@ -508,29 +432,21 @@ export function getAllSocketPaths(): string[] {
       }
     }
   } catch {
-    // Directory may not exist yet
   }
-
-  // Legacy fallback paths
   const legacyName = `open-code-cli-mcp-browser-bridge-${getUsername()}`
   const legacyTmpdir = join(tmpdir(), legacyName)
   const legacyTmp = `/tmp/${legacyName}`
-
   if (!paths.includes(legacyTmpdir)) {
     paths.push(legacyTmpdir)
   }
   if (legacyTmpdir !== legacyTmp && !paths.includes(legacyTmp)) {
     paths.push(legacyTmp)
   }
-
   return paths
 }
-
 function getSocketName(): string {
-  // NOTE: This must match the one used in the Open Code in Chrome MCP
   return `open-code-cli-mcp-browser-bridge-${getUsername()}`
 }
-
 function getUsername(): string {
   try {
     return userInfo().username || 'default'

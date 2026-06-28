@@ -1,11 +1,7 @@
 import { readdir } from 'fs/promises'
 import { getCwd } from '../../utils/cwd.js'
 import { registerBundledSkill } from '../bundledSkills.js'
-
-// openAiCompatibleApiContent.js bundles 247KB of .md strings. Lazy-load inside
-// getPromptForCommand so they only enter memory when /openai-compatible-api is invoked.
 type SkillContent = typeof import('./openAiCompatibleApiContent.js')
-
 type DetectedLanguage =
   | 'python'
   | 'typescript'
@@ -15,7 +11,6 @@ type DetectedLanguage =
   | 'csharp'
   | 'php'
   | 'curl'
-
 const LANGUAGE_INDICATORS: Record<DetectedLanguage, string[]> = {
   python: ['.py', 'requirements.txt', 'pyproject.toml', 'setup.py', 'Pipfile'],
   typescript: ['.ts', '.tsx', 'tsconfig.json', 'package.json'],
@@ -26,7 +21,6 @@ const LANGUAGE_INDICATORS: Record<DetectedLanguage, string[]> = {
   php: ['.php', 'composer.json'],
   curl: [],
 }
-
 async function detectLanguage(): Promise<DetectedLanguage | null> {
   const cwd = getCwd()
   let entries: string[]
@@ -35,7 +29,6 @@ async function detectLanguage(): Promise<DetectedLanguage | null> {
   } catch {
     return null
   }
-
   for (const [lang, indicators] of Object.entries(LANGUAGE_INDICATORS) as [
     DetectedLanguage,
     string[],
@@ -51,7 +44,6 @@ async function detectLanguage(): Promise<DetectedLanguage | null> {
   }
   return null
 }
-
 function getFilesForLanguage(
   lang: DetectedLanguage,
   content: SkillContent,
@@ -60,16 +52,13 @@ function getFilesForLanguage(
     path => path.startsWith(`${lang}/`) || path.startsWith('shared/'),
   )
 }
-
 function processContent(md: string, content: SkillContent): string {
-  // Strip HTML comments. Loop to handle nested comments.
   let out = md
   let prev
   do {
     prev = out
     out = out.replace(/<!--[\s\S]*?-->\n?/g, '')
   } while (out !== prev)
-
   out = out.replace(
     /\{\{(\w+)\}\}/g,
     (match, key: string) =>
@@ -77,7 +66,6 @@ function processContent(md: string, content: SkillContent): string {
   )
   return out
 }
-
 function buildInlineReference(
   filePaths: string[],
   content: SkillContent,
@@ -92,58 +80,41 @@ function buildInlineReference(
   }
   return sections.join('\n\n')
 }
-
 const INLINE_READING_GUIDE = `## Reference Documentation
-
 The relevant documentation for your detected language is included below in \`<doc>\` tags. Each tag has a \`path\` attribute showing its original file path. Use this to find the right section:
-
 ### Quick Task Reference
-
 **Single text classification/summarization/extraction/Q&A:**
 → Refer to \`{lang}/openai-compatible-api/README.md\`
-
 **Chat UI or real-time response display:**
 → Refer to \`{lang}/openai-compatible-api/README.md\` + \`{lang}/openai-compatible-api/streaming.md\`
-
 **Long-running conversations (may exceed context window):**
 → Refer to \`{lang}/openai-compatible-api/README.md\` — see Compaction section
-
 **Prompt caching / optimize caching / "why is my cache hit rate low":**
 → Refer to \`shared/prompt-caching.md\` + \`{lang}/openai-compatible-api/README.md\` (Prompt Caching section)
-
 **Function calling / tool use / agents:**
 → Refer to \`{lang}/openai-compatible-api/README.md\` + \`shared/tool-use-concepts.md\` + \`{lang}/openai-compatible-api/tool-use.md\`
-
 **Batch processing (non-latency-sensitive):**
 → Refer to \`{lang}/openai-compatible-api/README.md\` + \`{lang}/openai-compatible-api/batches.md\`
-
 **File uploads across multiple requests:**
 → Refer to \`{lang}/openai-compatible-api/README.md\` + \`{lang}/openai-compatible-api/files-api.md\`
-
 **Agent with built-in tools (file/web/terminal) (Python & TypeScript only):**
 → Refer to \`{lang}/agent-sdk/README.md\` + \`{lang}/agent-sdk/patterns.md\`
-
 **Error handling:**
 → Refer to \`shared/error-codes.md\`
-
 **Latest docs via WebFetch:**
 → Refer to \`shared/live-sources.md\` for URLs`
-
 function buildPrompt(
   lang: DetectedLanguage | null,
   args: string,
   content: SkillContent,
 ): string {
-  // Take the SKILL.md content up to the "Reading Guide" section
   const cleanPrompt = processContent(content.SKILL_PROMPT, content)
   const readingGuideIdx = cleanPrompt.indexOf('## Reading Guide')
   const basePrompt =
     readingGuideIdx !== -1
       ? cleanPrompt.slice(0, readingGuideIdx).trimEnd()
       : cleanPrompt
-
   const parts: string[] = [basePrompt]
-
   if (lang) {
     const filePaths = getFilesForLanguage(lang, content)
     const readingGuide = INLINE_READING_GUIDE.replace(/\{lang\}/g, lang)
@@ -153,7 +124,6 @@ function buildPrompt(
         buildInlineReference(filePaths, content),
     )
   } else {
-    // No language detected — include all docs and let the model ask
     parts.push(INLINE_READING_GUIDE.replace(/\{lang\}/g, 'unknown'))
     parts.push(
       'No project language was auto-detected. Ask the user which language they are using, then refer to the matching docs below.',
@@ -163,20 +133,15 @@ function buildPrompt(
         buildInlineReference(Object.keys(content.SKILL_FILES), content),
     )
   }
-
-  // Preserve the "When to Use WebFetch" and "Common Pitfalls" sections
   const webFetchIdx = cleanPrompt.indexOf('## When to Use WebFetch')
   if (webFetchIdx !== -1) {
     parts.push(cleanPrompt.slice(webFetchIdx).trimEnd())
   }
-
   if (args) {
     parts.push(`## User Request\n\n${args}`)
   }
-
   return parts.join('\n\n')
 }
-
 export function registerOpenAiCompatibleApiSkill(): void {
   registerBundledSkill({
     name: 'openai-compatible-api',

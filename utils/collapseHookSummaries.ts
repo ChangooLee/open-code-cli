@@ -2,7 +2,6 @@ import type {
   RenderableMessage,
   SystemStopHookSummaryMessage,
 } from '../types/message.js'
-
 function isLabeledHookSummary(
   msg: RenderableMessage,
 ): msg is SystemStopHookSummaryMessage {
@@ -12,18 +11,11 @@ function isLabeledHookSummary(
     msg.hookLabel !== undefined
   )
 }
-
-/**
- * Collapses consecutive hook summary messages with the same hookLabel
- * (e.g. PostToolUse) into a single summary. This happens when parallel
- * tool calls each emit their own hook summary.
- */
 export function collapseHookSummaries(
   messages: RenderableMessage[],
 ): RenderableMessage[] {
   const result: RenderableMessage[] = []
   let i = 0
-
   while (i < messages.length) {
     const msg = messages[i]!
     if (isLabeledHookSummary(msg)) {
@@ -45,7 +37,6 @@ export function collapseHookSummaries(
           hookErrors: group.flatMap(m => m.hookErrors),
           preventedContinuation: group.some(m => m.preventedContinuation),
           hasOutput: group.some(m => m.hasOutput),
-          // Parallel tool calls' hooks overlap; max is closest to wall-clock.
           totalDurationMs: Math.max(...group.map(m => m.totalDurationMs ?? 0)),
         })
       }
@@ -54,6 +45,5 @@ export function collapseHookSummaries(
       i++
     }
   }
-
   return result
 }

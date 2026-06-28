@@ -19,23 +19,15 @@ import { getOpenCodeCliConfigHomeDir, isEnvTruthy } from '../utils/envUtils.js'
 import { getErrnoCode } from '../utils/errors.js'
 import { normalizeMessagesForAPI } from '../utils/messages.js'
 import { jsonParse, jsonStringify } from '../utils/slowOperations.js'
-
 function shouldUseVCR(): boolean {
   if (process.env.NODE_ENV === 'test') {
     return true
   }
-
   if (process.env.USER_TYPE === 'ant' && isEnvTruthy(process.env.FORCE_VCR)) {
     return true
   }
-
   return false
 }
-
-/**
- * Generic fixture management helper
- * Handles caching, reading, writing fixtures for any data type
- */
 async function withFixture<T>(
   input: unknown,
   fixtureName: string,
@@ -44,8 +36,6 @@ async function withFixture<T>(
   if (!shouldUseVCR()) {
     return await f()
   }
-
-  // Create hash of input for fixture filename
   const hash = createHash('sha1')
     .update(jsonStringify(input))
     .digest('hex')
@@ -54,8 +44,6 @@ async function withFixture<T>(
     process.env.OPEN_CODE_CLI_TEST_FIXTURES_ROOT ?? getCwd(),
     `fixtures/${fixtureName}-${hash}.json`,
   )
-
-  // Fetch cached fixture
   try {
     const cached = jsonParse(
       await readFile(filename, { encoding: 'utf8' }),
@@ -67,24 +55,18 @@ async function withFixture<T>(
       throw e
     }
   }
-
   if ((env.isCI || process.env.CI) && !isEnvTruthy(process.env.VCR_RECORD)) {
     throw new Error(
       `Fixture missing: ${filename}. Re-run tests with VCR_RECORD=1, then commit the result.`,
     )
   }
-
-  // Create & write new fixture
   const result = await f()
-
   await mkdir(dirname(filename), { recursive: true })
   await writeFile(filename, jsonStringify(result, null, 2), {
     encoding: 'utf8',
   })
-
   return result
 }
-
 export async function withVCR(
   messages: Message[],
   f: () => Promise<(AssistantMessage | StreamEvent | SystemAPIErrorMessage)[]>,
@@ -92,7 +74,6 @@ export async function withVCR(
   if (!shouldUseVCR()) {
     return await f()
   }
-
   const messagesForAPI = normalizeMessagesForAPI(
     messages.filter(_ => {
       if (_.type !== 'user') {
@@ -104,7 +85,6 @@ export async function withVCR(
       return true
     }),
   )
-
   const dehydratedInput = mapMessages(
     messagesForAPI.map(_ => _.message.content),
     dehydrateValue,
@@ -113,8 +93,6 @@ export async function withVCR(
     process.env.OPEN_CODE_CLI_TEST_FIXTURES_ROOT ?? getCwd(),
     `fixtures/${dehydratedInput.map(_ => createHash('sha1').update(jsonStringify(_)).digest('hex').slice(0, 6)).join('-')}.json`,
   )
-
-  // Fetch cached fixture
   try {
     const cached = jsonParse(
       await readFile(filename, { encoding: 'utf8' }),
@@ -129,19 +107,15 @@ export async function withVCR(
       throw e
     }
   }
-
   if (env.isCI && !isEnvTruthy(process.env.VCR_RECORD)) {
     throw new Error(
       `OpenAICompatible API fixture missing: ${filename}. Re-run tests with VCR_RECORD=1, then commit the result. Input messages:\n${jsonStringify(dehydratedInput, null, 2)}`,
     )
   }
-
-  // Create & write new fixture
   const results = await f()
   if (env.isCI && !isEnvTruthy(process.env.VCR_RECORD)) {
     return results
   }
-
   await mkdir(dirname(filename), { recursive: true })
   await writeFile(
     filename,
@@ -159,7 +133,6 @@ export async function withVCR(
   )
   return results
 }
-
 function addCachedCostToTotalSessionCost(
   message: AssistantMessage | StreamEvent,
 ): void {
@@ -171,7 +144,6 @@ function addCachedCostToTotalSessionCost(
   const costUSD = calculateUSDCost(model, usage)
   addToTotalSessionCost(costUSD, usage, model)
 }
-
 function mapMessages(
   messages: (UserMessage | AssistantMessage)['message']['content'][],
   f: (s: unknown) => unknown,
@@ -217,7 +189,6 @@ function mapMessages(
     })
   }) as (UserMessage | AssistantMessage)['message']['content'][]
 }
-
 function mapValuesDeep(
   obj: {
     [x: string]: unknown
@@ -234,7 +205,6 @@ function mapValuesDeep(
     return f(val, key, obj)
   })
 }
-
 function mapAssistantMessage(
   message: AssistantMessage,
   f: (s: unknown) => unknown,
@@ -242,10 +212,6 @@ function mapAssistantMessage(
   uuid?: UUID,
 ): AssistantMessage {
   return {
-    // Use provided UUID if given (hydrate path uses randomUUID for globally unique IDs),
-    // otherwise fall back to deterministic index-based UUID (dehydrate/fixture path).
-    // sessionStorage.ts deduplicates messages by UUID, so without unique UUIDs across
-    // VCR calls, resumed sessions would treat different responses as duplicates.
     uuid: uuid ?? (`UUID-${index}` as unknown as UUID),
     requestId: 'REQUEST_ID',
     timestamp: message.timestamp,
@@ -259,14 +225,14 @@ function mapAssistantMessage(
                 ..._,
                 text: f(_.text) as string,
                 citations: _.citations || [],
-              } // Ensure citations
+              } 
             case 'tool_use':
               return {
                 ..._,
                 input: mapValuesDeep(_.input as Record<string, unknown>, f),
               }
             default:
-              return _ // Handle other block types unchanged
+              return _ 
           }
         })
         .filter(Boolean) as BetaContentBlock[],
@@ -274,7 +240,6 @@ function mapAssistantMessage(
     type: 'assistant',
   }
 }
-
 function mapMessage(
   message: AssistantMessage | SystemAPIErrorMessage | StreamEvent,
   f: (s: unknown) => unknown,
@@ -287,7 +252,6 @@ function mapMessage(
     return message
   }
 }
-
 function dehydrateValue(s: unknown): unknown {
   if (typeof s !== 'string') {
     return s
@@ -298,19 +262,12 @@ function dehydrateValue(s: unknown): unknown {
     .replace(/num_files="\d+"/g, 'num_files="[NUM]"')
     .replace(/duration_ms="\d+"/g, 'duration_ms="[DURATION]"')
     .replace(/cost_usd="\d+"/g, 'cost_usd="[COST]"')
-    // Note: We intentionally don't replace all forward slashes with path.sep here.
-    // That would corrupt XML-like tags (e.g., </system-reminder> -> <\system-reminder>).
-    // The [CONFIG_HOME] and [CWD] replacements below handle path normalization.
     .replaceAll(configHome, '[CONFIG_HOME]')
     .replaceAll(cwd, '[CWD]')
     .replace(/Available commands:.+/, 'Available commands: [COMMANDS]')
-  // On Windows, paths may appear in multiple forms:
-  // 1. Forward-slash variants (Git, some Node APIs)
-  // 2. JSON-escaped variants (backslashes doubled in serialized JSON within messages)
   if (process.platform === 'win32') {
     const cwdFwd = cwd.replaceAll('\\', '/')
     const configHomeFwd = configHome.replaceAll('\\', '/')
-    // jsonStringify escapes \ to \\ - match paths embedded in JSON strings
     const cwdJsonEscaped = jsonStringify(cwd).slice(1, -1)
     const configHomeJsonEscaped = jsonStringify(configHome).slice(1, -1)
     s1 = s1
@@ -319,9 +276,6 @@ function dehydrateValue(s: unknown): unknown {
       .replaceAll(cwdFwd, '[CWD]')
       .replaceAll(configHomeFwd, '[CONFIG_HOME]')
   }
-  // Normalize backslash path separators after placeholders so VCR fixture
-  // hashes match across platforms (e.g., [CWD]\foo\bar -> [CWD]/foo/bar)
-  // Handle both single backslashes and JSON-escaped double backslashes (\\)
   s1 = s1
     .replace(/\[CWD\][^\s"'<>]*/g, match =>
       match.replaceAll('\\\\', '/').replaceAll('\\', '/'),
@@ -334,7 +288,6 @@ function dehydrateValue(s: unknown): unknown {
   }
   return s1
 }
-
 function hydrateValue(s: unknown): unknown {
   if (typeof s !== 'string') {
     return s
@@ -345,7 +298,6 @@ function hydrateValue(s: unknown): unknown {
     .replaceAll('[CONFIG_HOME]', getOpenCodeCliConfigHomeDir())
     .replaceAll('[CWD]', getCwd())
 }
-
 export async function* withStreamingVCR(
   messages: Message[],
   f: () => AsyncGenerator<
@@ -359,36 +311,24 @@ export async function* withStreamingVCR(
   if (!shouldUseVCR()) {
     return yield* f()
   }
-
-  // Compute and yield messages
   const buffer: (StreamEvent | AssistantMessage | SystemAPIErrorMessage)[] = []
-
-  // Record messages (or fetch from cache)
   const cachedBuffer = await withVCR(messages, async () => {
     for await (const message of f()) {
       buffer.push(message)
     }
     return buffer
   })
-
   if (cachedBuffer.length > 0) {
     yield* cachedBuffer
     return
   }
-
   yield* buffer
 }
-
 export async function withTokenCountVCR(
   messages: unknown[],
   tools: unknown[],
   f: () => Promise<number | null>,
 ): Promise<number | null> {
-  // Dehydrate before hashing so fixture keys survive cwd/config-home/tempdir
-  // variation and message UUID/timestamp churn. System prompts embed the
-  // working directory (both raw and as a slash→dash project slug in the
-  // auto-memory path) and messages carry fresh UUIDs per run; without this,
-  // every test run produces a new hash and fixtures never hit in CI.
   const cwdSlug = getCwd().replace(/[^a-zA-Z0-9]/g, '-')
   const dehydrated = (
     dehydrateValue(jsonStringify({ messages, tools })) as string

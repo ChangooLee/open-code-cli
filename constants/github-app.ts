@@ -104,10 +104,10 @@ on:
     types: [opened, synchronize, ready_for_review, reopened]
     # Optional: Only run on specific file changes
     # paths:
-    #   - "src/**/*.ts"
-    #   - "src/**/*.tsx"
-    #   - "src/**/*.js"
-    #   - "src/**/*.jsx"
+    #   - "src*.ts"
+    #   - "src*.tsx"
+    #   - "src*.js"
+    #   - "src*.jsx"
 
 jobs:
   open-code-cli-review:

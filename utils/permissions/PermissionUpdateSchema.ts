@@ -1,12 +1,4 @@
-/**
- * Zod schemas for permission updates.
- *
- * This file is intentionally kept minimal with no complex dependencies
- * so it can be safely imported by src/types/hooks.ts without creating
- * circular dependencies.
- */
 import z from 'zod/v4'
-// Types extracted to src/types/permissions.ts to break import cycles
 import type {
   PermissionUpdate,
   PermissionUpdateDestination,
@@ -17,28 +9,16 @@ import {
   permissionBehaviorSchema,
   permissionRuleValueSchema,
 } from './PermissionRule.js'
-
-// Re-export for backwards compatibility
 export type { PermissionUpdate, PermissionUpdateDestination }
-
-/**
- * PermissionUpdateDestination is where a new permission rule should be saved to.
- */
 export const permissionUpdateDestinationSchema = lazySchema(() =>
   z.enum([
-    // User settings (global)
     'userSettings',
-    // Project settings (shared per-directory)
     'projectSettings',
-    // Local settings (gitignored)
     'localSettings',
-    // In-memory for the current session only
     'session',
-    // From the command line arguments
     'cliArg',
   ]),
 )
-
 export const permissionUpdateSchema = lazySchema(() =>
   z.discriminatedUnion('type', [
     z.object({

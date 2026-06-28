@@ -8,7 +8,6 @@ import {
   allWorkingDirectories,
   pathInWorkingPath,
 } from '../../utils/permissions/filesystem.js'
-
 export type AddDirectoryResult =
   | {
       resultType: 'success'
@@ -27,7 +26,6 @@ export type AddDirectoryResult =
       directoryPath: string
       workingDir: string
     }
-
 export async function validateDirectoryForWorkspace(
   directoryPath: string,
   permissionContext: ToolPermissionContext,
@@ -37,12 +35,7 @@ export async function validateDirectoryForWorkspace(
       resultType: 'emptyPath',
     }
   }
-
-  // resolve() strips the trailing slash expandPath can leave on absolute
-  // inputs, so /foo and /foo/ map to the same storage key (CC-33).
   const absolutePath = resolve(expandPath(directoryPath))
-
-  // Check if path exists and is a directory (single syscall)
   try {
     const stats = await stat(absolutePath)
     if (!stats.isDirectory()) {
@@ -54,9 +47,6 @@ export async function validateDirectoryForWorkspace(
     }
   } catch (e: unknown) {
     const code = getErrnoCode(e)
-    // Match prior existsSync() semantics: treat any of these as "not found"
-    // rather than re-throwing. EACCES/EPERM in particular must not crash
-    // startup when a settings-configured additional directory is inaccessible.
     if (
       code === 'ENOENT' ||
       code === 'ENOTDIR' ||
@@ -71,11 +61,7 @@ export async function validateDirectoryForWorkspace(
     }
     throw e
   }
-
-  // Get current permission context
   const currentWorkingDirs = allWorkingDirectories(permissionContext)
-
-  // Check if already within an existing working directory
   for (const workingDir of currentWorkingDirs) {
     if (pathInWorkingPath(absolutePath, workingDir)) {
       return {
@@ -85,13 +71,11 @@ export async function validateDirectoryForWorkspace(
       }
     }
   }
-
   return {
     resultType: 'success',
     absolutePath,
   }
 }
-
 export function addDirHelpMessage(result: AddDirectoryResult): string {
   switch (result.resultType) {
     case 'emptyPath':

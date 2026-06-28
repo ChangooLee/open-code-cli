@@ -21,7 +21,6 @@ import {
   renderToolUseMessage,
   renderToolUseProgressMessage,
 } from './UI.js'
-
 const inputSchema = lazySchema(() =>
   z.strictObject({
     query: z.string().min(2).describe('The search query to use'),
@@ -36,23 +35,18 @@ const inputSchema = lazySchema(() =>
   }),
 )
 type InputSchema = ReturnType<typeof inputSchema>
-
 type Input = z.infer<InputSchema>
-
 const searchResultSchema = lazySchema(() => {
   const searchHitSchema = z.object({
     title: z.string().describe('The title of the search result'),
     url: z.string().describe('The URL of the search result'),
   })
-
   return z.object({
     tool_use_id: z.string().describe('ID of the tool use'),
     content: z.array(searchHitSchema).describe('Array of search hits'),
   })
 })
-
 export type SearchResult = z.infer<ReturnType<typeof searchResultSchema>>
-
 const outputSchema = lazySchema(() =>
   z.object({
     query: z.string().describe('The search query that was executed'),
@@ -65,14 +59,9 @@ const outputSchema = lazySchema(() =>
   }),
 )
 type OutputSchema = ReturnType<typeof outputSchema>
-
 export type Output = z.infer<OutputSchema>
-
-// Re-export WebSearchProgress from centralized types to break import cycles
 export type { WebSearchProgress } from '../../types/tools.js'
-
 import type { WebSearchProgress } from '../../types/tools.js'
-
 function makeToolSchema(input: Input): BetaWebSearchTool20250305 {
   return {
     type: 'web_search_20250305',
@@ -82,24 +71,14 @@ function makeToolSchema(input: Input): BetaWebSearchTool20250305 {
     max_uses: 8, // Hardcoded to 8 searches maximum
   }
 }
-
 function makeOutputFromSearchResponse(
   result: BetaContentBlock[],
   query: string,
   durationSeconds: number,
 ): Output {
-  // The result is a sequence of these blocks:
-  // - text to start -- always?
-  // [
-  //    - server_tool_use
-  //    - web_search_tool_result
-  //    - text and citation blocks intermingled
-  //  ]+  (this block repeated for each search)
-
   const results: (SearchResult | string)[] = []
   let textAcc = ''
   let inText = true
-
   for (const block of result) {
     if (block.type === 'server_tool_use') {
       if (inText) {
@@ -111,28 +90,22 @@ function makeOutputFromSearchResponse(
       }
       continue
     }
-
     if (block.type === 'web_search_tool_result') {
-      // BetaExtraContentBlock keeps content open (unknown); narrow to the
-      // web-search shape the API actually returns here.
       const searchContent = block.content as
         | { title: string; url: string }[]
         | { error_code: string }
-      // Handle error case - content is a WebSearchToolResultError
       if (!Array.isArray(searchContent)) {
         const errorMessage = `Web search error: ${searchContent.error_code}`
         logError(new Error(errorMessage))
         results.push(errorMessage)
         continue
       }
-      // Success case - add results to our collection
       const hits = searchContent.map(r => ({ title: r.title, url: r.url }))
       results.push({
         tool_use_id: String(block.tool_use_id),
         content: hits,
       })
     }
-
     if (block.type === 'text') {
       if (inText) {
         textAcc += block.text
@@ -142,18 +115,15 @@ function makeOutputFromSearchResponse(
       }
     }
   }
-
   if (textAcc.length) {
     results.push(textAcc.trim())
   }
-
   return {
     query,
     results,
     durationSeconds,
   }
 }
-
 export const WebSearchTool = buildTool({
   name: WEB_SEARCH_TOOL_NAME,
   searchHint: 'search the web for current information',
@@ -209,9 +179,6 @@ export const WebSearchTool = buildTool({
   renderToolUseProgressMessage,
   renderToolResultMessage,
   extractSearchText() {
-    // renderToolResultMessage shows only "Did N searches in Xs" chrome —
-    // the results[] content never appears on screen. Heuristic would index
-    // string entries in results[] (phantom match). Nothing to search.
     return ''
   },
   async validateInput(input) {
@@ -240,12 +207,10 @@ export const WebSearchTool = buildTool({
       content: 'Perform a web search for the query: ' + query,
     })
     const toolSchema = makeToolSchema(input)
-
     const useHaiku = getFeatureValue_CACHED_MAY_BE_STALE(
       'open_code_cli_plum_vx3',
       false,
     )
-
     const appState = context.getAppState()
     const queryStream = queryModelWithStreaming({
       messages: [userMessage],
@@ -271,20 +236,16 @@ export const WebSearchTool = buildTool({
         effortValue: appState.effortValue,
       },
     })
-
     const allContentBlocks: BetaContentBlock[] = []
     let currentToolUseId = null
     let currentToolUseJson = ''
     let progressCounter = 0
-    const toolUseQueries = new Map() // Map of tool_use_id to query
-
+    const toolUseQueries = new Map() 
     for await (const event of queryStream) {
       if (event.type === 'assistant') {
         allContentBlocks.push(...event.message.content)
         continue
       }
-
-      // Track tool use ID when server_tool_use starts
       if (
         event.type === 'stream_event' &&
         event.event?.type === 'content_block_start'
@@ -293,13 +254,9 @@ export const WebSearchTool = buildTool({
         if (contentBlock && contentBlock.type === 'server_tool_use') {
           currentToolUseId = contentBlock.id
           currentToolUseJson = ''
-          // Note: The ServerToolUseBlock doesn't contain input.query
-          // The actual query comes through input_json_delta events
           continue
         }
       }
-
-      // Accumulate JSON for current tool use
       if (
         currentToolUseId &&
         event.type === 'stream_event' &&
@@ -308,17 +265,12 @@ export const WebSearchTool = buildTool({
         const delta = event.event.delta
         if (delta?.type === 'input_json_delta' && delta.partial_json) {
           currentToolUseJson += delta.partial_json
-
-          // Try to extract query from partial JSON for progress updates
           try {
-            // Look for a complete query field
             const queryMatch = currentToolUseJson.match(
               /"query"\s*:\s*"((?:[^"\\]|\\.)*)"/,
             )
             if (queryMatch && queryMatch[1]) {
-              // The regex properly handles escaped characters
               const query = jsonParse('"' + queryMatch[1] + '"')
-
               if (
                 !toolUseQueries.has(currentToolUseId) ||
                 toolUseQueries.get(currentToolUseId) !== query
@@ -337,23 +289,18 @@ export const WebSearchTool = buildTool({
               }
             }
           } catch {
-            // Ignore parsing errors for partial JSON
           }
         }
       }
-
-      // Yield progress when search results come in
       if (
         event.type === 'stream_event' &&
         event.event?.type === 'content_block_start'
       ) {
         const contentBlock = event.event.content_block
         if (contentBlock && contentBlock.type === 'web_search_tool_result') {
-          // Get the actual query that was used for this search
           const toolUseId = (contentBlock.tool_use_id as string | undefined) ?? ''
           const actualQuery = toolUseQueries.get(toolUseId) || query
           const content = contentBlock.content
-
           progressCounter++
           if (onProgress) {
             onProgress({
@@ -368,11 +315,8 @@ export const WebSearchTool = buildTool({
         }
       }
     }
-
-    // Process the final result
     const endTime = performance.now()
     const durationSeconds = (endTime - startTime) / 1000
-
     const data = makeOutputFromSearchResponse(
       allContentBlocks,
       query,
@@ -382,21 +326,14 @@ export const WebSearchTool = buildTool({
   },
   mapToolResultToToolResultBlockParam(output, toolUseID) {
     const { query, results } = output
-
     let formattedOutput = `Web search results for query: "${query}"\n\n`
-
-    // Process the results array - it can contain both string summaries and search result objects.
-    // Guard against null/undefined entries that can appear after JSON round-tripping
-    // (e.g., from compaction or transcript deserialization).
     ;(results ?? []).forEach(result => {
       if (result == null) {
         return
       }
       if (typeof result === 'string') {
-        // Text summary
         formattedOutput += result + '\n\n'
       } else {
-        // Search result with links
         if (result.content?.length > 0) {
           formattedOutput += `Links: ${jsonStringify(result.content)}\n\n`
         } else {
@@ -404,10 +341,8 @@ export const WebSearchTool = buildTool({
         }
       }
     })
-
     formattedOutput +=
       '\nREMINDER: You MUST include the sources above in your response to the user using markdown hyperlinks.'
-
     return {
       tool_use_id: toolUseID,
       type: 'tool_result',

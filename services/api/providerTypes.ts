@@ -1,11 +1,9 @@
 export type JsonObject = Record<string, unknown>
-
 export class APIError extends Error {
   status?: number
   headers?: Headers
   error?: unknown
   requestID?: string
-
   constructor(
     statusOrMessage?: number | string,
     message?: string,
@@ -25,42 +23,36 @@ export class APIError extends Error {
     this.error = error
   }
 }
-
 export class APIConnectionError extends Error {
   constructor(message = 'API connection error') {
     super(message)
     this.name = 'APIConnectionError'
   }
 }
-
 export class APIConnectionTimeoutError extends APIConnectionError {
   constructor(message = 'API connection timeout') {
     super(message)
     this.name = 'APIConnectionTimeoutError'
   }
 }
-
 export class APIUserAbortError extends Error {
   constructor(message = 'Request aborted') {
     super(message)
     this.name = 'APIUserAbortError'
   }
 }
-
 export class AuthenticationError extends APIError {
   constructor(message = 'Authentication failed', headers?: Headers, error?: unknown) {
     super(401, message, headers, error)
     this.name = 'AuthenticationError'
   }
 }
-
 export class NotFoundError extends APIError {
   constructor(message = 'Not found', headers?: Headers, error?: unknown) {
     super(404, message, headers, error)
     this.name = 'NotFoundError'
   }
 }
-
 export type ClientOptions = {
   fetch?: typeof fetch
   fetchOptions?: RequestInit
@@ -75,7 +67,6 @@ export type ClientOptions = {
     debug?: (msg: string, ...args: unknown[]) => void
   }
 }
-
 export type BetaUsage = {
   input_tokens?: number | null
   output_tokens?: number | null
@@ -98,7 +89,6 @@ export type BetaUsage = {
   }> | null
   speed?: string | null
 }
-
 export type BetaMessageDeltaUsage = BetaUsage
 export type BetaStopReason =
   | 'end_turn'
@@ -108,7 +98,6 @@ export type BetaStopReason =
   | 'model_context_window_exceeded'
   | 'refusal'
   | null
-
 export type TextBlockParam = { type: 'text'; text: string; cache_control?: unknown }
 export type TextBlock = TextBlockParam
 export type ThinkingBlock = {
@@ -154,9 +143,6 @@ export type ToolResultBlockParam = {
   cache_control?: unknown
 }
 export type BetaToolResultBlockParam = ToolResultBlockParam
-// Additional beta/server content blocks the CLI enumerates but mostly passes
-// through. Each keeps a literal `type` discriminant (so narrowing the named
-// blocks above still works) plus an open shape for forward-compatible fields.
 export type BetaExtraContentBlock = {
   type:
     | 'server_tool_use'
@@ -177,7 +163,6 @@ export type BetaExtraContentBlock = {
   content?: unknown
   [key: string]: unknown
 }
-
 export type ContentBlockParam =
   | TextBlockParam
   | ImageBlockParam
@@ -192,7 +177,6 @@ export type BetaContentBlockParam = ContentBlockParam
 export type BetaContentBlock = ContentBlock
 export type BetaThinkingBlock = ThinkingBlock
 export type BetaRedactedThinkingBlock = RedactedThinkingBlock
-
 export type MessageParam = {
   role: 'user' | 'assistant'
   content: string | ContentBlockParam[]
@@ -209,7 +193,6 @@ export type BetaMessage = {
   stop_sequence?: string | null
   usage: BetaUsage
 }
-
 export type BetaJSONOutputFormat = JsonObject
 export type BetaOutputConfig = JsonObject
 export type BetaToolChoiceAuto = { type: 'auto' }
@@ -229,7 +212,6 @@ export type BetaWebSearchTool20250305 = {
 }
 export type BetaToolUnion = BetaTool
 export type Tool = BetaTool
-
 export type BetaMessageStreamParams = {
   model: string
   messages: MessageParam[]
@@ -245,7 +227,6 @@ export type BetaMessageStreamParams = {
   output_config?: BetaOutputConfig
   [key: string]: unknown
 }
-
 export type BetaRawMessageStreamEvent =
   | { type: 'message_start'; message: BetaMessage }
   | {
@@ -270,5 +251,4 @@ export type BetaRawMessageStreamEvent =
       usage?: BetaMessageDeltaUsage
     }
   | { type: 'message_stop' }
-
 export type Stream<T> = AsyncIterable<T> & { controller: AbortController }

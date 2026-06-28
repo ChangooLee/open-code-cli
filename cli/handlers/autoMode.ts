@@ -1,8 +1,3 @@
-/**
- * Auto mode subcommand handlers — dump default/merged classifier rules and
- * critique user-written rules. Dynamically imported when `open-code-cli auto-mode ...` runs.
- */
-
 import { errorMessage } from '../../utils/errors.js'
 import {
   getMainLoopModel,
@@ -16,22 +11,12 @@ import {
 import { getAutoModeConfig } from '../../utils/settings/settings.js'
 import { sideQuery } from '../../utils/sideQuery.js'
 import { jsonStringify } from '../../utils/slowOperations.js'
-
 function writeRules(rules: AutoModeRules): void {
   process.stdout.write(jsonStringify(rules, null, 2) + '\n')
 }
-
 export function autoModeDefaultsHandler(): void {
   writeRules(getDefaultExternalAutoModeRules())
 }
-
-/**
- * Dump the effective auto mode config: user settings where provided, external
- * defaults otherwise. Per-section REPLACE semantics — matches how
- * buildYoloSystemPrompt resolves the external template (a non-empty user
- * section replaces that section's defaults entirely; an empty/absent section
- * falls through to defaults).
- */
 export function autoModeConfigHandler(): void {
   const config = getAutoModeConfig()
   const defaults = getDefaultExternalAutoModeRules()
@@ -45,7 +30,6 @@ export function autoModeConfigHandler(): void {
       : defaults.environment,
   })
 }
-
 const CRITIQUE_SYSTEM_PROMPT =
   'You are an expert reviewer of auto mode classifier rules for Open Code CLI.\n' +
   '\n' +
@@ -69,7 +53,6 @@ const CRITIQUE_SYSTEM_PROMPT =
   '\n' +
   'Be concise and constructive. Only comment on rules that could be improved. ' +
   'If all rules look good, say so.'
-
 export async function autoModeCritiqueHandler(options: {
   model?: string
 }): Promise<void> {
@@ -78,7 +61,6 @@ export async function autoModeCritiqueHandler(options: {
     (config?.allow?.length ?? 0) > 0 ||
     (config?.soft_deny?.length ?? 0) > 0 ||
     (config?.environment?.length ?? 0) > 0
-
   if (!hasCustomRules) {
     process.stdout.write(
       'No custom auto mode rules found.\n\n' +
@@ -87,14 +69,11 @@ export async function autoModeCritiqueHandler(options: {
     )
     return
   }
-
   const model = options.model
     ? parseUserSpecifiedModel(options.model)
     : getMainLoopModel()
-
   const defaults = getDefaultExternalAutoModeRules()
   const classifierPrompt = buildDefaultExternalSystemPrompt()
-
   const userRulesSummary =
     formatRulesForCritique('allow', config?.allow ?? [], defaults.allow) +
     formatRulesForCritique(
@@ -107,9 +86,7 @@ export async function autoModeCritiqueHandler(options: {
       config?.environment ?? [],
       defaults.environment,
     )
-
   process.stdout.write('Analyzing your auto mode rules…\n\n')
-
   let response
   try {
     response = await sideQuery({
@@ -139,7 +116,6 @@ export async function autoModeCritiqueHandler(options: {
     process.exitCode = 1
     return
   }
-
   const textBlock = response.content.find(block => block.type === 'text')
   if (textBlock?.type === 'text') {
     process.stdout.write(textBlock.text + '\n')
@@ -147,7 +123,6 @@ export async function autoModeCritiqueHandler(options: {
     process.stdout.write('No critique was generated. Please try again.\n')
   }
 }
-
 function formatRulesForCritique(
   section: string,
   userRules: string[],

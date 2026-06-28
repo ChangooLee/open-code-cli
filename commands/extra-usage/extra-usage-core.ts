@@ -10,29 +10,19 @@ import { hasOpenCodeCliBillingAccess } from '../../utils/billing.js'
 import { openBrowser } from '../../utils/browser.js'
 import { getGlobalConfig, saveGlobalConfig } from '../../utils/config.js'
 import { logError } from '../../utils/log.js'
-
 type ExtraUsageResult =
   | { type: 'message'; value: string }
   | { type: 'browser-opened'; url: string; opened: boolean }
-
 export async function runExtraUsage(): Promise<ExtraUsageResult> {
   if (!getGlobalConfig().hasVisitedExtraUsage) {
     saveGlobalConfig(prev => ({ ...prev, hasVisitedExtraUsage: true }))
   }
-  // Invalidate only the current org's entry so a follow-up read refetches
-  // the granted state. Separate from the visited flag since users may run
-  // /extra-usage more than once while iterating on the claim flow.
   invalidateOverageCreditGrantCache()
-
   const subscriptionType = getSubscriptionType()
   const isTeamOrEnterprise =
     subscriptionType === 'team' || subscriptionType === 'enterprise'
   const hasBillingAccess = hasOpenCodeCliBillingAccess()
-
   if (!hasBillingAccess && isTeamOrEnterprise) {
-    // Mirror apps/open-code-cli-ai useHasUnlimitedOverage(): if overage is enabled
-    // with no monthly cap, there is nothing to request. On fetch error, fall
-    // through and let the user ask (matching web's "err toward show" behavior).
     let extraUsage: ExtraUsage | null | undefined
     try {
       const utilization = await fetchUtilization()
@@ -40,7 +30,6 @@ export async function runExtraUsage(): Promise<ExtraUsageResult> {
     } catch (error) {
       logError(error as Error)
     }
-
     if (extraUsage?.is_enabled && extraUsage.monthly_limit === null) {
       return {
         type: 'message',
@@ -48,7 +37,6 @@ export async function runExtraUsage(): Promise<ExtraUsageResult> {
           'Your organization already has unlimited extra usage. No request needed.',
       }
     }
-
     try {
       const eligibility = await checkAdminRequestEligibility('limit_increase')
       if (eligibility?.is_allowed === false) {
@@ -59,9 +47,7 @@ export async function runExtraUsage(): Promise<ExtraUsageResult> {
       }
     } catch (error) {
       logError(error as Error)
-      // If eligibility check fails, continue — the create endpoint will enforce if necessary
     }
-
     try {
       const pendingOrDismissedRequests = await getMyAdminRequests(
         'limit_increase',
@@ -76,9 +62,7 @@ export async function runExtraUsage(): Promise<ExtraUsageResult> {
       }
     } catch (error) {
       logError(error as Error)
-      // Fall through to creating a new request below
     }
-
     try {
       await createAdminRequest({
         request_type: 'limit_increase',
@@ -92,19 +76,15 @@ export async function runExtraUsage(): Promise<ExtraUsageResult> {
       }
     } catch (error) {
       logError(error as Error)
-      // Fall through to generic message below
     }
-
     return {
       type: 'message',
       value: 'Please contact your admin to manage extra usage settings.',
     }
   }
-
   const url = isTeamOrEnterprise
     ? 'https://Open Code CLI/admin-settings/usage'
     : 'https://Open Code CLI/settings/usage'
-
   try {
     const opened = await openBrowser(url)
     return { type: 'browser-opened', url, opened }

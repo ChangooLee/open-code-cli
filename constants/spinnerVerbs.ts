@@ -1,5 +1,4 @@
 import { getInitialSettings } from '../utils/settings/settings.js'
-
 export function getSpinnerVerbs(): string[] {
   const settings = getInitialSettings()
   const config = settings.spinnerVerbs
@@ -11,8 +10,6 @@ export function getSpinnerVerbs(): string[] {
   }
   return [...SPINNER_VERBS, ...config.verbs]
 }
-
-// Spinner verbs for loading messages
 export const SPINNER_VERBS = [
   'Accomplishing',
   'Actioning',

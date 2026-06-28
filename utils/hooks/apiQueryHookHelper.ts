@@ -8,35 +8,22 @@ import { toError } from '../errors.js'
 import { extractTextContent } from '../messages.js'
 import { asSystemPrompt } from '../systemPromptType.js'
 import type { REPLHookContext } from './postSamplingHooks.js'
-
 export type ApiQueryHookContext = REPLHookContext & {
   queryMessageCount?: number
 }
-
 export type ApiQueryHookConfig<TResult> = {
   name: QuerySource
   shouldRun: (context: ApiQueryHookContext) => Promise<boolean>
-
-  // Build the complete message list to send to the API
   buildMessages: (context: ApiQueryHookContext) => Message[]
-
-  // Optional: override system prompt (defaults to context.systemPrompt)
   systemPrompt?: string
-
-  // Optional: whether to use tools from context (defaults to true)
-  // Set to false to pass empty tools array
   useTools?: boolean
-
   parseResponse: (content: string, context: ApiQueryHookContext) => TResult
   logResult: (
     result: ApiQueryResult<TResult>,
     context: ApiQueryHookContext,
   ) => void
-  // Must be a function to ensure lazy loading (config is accessed before allowed)
-  // Receives context so callers can inherit the main loop model if desired.
   getModel: (context: ApiQueryHookContext) => string
 }
-
 export type ApiQueryResult<TResult> =
   | {
       type: 'success'
@@ -52,7 +39,6 @@ export type ApiQueryResult<TResult> =
       error: Error
       uuid: string
     }
-
 export function createApiQueryHook<TResult>(
   config: ApiQueryHookConfig<TResult>,
 ) {
@@ -62,26 +48,15 @@ export function createApiQueryHook<TResult>(
       if (!shouldRun) {
         return
       }
-
       const uuid = randomUUID()
-
-      // Build messages using the config's buildMessages function
       const messages = config.buildMessages(context)
       context.queryMessageCount = messages.length
-
-      // Use config's system prompt if provided, otherwise use context's
       const systemPrompt = config.systemPrompt
         ? asSystemPrompt([config.systemPrompt])
         : context.systemPrompt
-
-      // Use config's tools preference (defaults to true = use context tools)
       const useTools = config.useTools ?? true
       const tools = useTools ? context.toolUseContext.options.tools : []
-
-      // Get model (lazy loaded)
       const model = config.getModel(context)
-
-      // Make API call
       const response = await queryModelWithoutStreaming({
         messages,
         systemPrompt,
@@ -106,10 +81,7 @@ export function createApiQueryHook<TResult>(
           agentId: context.toolUseContext.agentId,
         },
       })
-
-      // Parse response
       const content = extractTextContent(response.message.content).trim()
-
       try {
         const result = config.parseResponse(content, context)
         config.logResult(

@@ -22,12 +22,10 @@ import { useSetAppState } from '../../state/AppState.js'
 import { env } from '../../utils/env.js'
 import { jsonStringify } from '../../utils/slowOperations.js'
 import { type CompletionType, logUnaryEvent } from '../../utils/unaryLogging.js'
-
 export type UnaryEvent = {
   completion_type: CompletionType
   language_name: string | Promise<string>
 }
-
 function permissionResultToLog(permissionResult: PermissionResult): string {
   switch (permissionResult.behavior) {
     case 'allow':
@@ -57,7 +55,6 @@ reason: ${decisionReasonToString(permissionResult.decisionReason)}`
     }
   }
 }
-
 function decisionReasonToString(
   decisionReason: PermissionDecisionReason | undefined,
 ): string {
@@ -93,33 +90,17 @@ function decisionReasonToString(
       return jsonStringify(decisionReason, null, 2)
   }
 }
-
-/**
- * Logs permission request events using analytics and unary logging.
- * Handles both the analytics event and the unary event logging.
- */
 export function usePermissionRequestLogging(
   toolUseConfirm: ToolUseConfirm,
   unaryEvent: UnaryEvent,
 ): void {
   const setAppState = useSetAppState()
-  // Guard against effect re-firing if toolUseConfirm's object reference
-  // changes during a single dialog's lifetime (e.g., parent re-renders with a
-  // fresh object). Without this, the unconditional setAppState below can
-  // cascade into an infinite microtask loop — each re-fire does another
-  // setAppState spread + (ant builds) splitCommand → shell-quote regex,
-  // pegging CPU at 100% and leaking ~500MB/min in JSRopeString/RegExp allocs.
-  // The component is keyed by toolUseID, so this ref resets on remount —
-  // we only need to dedupe re-fires WITHIN one dialog instance.
   const loggedToolUseID = useRef<string | null>(null)
-
   useEffect(() => {
     if (loggedToolUseID.current === toolUseConfirm.toolUseID) {
       return
     }
     loggedToolUseID.current = toolUseConfirm.toolUseID
-
-    // Increment permission prompt count for attribution tracking
     setAppState(prev => ({
       ...prev,
       attribution: {
@@ -127,8 +108,6 @@ export function usePermissionRequestLogging(
         permissionPromptCount: prev.attribution.permissionPromptCount + 1,
       },
     }))
-
-    // Log analytics event
     logEvent('open_code_cli_tool_use_show_permission_request', {
       messageID: toolUseConfirm.assistantMessage.message
         .id as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
@@ -138,7 +117,6 @@ export function usePermissionRequestLogging(
         ?.type as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
       sandboxEnabled: SandboxManager.isSandboxingEnabled(),
     })
-
     if (process.env.USER_TYPE === 'ant') {
       const permissionResult = toolUseConfirm.permissionResult
       if (
@@ -146,7 +124,6 @@ export function usePermissionRequestLogging(
         permissionResult.behavior === 'ask' &&
         !hasRules(permissionResult.suggestions)
       ) {
-        // Log if no rule suggestions ("always allow") are provided
         logEvent('open_code_cli_internal_tool_use_permission_request_no_always_allow', {
           messageID: toolUseConfirm.assistantMessage.message
             .id as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
@@ -155,17 +132,12 @@ export function usePermissionRequestLogging(
           decisionReasonType: (permissionResult.decisionReason?.type ??
             'unknown') as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
           sandboxEnabled: SandboxManager.isSandboxingEnabled(),
-
-          // This DOES contain code/filepaths and should not be logged in the public build!
           decisionReasonDetails: decisionReasonToString(
             permissionResult.decisionReason,
           ) as never,
         })
       }
     }
-
-    // [ANT-ONLY] Log bash tool calls, so we can categorize
-    // & burn down calls that should have been allowed
     if (process.env.USER_TYPE === 'ant') {
       const parsedInput = BashTool.inputSchema.safeParse(toolUseConfirm.input)
       if (
@@ -173,12 +145,10 @@ export function usePermissionRequestLogging(
         toolUseConfirm.permissionResult.behavior === 'ask' &&
         parsedInput.success
       ) {
-        // Note: All metadata fields in this event contain code/filepaths
         let split = [parsedInput.data.command]
         try {
           split = splitCommand_DEPRECATED(parsedInput.data.command)
         } catch {
-          // Ignore parse errors here - just log the full command
         }
         logEvent('open_code_cli_internal_bash_tool_use_permission_request', {
           parts: jsonStringify(
@@ -195,7 +165,6 @@ export function usePermissionRequestLogging(
         })
       }
     }
-
     void logUnaryEvent({
       completion_type: unaryEvent.completion_type,
       event: 'response',

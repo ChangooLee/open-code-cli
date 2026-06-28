@@ -9,10 +9,8 @@ import {
 } from '../../utils/tasks.js'
 import { TASK_LIST_TOOL_NAME } from './constants.js'
 import { DESCRIPTION, getPrompt } from './prompt.js'
-
 const inputSchema = lazySchema(() => z.strictObject({}))
 type InputSchema = ReturnType<typeof inputSchema>
-
 const outputSchema = lazySchema(() =>
   z.object({
     tasks: z.array(
@@ -27,9 +25,7 @@ const outputSchema = lazySchema(() =>
   }),
 )
 type OutputSchema = ReturnType<typeof outputSchema>
-
 export type Output = z.infer<OutputSchema>
-
 export const TaskListTool = buildTool({
   name: TASK_LIST_TOOL_NAME,
   searchHint: 'list all tasks',
@@ -64,16 +60,12 @@ export const TaskListTool = buildTool({
   },
   async call() {
     const taskListId = getTaskListId()
-
     const allTasks = (await listTasks(taskListId)).filter(
       t => !t.metadata?._internal,
     )
-
-    // Build a set of resolved task IDs for filtering
     const resolvedTaskIds = new Set(
       allTasks.filter(t => t.status === 'completed').map(t => t.id),
     )
-
     const tasks = allTasks.map(task => ({
       id: task.id,
       subject: task.subject,
@@ -81,7 +73,6 @@ export const TaskListTool = buildTool({
       owner: task.owner,
       blockedBy: task.blockedBy.filter(id => !resolvedTaskIds.has(id)),
     }))
-
     return {
       data: {
         tasks,
@@ -97,7 +88,6 @@ export const TaskListTool = buildTool({
         content: 'No tasks found',
       }
     }
-
     const lines = tasks.map(task => {
       const owner = task.owner ? ` (${task.owner})` : ''
       const blocked =
@@ -106,7 +96,6 @@ export const TaskListTool = buildTool({
           : ''
       return `#${task.id} [${task.status}] ${task.subject}${owner}${blocked}`
     })
-
     return {
       tool_use_id: toolUseID,
       type: 'tool_result',

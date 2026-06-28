@@ -1,10 +1,3 @@
-// Utility types that cannot be expressed as Zod schemas.
-
-/**
- * The provider API usage shape with every field present (non-nullable).
- * Consumers (EMPTY_USAGE, updateUsage, accumulateUsage in services/api) use the
- * snake_case wire shape, so this models that rather than the SDK ModelUsage.
- */
 export type NonNullableUsage = {
   input_tokens: number
   cache_creation_input_tokens: number

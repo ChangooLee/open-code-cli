@@ -9,20 +9,6 @@ import {
   loadMarkdownFilesForSubdir,
 } from '../utils/markdownConfigLoader.js'
 import { clearPluginOutputStyleCache } from '../utils/plugins/loadPluginOutputStyles.js'
-
-/**
- * Loads markdown files from .open-code-cli/output-styles directories throughout the project
- * and from ~/.open-code-cli/output-styles directory and converts them to output styles.
- *
- * Each filename becomes a style name, and the file content becomes the style prompt.
- * The frontmatter provides name and description.
- *
- * Structure:
- * - Project .open-code-cli/output-styles/*.md -> project styles
- * - User ~/.open-code-cli/output-styles/*.md -> user styles (overridden by project styles)
- *
- * @param cwd Current working directory for project directory traversal
- */
 export const getOutputStyleDirStyles = memoize(
   async (cwd: string): Promise<OutputStyleConfig[]> => {
     try {
@@ -30,14 +16,11 @@ export const getOutputStyleDirStyles = memoize(
         'output-styles',
         cwd,
       )
-
       const styles = markdownFiles
         .map(({ filePath, frontmatter, content, source }) => {
           try {
             const fileName = basename(filePath)
             const styleName = fileName.replace(/\.md$/, '')
-
-            // Get style configuration from frontmatter
             const name = (frontmatter['name'] || styleName) as string
             const description =
               coerceDescriptionToString(
@@ -48,8 +31,6 @@ export const getOutputStyleDirStyles = memoize(
                 content,
                 `Custom ${styleName} output style`,
               )
-
-            // Parse keep-coding-instructions flag (supports both boolean and string values)
             const keepCodingInstructionsRaw =
               frontmatter['keep-coding-instructions']
             const keepCodingInstructions =
@@ -60,15 +41,12 @@ export const getOutputStyleDirStyles = memoize(
                     keepCodingInstructionsRaw === 'false'
                   ? false
                   : undefined
-
-            // Warn if force-for-plugin is set on non-plugin output style
             if (frontmatter['force-for-plugin'] !== undefined) {
               logForDebugging(
                 `Output style "${name}" has force-for-plugin set, but this option only applies to plugin output styles. Ignoring.`,
                 { level: 'warn' },
               )
             }
-
             return {
               name,
               description,
@@ -82,7 +60,6 @@ export const getOutputStyleDirStyles = memoize(
           }
         })
         .filter(style => style !== null)
-
       return styles
     } catch (error) {
       logError(error)
@@ -90,7 +67,6 @@ export const getOutputStyleDirStyles = memoize(
     }
   },
 )
-
 export function clearOutputStyleCaches(): void {
   getOutputStyleDirStyles.cache?.clear?.()
   loadMarkdownFilesForSubdir.cache?.clear?.()

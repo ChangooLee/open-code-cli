@@ -1,7 +1,3 @@
-/**
- * Conversation clearing utility.
- * This module has heavier dependencies and should be lazy-loaded when possible.
- */
 import { feature } from 'bun:bundle'
 import { randomUUID, type UUID } from 'crypto'
 import {
@@ -46,7 +42,6 @@ import {
 } from '../../utils/task/diskOutput.js'
 import { getCurrentWorktreeSession } from '../../utils/worktree.js'
 import { clearSessionCaches } from './caches.js'
-
 export async function clearConversation({
   setMessages,
   readFileState,
@@ -64,8 +59,6 @@ export async function clearConversation({
   setAppState?: (f: (prev: AppState) => AppState) => void
   setConversationId?: (id: UUID) => void
 }): Promise<void> {
-  // Execute SessionEnd hooks before clearing (bounded by
-  // OPEN_CODE_CLI_SESSIONEND_HOOKS_TIMEOUT_MS, default 1.5s)
   const sessionEndTimeoutMs = getSessionEndHookTimeoutMs()
   await executeSessionEndHooks('clear', {
     getAppState,
@@ -73,8 +66,6 @@ export async function clearConversation({
     signal: AbortSignal.timeout(sessionEndTimeoutMs),
     timeoutMs: sessionEndTimeoutMs,
   })
-
-  // Signal to the provider that this conversation's cache can be evicted.
   const lastRequestId = getLastMainRequestId()
   if (lastRequestId) {
     logEvent('open_code_cli_cache_eviction_hint', {
@@ -84,13 +75,6 @@ export async function clearConversation({
         lastRequestId as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
     })
   }
-
-  // Compute preserved tasks up front so their per-agent state survives the
-  // cache wipe below. A task is preserved unless it explicitly has
-  // isBackgrounded === false. Main-session tasks (Ctrl+B) are preserved —
-  // they write to an isolated per-task transcript and run under an agent
-  // context, so they're safe across session ID regeneration. See
-  // LocalMainSessionTask.ts startBackgroundSession.
   const preservedAgentIds = new Set<string>()
   const preservedLocalAgents: LocalAgentTaskState[] = []
   const shouldKillTask = (task: AppState['tasks'][string]): boolean =>
@@ -106,44 +90,27 @@ export async function clearConversation({
       }
     }
   }
-
   setMessages(() => [])
-
-  // Clear context-blocked flag so proactive ticks resume after /clear
   if (feature('PROACTIVE') || feature('KAIROS')) {
-    /* eslint-disable @typescript-eslint/no-require-imports */
     const { setContextBlocked } = require('../../proactive/index.js')
-    /* eslint-enable @typescript-eslint/no-require-imports */
     setContextBlocked(false)
   }
-
-  // Force logo re-render by updating conversationId
   if (setConversationId) {
     setConversationId(randomUUID())
   }
-
-  // Clear all session-related caches. Per-agent state for preserved background
-  // tasks (invoked skills, pending permission callbacks, dump state, cache-break
-  // tracking) is retained so those agents keep functioning.
   clearSessionCaches(preservedAgentIds)
-
   setCwd(getOriginalCwd())
   readFileState.clear()
   discoveredSkillNames?.clear()
   loadedNestedMemoryPaths?.clear()
-
-  // Clean out necessary items from App State
   if (setAppState) {
     setAppState(prev => {
-      // Partition tasks using the same predicate computed above:
-      // kill+remove foreground tasks, preserve everything else.
       const nextTasks: AppState['tasks'] = {}
       for (const [taskId, task] of Object.entries(prev.tasks)) {
         if (!shouldKillTask(task)) {
           nextTasks[taskId] = task
           continue
         }
-        // Foreground task: kill it and drop from state
         try {
           if (task.status === 'running') {
             if (isLocalShellTask(task)) {
@@ -165,22 +132,16 @@ export async function clearConversation({
         }
         void evictTaskOutput(taskId)
       }
-
       return {
         ...prev,
         tasks: nextTasks,
         attribution: createEmptyAttributionState(),
-        // Clear standalone agent context (name/color set by /rename, /color)
-        // so the new session doesn't display the old session's identity badge
         standaloneAgentContext: undefined,
         fileHistory: {
           snapshots: [],
           trackedFiles: new Set(),
           snapshotSequence: 0,
         },
-        // Reset MCP state to default to trigger re-initialization.
-        // Preserve pluginReconnectKey so /clear doesn't cause a no-op
-        // (it's only bumped by /reload-plugins).
         mcp: {
           clients: [],
           tools: [],
@@ -191,31 +152,13 @@ export async function clearConversation({
       }
     })
   }
-
-  // Clear plan slug cache so a new plan file is used after /clear
   clearAllPlanSlugs()
-
-  // Clear cached session metadata (title, tag, agent name/color)
-  // so the new session doesn't inherit the previous session's identity
   clearSessionMetadata()
-
-  // Generate new session ID to provide fresh state
-  // Set the old session as parent for analytics lineage tracking
   regenerateSessionId({ setCurrentAsParent: true })
-  // Update the environment variable so subprocesses use the new session ID
   if (process.env.USER_TYPE === 'ant' && process.env.OPEN_CODE_CLI_SESSION_ID) {
     setOpenCodeCliEnv('SESSION_ID', getSessionId())
   }
   await resetSessionFilePointer()
-
-  // Preserved local_agent tasks had their TaskOutput symlink baked against the
-  // old session ID at spawn time, but post-clear transcript writes land under
-  // the new session directory (appendEntry re-reads getSessionId()). Re-point
-  // the symlinks so TaskOutput reads the live file instead of a frozen pre-clear
-  // snapshot. Only re-point running tasks — finished tasks will never write
-  // again, so re-pointing would replace a valid symlink with a dangling one.
-  // Main-session tasks use the same per-agent path (they write via
-  // recordSidechainTranscript to getAgentTranscriptPath), so no special case.
   for (const task of preservedLocalAgents) {
     if (task.status !== 'running') continue
     void initTaskOutputAsSymlink(
@@ -223,29 +166,18 @@ export async function clearConversation({
       getAgentTranscriptPath(asAgentId(task.agentId)),
     )
   }
-
-  // Re-persist mode and worktree state after the clear so future --resume
-  // knows what the new post-clear session was in. clearSessionMetadata
-  // wiped both from the cache, but the process is still in the same mode
-  // and (if applicable) the same worktree directory.
   if (feature('COORDINATOR_MODE')) {
-    /* eslint-disable @typescript-eslint/no-require-imports */
     const { saveMode } = require('../../utils/sessionStorage.js')
     const {
       isCoordinatorMode,
     } = require('../../coordinator/coordinatorMode.js')
-    /* eslint-enable @typescript-eslint/no-require-imports */
     saveMode(isCoordinatorMode() ? 'coordinator' : 'normal')
   }
   const worktreeSession = getCurrentWorktreeSession()
   if (worktreeSession) {
     saveWorktreeState(worktreeSession)
   }
-
-  // Execute SessionStart hooks after clearing
   const hookMessages = await processSessionStartHooks('clear')
-
-  // Update messages with hook results
   if (hookMessages.length > 0) {
     setMessages(() => hookMessages)
   }

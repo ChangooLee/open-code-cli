@@ -1,5 +1,4 @@
 import { feature } from 'bun:bundle'
-
 export const OPEN_CODE_CLI_20250219_BETA_HEADER = 'open-code-cli-20250219'
 export const INTERLEAVED_THINKING_BETA_HEADER =
   'interleaved-thinking-2025-05-14'
@@ -7,9 +6,6 @@ export const CONTEXT_1M_BETA_HEADER = 'context-1m-2025-08-07'
 export const CONTEXT_MANAGEMENT_BETA_HEADER = 'context-management-2025-06-27'
 export const STRUCTURED_OUTPUTS_BETA_HEADER = 'structured-outputs-2025-12-15'
 export const WEB_SEARCH_BETA_HEADER = 'web-search-2025-03-05'
-// Tool search beta headers differ by provider:
-// - OpenAI-compatible API / OpenAICompatible: advanced-tool-use-2025-11-20
-// - OpenAICompatible AI / OpenAICompatible: tool-search-tool-2025-10-19
 export const TOOL_SEARCH_BETA_HEADER_1P = 'advanced-tool-use-2025-11-20'
 export const TOOL_SEARCH_BETA_HEADER_3P = 'tool-search-tool-2025-10-19'
 export const EFFORT_BETA_HEADER = 'effort-2025-11-24'
@@ -29,25 +25,13 @@ export const AFK_MODE_BETA_HEADER = feature('TRANSCRIPT_CLASSIFIER')
 export const CLI_INTERNAL_BETA_HEADER =
   process.env.USER_TYPE === 'ant' ? 'cli-internal-2026-02-09' : ''
 export const ADVISOR_BETA_HEADER = 'advisor-tool-2026-03-01'
-// ant-only; only read behind feature('CACHED_MICROCOMPACT'), empty otherwise.
 export const CACHE_EDITING_BETA_HEADER =
   process.env.USER_TYPE === 'ant' ? 'cache-editing-2026-01-15' : ''
-
-/**
- * OpenAICompatible only supports a limited number of beta headers and only through
- * extraBodyParams. This set maintains the beta strings that should be in
- * OpenAICompatible extraBodyParams *and not* in OpenAICompatible headers.
- */
 export const BEDROCK_EXTRA_PARAMS_HEADERS = new Set([
   INTERLEAVED_THINKING_BETA_HEADER,
   CONTEXT_1M_BETA_HEADER,
   TOOL_SEARCH_BETA_HEADER_3P,
 ])
-
-/**
- * Betas allowed on OpenAICompatible countTokens API.
- * Other betas will cause 400 errors.
- */
 export const VERTEX_COUNT_TOKENS_ALLOWED_BETAS = new Set([
   OPEN_CODE_CLI_20250219_BETA_HEADER,
   INTERLEAVED_THINKING_BETA_HEADER,

@@ -1,7 +1,3 @@
-/**
- * Utilities for handling local installation
- */
-
 import { access, chmod, writeFile } from 'fs/promises'
 import { join } from 'path'
 import { type ReleaseChannel, saveGlobalConfig } from './config.js'
@@ -11,30 +7,16 @@ import { execFileNoThrowWithCwd } from './execFileNoThrow.js'
 import { getFsImplementation } from './fsOperations.js'
 import { logError } from './log.js'
 import { jsonStringify } from './slowOperations.js'
-
-// Lazy getters: getOpenCodeCliConfigHomeDir() is memoized and reads process.env.
-// Evaluating at module scope would capture the value before entrypoints like
-// hfi.tsx get a chance to set OPEN_CODE_CLI_CONFIG_DIR in main(), and would also
-// populate the memoize cache with that stale value for all 150+ other callers.
 function getLocalInstallDir(): string {
   return join(getOpenCodeCliConfigHomeDir(), 'local')
 }
 export function getLocalOpenCodeCliPath(): string {
   return join(getLocalInstallDir(), 'open-code-cli')
 }
-
-/**
- * Check if we're running from our managed local installation
- */
 export function isRunningFromLocalInstallation(): boolean {
   const execPath = process.argv[1] || ''
   return execPath.includes('/.open-code-cli/local/node_modules/')
 }
-
-/**
- * Write `content` to `path` only if the file does not already exist.
- * Uses O_EXCL ('wx') for atomic create-if-missing.
- */
 async function writeIfMissing(
   path: string,
   content: string,
@@ -48,19 +30,10 @@ async function writeIfMissing(
     throw e
   }
 }
-
-/**
- * Ensure the local package environment is set up
- * Creates the directory, package.json, and wrapper script
- */
 export async function ensureLocalPackageEnvironment(): Promise<boolean> {
   try {
     const localInstallDir = getLocalInstallDir()
-
-    // Create installation directory (recursive, idempotent)
     await getFsImplementation().mkdir(localInstallDir)
-
-    // Create package.json if it doesn't exist
     await writeIfMissing(
       join(localInstallDir, 'package.json'),
       jsonStringify(
@@ -69,8 +42,6 @@ export async function ensureLocalPackageEnvironment(): Promise<boolean> {
         2,
       ),
     )
-
-    // Create the wrapper script if it doesn't exist
     const wrapperPath = join(localInstallDir, 'open-code-cli')
     const created = await writeIfMissing(
       wrapperPath,
@@ -78,33 +49,22 @@ export async function ensureLocalPackageEnvironment(): Promise<boolean> {
       0o755,
     )
     if (created) {
-      // Mode in writeFile is masked by umask; chmod to ensure executable bit.
       await chmod(wrapperPath, 0o755)
     }
-
     return true
   } catch (error) {
     logError(error)
     return false
   }
 }
-
-/**
- * Install or update Open Code CLI package in the local directory
- * @param channel - Release channel to use (latest or stable)
- * @param specificVersion - Optional specific version to install (overrides channel)
- */
 export async function installOrUpdateOpenCodeCliPackage(
   channel: ReleaseChannel,
   specificVersion?: string | null,
 ): Promise<'in_progress' | 'success' | 'install_failed'> {
   try {
-    // First ensure the environment is set up
     if (!(await ensureLocalPackageEnvironment())) {
       return 'install_failed'
     }
-
-    // Use specific version if provided, otherwise use channel tag
     const versionSpec = specificVersion
       ? specificVersion
       : channel === 'stable'
@@ -115,7 +75,6 @@ export async function installOrUpdateOpenCodeCliPackage(
       ['install', `${MACRO.PACKAGE_URL}@${versionSpec}`],
       { cwd: getLocalInstallDir(), maxBuffer: 1000000 },
     )
-
     if (result.code !== 0) {
       const error = new Error(
         `Failed to install Open Code CLI package: ${result.stderr}`,
@@ -123,24 +82,16 @@ export async function installOrUpdateOpenCodeCliPackage(
       logError(error)
       return result.code === 190 ? 'in_progress' : 'install_failed'
     }
-
-    // Set installMethod to 'local' to prevent npm permission warnings
     saveGlobalConfig(current => ({
       ...current,
       installMethod: 'local',
     }))
-
     return 'success'
   } catch (error) {
     logError(error)
     return 'install_failed'
   }
 }
-
-/**
- * Check if local installation exists.
- * Pure existence probe — callers use this to choose update path / UI hints.
- */
 export async function localInstallationExists(): Promise<boolean> {
   try {
     await access(join(getLocalInstallDir(), 'node_modules', '.bin', 'open-code-cli'))
@@ -149,10 +100,6 @@ export async function localInstallationExists(): Promise<boolean> {
     return false
   }
 }
-
-/**
- * Get shell type to determine appropriate path setup
- */
 export function getShellType(): string {
   const shellPath = process.env.SHELL || ''
   if (shellPath.includes('zsh')) return 'zsh'

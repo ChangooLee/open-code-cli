@@ -10,7 +10,6 @@ import {
 } from '../hooks.js'
 import { clearCwdEnvFiles } from '../sessionEnvironment.js'
 import { getHooksConfigFromSnapshot } from './hooksConfigSnapshot.js'
-
 let watcher: FSWatcher | null = null
 let currentCwd: string
 let dynamicWatchPaths: string[] = []
@@ -18,39 +17,30 @@ let dynamicWatchPathsSorted: string[] = []
 let initialized = false
 let hasEnvHooks = false
 let notifyCallback: ((text: string, isError: boolean) => void) | null = null
-
 export function setEnvHookNotifier(
   cb: ((text: string, isError: boolean) => void) | null,
 ): void {
   notifyCallback = cb
 }
-
 export function initializeFileChangedWatcher(cwd: string): void {
   if (initialized) return
   initialized = true
   currentCwd = cwd
-
   const config = getHooksConfigFromSnapshot()
   hasEnvHooks =
     (config?.CwdChanged?.length ?? 0) > 0 ||
     (config?.FileChanged?.length ?? 0) > 0
-
   if (hasEnvHooks) {
     registerCleanup(async () => dispose())
   }
-
   const paths = resolveWatchPaths(config)
   if (paths.length === 0) return
-
   startWatching(paths)
 }
-
 function resolveWatchPaths(
   config?: ReturnType<typeof getHooksConfigFromSnapshot>,
 ): string[] {
   const matchers = (config ?? getHooksConfigFromSnapshot())?.FileChanged ?? []
-
-  // Matcher field: filenames to watch in cwd, pipe-separated (e.g. ".envrc|.env")
   const staticPaths: string[] = []
   for (const m of matchers) {
     if (!m.matcher) continue
@@ -59,11 +49,8 @@ function resolveWatchPaths(
       staticPaths.push(isAbsolute(name) ? name : join(currentCwd, name))
     }
   }
-
-  // Combine static matcher paths with dynamic paths from hook output
   return [...new Set([...staticPaths, ...dynamicWatchPaths])]
 }
-
 function startWatching(paths: string[]): void {
   logForDebugging(`FileChanged: watching ${paths.length} paths`)
   watcher = chokidar.watch(paths, {
@@ -76,7 +63,6 @@ function startWatching(paths: string[]): void {
   watcher.on('add', p => handleFileEvent(p, 'add'))
   watcher.on('unlink', p => handleFileEvent(p, 'unlink'))
 }
-
 function handleFileEvent(
   path: string,
   event: 'change' | 'add' | 'unlink',
@@ -104,7 +90,6 @@ function handleFileEvent(
       notifyCallback?.(msg, true)
     })
 }
-
 export function updateWatchPaths(paths: string[]): void {
   if (!initialized) return
   const sorted = paths.slice().sort()
@@ -118,7 +103,6 @@ export function updateWatchPaths(paths: string[]): void {
   dynamicWatchPathsSorted = sorted
   restartWatching()
 }
-
 function restartWatching(): void {
   if (watcher) {
     void watcher.close()
@@ -129,21 +113,17 @@ function restartWatching(): void {
     startWatching(paths)
   }
 }
-
 export async function onCwdChangedForHooks(
   oldCwd: string,
   newCwd: string,
 ): Promise<void> {
   if (oldCwd === newCwd) return
-
-  // Re-evaluate from the current snapshot so mid-session hook changes are picked up
   const config = getHooksConfigFromSnapshot()
   const currentHasEnvHooks =
     (config?.CwdChanged?.length ?? 0) > 0 ||
     (config?.FileChanged?.length ?? 0) > 0
   if (!currentHasEnvHooks) return
   currentCwd = newCwd
-
   await clearCwdEnvFiles()
   const hookResult = await executeCwdChangedHooks(oldCwd, newCwd).catch(e => {
     const msg = errorMessage(e)
@@ -167,13 +147,10 @@ export async function onCwdChangedForHooks(
       notifyCallback?.(r.output, true)
     }
   }
-
-  // Re-resolve matcher paths against the new cwd
   if (initialized) {
     restartWatching()
   }
 }
-
 function dispose(): void {
   if (watcher) {
     void watcher.close()
@@ -185,7 +162,6 @@ function dispose(): void {
   hasEnvHooks = false
   notifyCallback = null
 }
-
 export function resetFileChangedWatcherForTesting(): void {
   dispose()
 }

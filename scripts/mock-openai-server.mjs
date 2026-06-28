@@ -1,25 +1,10 @@
 #!/usr/bin/env node
-// Local mock OpenAI-compatible server for verifying open-code-cli's runtime
-// request -> response parsing -> (optional) tool round-trip path WITHOUT any
-// real provider, network egress, or API key.
-//
-// Usage:
-//   MOCK_PORT=8765 MOCK_MODE=text node scripts/mock-openai-server.mjs
-//   MOCK_MODE can be: text | tool
-//
-// It logs every received /chat/completions payload (model, messages, tools,
-// stream flag, auth header) to stderr so the caller can inspect what the CLI
-// actually sent.
-
 import http from 'node:http'
-
 const PORT = Number(process.env.MOCK_PORT || 8765)
 const MODE = process.env.MOCK_MODE || 'text'
-
 function log(...args) {
   process.stderr.write(`[mock] ${args.join(' ')}\n`)
 }
-
 function sendNonStreaming(res, message) {
   const body = {
     id: 'chatcmpl-mock-1',
@@ -38,7 +23,6 @@ function sendNonStreaming(res, message) {
   res.writeHead(200, { 'content-type': 'application/json' })
   res.end(JSON.stringify(body))
 }
-
 function sendStreaming(res, message) {
   res.writeHead(200, {
     'content-type': 'text/event-stream',
@@ -52,9 +36,7 @@ function sendStreaming(res, message) {
     created: Math.floor(Date.now() / 1000),
     model: 'mock-model',
   }
-
   if (message.tool_calls) {
-    // role chunk
     write({ ...base, choices: [{ index: 0, delta: { role: 'assistant' }, finish_reason: null }] })
     message.tool_calls.forEach((tc, i) => {
       write({
@@ -76,7 +58,6 @@ function sendStreaming(res, message) {
           },
         ],
       })
-      // stream the arguments in two pieces to exercise incremental json
       const args = tc.function.arguments
       const mid = Math.ceil(args.length / 2)
       for (const piece of [args.slice(0, mid), args.slice(mid)]) {
@@ -104,14 +85,12 @@ function sendStreaming(res, message) {
   res.write('data: [DONE]\n\n')
   res.end()
 }
-
 const server = http.createServer((req, res) => {
   if (req.method !== 'POST' || !req.url.includes('/chat/completions')) {
     res.writeHead(404, { 'content-type': 'application/json' })
     res.end(JSON.stringify({ error: { message: 'not found' } }))
     return
   }
-
   let raw = ''
   req.on('data', c => (raw += c))
   req.on('end', () => {
@@ -121,7 +100,6 @@ const server = http.createServer((req, res) => {
     } catch (e) {
       log('failed to parse body:', e.message)
     }
-
     const toolNames = (payload.tools || []).map(t => t?.function?.name).filter(Boolean)
     const roles = (payload.messages || []).map(m => m.role)
     const hasToolResult = roles.includes('tool')
@@ -132,10 +110,8 @@ const server = http.createServer((req, res) => {
     log('message roles:', JSON.stringify(roles))
     log('tool count:', String(toolNames.length), 'names:', JSON.stringify(toolNames.slice(0, 40)))
     log('has tool result in messages:', String(hasToolResult))
-
     let message
     if (MODE === 'tool' && !hasToolResult) {
-      // Pick a safe read-only tool the CLI advertised, build valid-ish args.
       let name = null
       let args = {}
       if (toolNames.includes('LS')) {
@@ -174,12 +150,10 @@ const server = http.createServer((req, res) => {
       }
       log('responding with text')
     }
-
     if (payload.stream) sendStreaming(res, message)
     else sendNonStreaming(res, message)
   })
 })
-
 server.listen(PORT, '127.0.0.1', () => {
   log(`listening on http://127.0.0.1:${PORT} mode=${MODE}`)
 })

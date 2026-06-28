@@ -38,13 +38,9 @@ import { sanitizeToolNameForAnalytics } from '../analytics/metadata.js'
 import { EMPTY_USAGE } from './emptyUsage.js'
 import { classifyAPIError } from './errors.js'
 import { extractConnectionErrorDetails } from './errorUtils.js'
-
 export type { NonNullableUsage }
 export { EMPTY_USAGE }
-
-// Strategy used for global prompt caching
 export type GlobalCacheStrategy = 'tool_based' | 'system_prompt' | 'none'
-
 function getErrorMessage(error: unknown): string {
   if (error instanceof APIError) {
     const body = error.error as { error?: { message?: string } } | undefined
@@ -52,7 +48,6 @@ function getErrorMessage(error: unknown): string {
   }
   return error instanceof Error ? error.message : String(error)
 }
-
 type KnownGateway =
   | 'litellm'
   | 'helicone'
@@ -61,49 +56,35 @@ type KnownGateway =
   | 'kong'
   | 'braintrust'
   | 'databricks'
-
-// Gateway fingerprints for detecting AI gateways from response headers
 const GATEWAY_FINGERPRINTS: Partial<
   Record<KnownGateway, { prefixes: string[] }>
 > = {
-  // https://docs.litellm.ai/docs/proxy/response_headers
   litellm: {
     prefixes: ['x-litellm-'],
   },
-  // https://docs.helicone.ai/helicone-headers/header-directory
   helicone: {
     prefixes: ['helicone-'],
   },
-  // https://portkey.ai/docs/api-reference/response-schema
   portkey: {
     prefixes: ['x-portkey-'],
   },
-  // https://developers.cloudflare.com/ai-gateway/evaluations/add-human-feedback-api/
   'cloudflare-ai-gateway': {
     prefixes: ['cf-aig-'],
   },
-  // https://developer.konghq.com/ai-gateway/ — X-Kong-Upstream-Latency, X-Kong-Proxy-Latency
   kong: {
     prefixes: ['x-kong-'],
   },
-  // https://www.braintrust.dev/docs/guides/proxy — x-bt-used-endpoint, x-bt-cached
   braintrust: {
     prefixes: ['x-bt-'],
   },
 }
-
-// Gateways that use provider-owned domains (not self-hosted), so the
-// OPEN_CODE_CLI_BASE_URL hostname is a reliable signal even without a
-// distinctive response header.
 const GATEWAY_HOST_SUFFIXES: Partial<Record<KnownGateway, string[]>> = {
-  // https://docs.databricks.com/aws/en/ai-gateway/
   databricks: [
     '.cloud.databricks.com',
     '.azuredatabricks.net',
     '.gcp.databricks.com',
   ],
 }
-
 function detectGateway({
   headers,
   baseUrl,
@@ -112,7 +93,6 @@ function detectGateway({
   baseUrl?: string
 }): KnownGateway | undefined {
   if (headers) {
-    // Header names are already lowercase from the Headers API
     const headerNames: string[] = []
     headers.forEach((_, key) => headerNames.push(key))
     for (const [gw, { prefixes }] of Object.entries(GATEWAY_FINGERPRINTS)) {
@@ -121,7 +101,6 @@ function detectGateway({
       }
     }
   }
-
   if (baseUrl) {
     try {
       const host = new URL(baseUrl).hostname.toLowerCase()
@@ -131,13 +110,10 @@ function detectGateway({
         }
       }
     } catch {
-      // malformed URL — ignore
     }
   }
-
   return undefined
 }
-
 function getOpenAICompatibleEnvMetadata() {
   return {
     ...(process.env.OPEN_CODE_CLI_BASE_URL
@@ -160,14 +136,12 @@ function getOpenAICompatibleEnvMetadata() {
       : {}),
   }
 }
-
 function getBuildAgeMinutes(): number | undefined {
   if (!MACRO.BUILD_TIME) return undefined
   const buildTime = new Date(MACRO.BUILD_TIME).getTime()
   if (isNaN(buildTime)) return undefined
   return Math.floor((Date.now() - buildTime) / 60000)
 }
-
 export function logAPIQuery({
   model,
   messagesLength,
@@ -231,7 +205,6 @@ export function logAPIQuery({
     ...getOpenAICompatibleEnvMetadata(),
   })
 }
-
 export function logAPIError({
   error,
   model,
@@ -259,14 +232,12 @@ export function logAPIError({
   durationMsIncludingRetries: number
   attempt: number
   requestId?: string | null
-  /** Client-generated ID sent as x-client-request-id header (survives timeouts) */
   clientRequestId?: string
   didFallBackToNonStreaming?: boolean
   promptCategory?: string
   headers?: globalThis.Headers
   queryTracking?: QueryChainTracking
   querySource?: string
-  /** The span from startLLMRequestSpan - pass this to correctly match responses to requests */
   llmSpan?: Span
   fastMode?: boolean
   previousRequestId?: string | null
@@ -276,12 +247,9 @@ export function logAPIError({
       error instanceof APIError && error.headers ? error.headers : headers,
     baseUrl: process.env.OPEN_CODE_CLI_BASE_URL,
   })
-
   const errStr = getErrorMessage(error)
   const status = error instanceof APIError ? String(error.status) : undefined
   const errorType = classifyAPIError(error)
-
-  // Log detailed connection error info to debug logs (visible via --debug)
   const connectionDetails = extractConnectionErrorDetails(error)
   if (connectionDetails) {
     const sslLabel = connectionDetails.isSSLError ? ' (SSL error)' : ''
@@ -290,16 +258,13 @@ export function logAPIError({
       { level: 'error' },
     )
   }
-
   const invocation = consumeInvokingRequestId()
-
   if (clientRequestId) {
     logForDebugging(
       `API error x-client-request-id=${clientRequestId} (give this to the API team for server-log lookup)`,
       { level: 'error' },
     )
   }
-
   logError(error as Error)
   logEvent('open_code_cli_api_error', {
     model: model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
@@ -363,8 +328,6 @@ export function logAPIError({
       : {}),
     ...getOpenAICompatibleEnvMetadata(),
   })
-
-  // Log API error event for OTLP
   void logOTelEvent('api_error', {
     model: model,
     error: errStr,
@@ -373,16 +336,12 @@ export function logAPIError({
     attempt: String(attempt),
     speed: fastMode ? 'fast' : 'normal',
   })
-
-  // Pass the span to correctly match responses to requests when beta tracing is enabled
   endLLMRequestSpan(llmSpan, {
     success: false,
     statusCode: status ? parseInt(status) : undefined,
     error: errStr,
     attempt,
   })
-
-  // Log first error for teleported sessions (reliability tracking)
   const teleportInfo = getTeleportedSessionInfo()
   if (teleportInfo?.isTeleported && !teleportInfo.hasLoggedFirstMessage) {
     logEvent('open_code_cli_teleport_first_message_error', {
@@ -394,7 +353,6 @@ export function logAPIError({
     markFirstTeleportMessageLogged()
   }
 }
-
 function logAPISuccess({
   model,
   preNormalizedModel,
@@ -452,14 +410,11 @@ function logAPISuccess({
   const isPostCompaction = consumePostCompaction()
   const hasPrintFlag =
     process.argv.includes('-p') || process.argv.includes('--print')
-
   const now = Date.now()
   const lastCompletion = getLastApiCompletionTimestamp()
   const timeSinceLastApiCallMs =
     lastCompletion !== null ? now - lastCompletion : undefined
-
   const invocation = consumeInvokingRequestId()
-
   logEvent('open_code_cli_api_success', {
     model: model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
     ...(preNormalizedModel !== model
@@ -552,9 +507,6 @@ function logAPISuccess({
         } as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS)
       : {}),
     fastMode,
-    // Log cache_deleted_input_tokens for cache editing analysis. Casts needed
-    // because the field is intentionally not on NonNullableUsage (excluded from
-    // external builds). Set by updateUsage() when cache editing is active.
     ...(feature('CACHED_MICROCOMPACT') &&
     ((usage as unknown as { cache_deleted_input_tokens?: number })
       .cache_deleted_input_tokens ?? 0) > 0
@@ -574,10 +526,8 @@ function logAPISuccess({
     ...getOpenAICompatibleEnvMetadata(),
     timeSinceLastApiCallMs,
   })
-
   setLastApiCompletionTimestamp(now)
 }
-
 export function logAPISuccessAndDuration({
   model,
   preNormalizedModel,
@@ -622,19 +572,12 @@ export function logAPISuccessAndDuration({
   costUSD: number
   queryTracking?: QueryChainTracking
   permissionMode?: PermissionMode
-  /** Assistant messages from the response - used to extract model_output and thinking_output
-   *  when beta tracing is enabled */
   newMessages?: AssistantMessage[]
-  /** The span from startLLMRequestSpan - pass this to correctly match responses to requests */
   llmSpan?: Span
-  /** Strategy used for global prompt caching: 'tool_based', 'system_prompt', or 'none' */
   globalCacheStrategy?: GlobalCacheStrategy
-  /** Time spent in pre-request setup before the successful attempt */
   requestSetupMs?: number
-  /** Timestamps (Date.now()) of each attempt start — used for retry sub-spans in Perfetto */
   attemptStartTimes?: number[]
   fastMode?: boolean
-  /** Request ID from the previous API call in this session */
   previousRequestId?: string | null
   betas?: string[]
 }): void {
@@ -642,19 +585,16 @@ export function logAPISuccessAndDuration({
     headers,
     baseUrl: process.env.OPEN_CODE_CLI_BASE_URL,
   })
-
   let textContentLength: number | undefined
   let thinkingContentLength: number | undefined
   let toolUseContentLengths: Record<string, number> | undefined
   let connectorTextBlockCount: number | undefined
-
   if (newMessages) {
     let textLen = 0
     let thinkingLen = 0
     let hasToolUse = false
     const toolLengths: Record<string, number> = {}
     let connectorCount = 0
-
     for (const msg of newMessages) {
       for (const block of msg.message.content) {
         if (block.type === 'text') {
@@ -676,17 +616,14 @@ export function logAPISuccessAndDuration({
         }
       }
     }
-
     textContentLength = textLen
     thinkingContentLength = thinkingLen > 0 ? thinkingLen : undefined
     toolUseContentLengths = hasToolUse ? toolLengths : undefined
     connectorTextBlockCount = connectorCount > 0 ? connectorCount : undefined
   }
-
   const durationMs = Date.now() - start
   const durationMsIncludingRetries = Date.now() - startIncludingRetries
   addToTotalDurationState(durationMsIncludingRetries, durationMs)
-
   logAPISuccess({
     model,
     preNormalizedModel,
@@ -714,7 +651,6 @@ export function logAPISuccessAndDuration({
     previousRequestId,
     betas,
   })
-  // Log API request event for OTLP
   void logOTelEvent('api_request', {
     model,
     input_tokens: String(usage.input_tokens),
@@ -725,14 +661,10 @@ export function logAPISuccessAndDuration({
     duration_ms: String(durationMs),
     speed: fastMode ? 'fast' : 'normal',
   })
-
-  // Extract model output, thinking output, and tool call flag when beta tracing is enabled
   let modelOutput: string | undefined
   let thinkingOutput: string | undefined
   let hasToolCall: boolean | undefined
-
   if (isBetaTracingEnabled() && newMessages) {
-    // Model output - visible to all users
     modelOutput =
       newMessages
         .flatMap(m =>
@@ -741,8 +673,6 @@ export function logAPISuccessAndDuration({
             .map(c => (c as { type: 'text'; text: string }).text),
         )
         .join('\n') || undefined
-
-    // Thinking output - Ant-only (build-time gated)
     if (process.env.USER_TYPE === 'ant') {
       thinkingOutput =
         newMessages
@@ -753,14 +683,10 @@ export function logAPISuccessAndDuration({
           )
           .join('\n') || undefined
     }
-
-    // Check if any tool_use blocks were in the output
     hasToolCall = newMessages.some(m =>
       m.message.content.some(c => c.type === 'tool_use'),
     )
   }
-
-  // Pass the span to correctly match responses to requests when beta tracing is enabled
   endLLMRequestSpan(llmSpan, {
     success: true,
     inputTokens: usage.input_tokens,
@@ -775,8 +701,6 @@ export function logAPISuccessAndDuration({
     requestSetupMs,
     attemptStartTimes,
   })
-
-  // Log first successful message for teleported sessions (reliability tracking)
   const teleportInfo = getTeleportedSessionInfo()
   if (teleportInfo?.isTeleported && !teleportInfo.hasLoggedFirstMessage) {
     logEvent('open_code_cli_teleport_first_message_success', {

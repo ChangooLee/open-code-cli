@@ -6,7 +6,6 @@ import { safeParseJSON } from '../../utils/json.js'
 import { extractTextContent } from '../../utils/messages.js'
 import { extractConversationText } from '../../utils/sessionTitle.js'
 import { asSystemPrompt } from '../../utils/systemPromptType.js'
-
 export async function generateSessionName(
   messages: Message[],
   signal: AbortSignal,
@@ -15,7 +14,6 @@ export async function generateSessionName(
   if (!conversationText) {
     return null
   }
-
   try {
     const result = await queryHaiku({
       systemPrompt: asSystemPrompt([
@@ -42,9 +40,7 @@ export async function generateSessionName(
         mcpTools: [],
       },
     })
-
     const content = extractTextContent(result.message.content)
-
     const response = safeParseJSON(content)
     if (
       response &&
@@ -56,9 +52,6 @@ export async function generateSessionName(
     }
     return null
   } catch (error) {
-    // Haiku timeout/rate-limit/network are expected operational failures —
-    // logForDebugging, not logError. Called automatically on every 3rd bridge
-    // message (initReplBridge.ts), so errors here would flood the error file.
     logForDebugging(`generateSessionName failed: ${errorMessage(error)}`, {
       level: 'error',
     })

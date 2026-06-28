@@ -1,4 +1,3 @@
-// Generated from controlSchemas.ts (z.infer of each lazySchema).
 import type { z } from 'zod/v4'
 import type {
   SDKHookCallbackMatcherSchema,
@@ -43,7 +42,6 @@ import type {
   StdoutMessageSchema,
   StdinMessageSchema,
 } from './controlSchemas.js'
-
 export type SDKHookCallbackMatcher = z.infer<ReturnType<typeof SDKHookCallbackMatcherSchema>>
 export type SDKControlInitializeRequest = z.infer<ReturnType<typeof SDKControlInitializeRequestSchema>>
 export type SDKControlInitializeResponse = z.infer<ReturnType<typeof SDKControlInitializeResponseSchema>>
@@ -85,8 +83,6 @@ export type SDKKeepAliveMessage = z.infer<ReturnType<typeof SDKKeepAliveMessageS
 export type SDKUpdateEnvironmentVariablesMessage = z.infer<ReturnType<typeof SDKUpdateEnvironmentVariablesMessageSchema>>
 export type StdoutMessage = z.infer<ReturnType<typeof StdoutMessageSchema>>
 export type StdinMessage = z.infer<ReturnType<typeof StdinMessageSchema>>
-
-// Re-export message types referenced by control consumers.
 export type {
   SDKPartialAssistantMessage,
 } from './coreTypes.generated.js'

@@ -14,10 +14,7 @@ import {
   READ_ONLY_BASH_DENYLIST,
   READ_ONLY_MODIFICATION_PROHIBITIONS,
 } from './sharedPrompts.js'
-
 function getExploreSystemPrompt(): string {
-  // Ant-native builds alias find/grep to embedded bfs/ugrep and remove the
-  // dedicated Glob/Grep tools, so point at find/grep via Bash instead.
   const embedded = hasEmbeddedSearchTools()
   const globGuidance = embedded
     ? `- Use \`find\` via ${BASH_TOOL_NAME} for broad file pattern matching`
@@ -25,20 +22,15 @@ function getExploreSystemPrompt(): string {
   const grepGuidance = embedded
     ? `- Use \`grep\` via ${BASH_TOOL_NAME} for searching file contents with regex`
     : `- Use ${GREP_TOOL_NAME} for searching file contents with regex`
-
   return `You are a file search specialist for ${CODE_AGENT_DESCRIPTION}. You excel at thoroughly navigating and exploring codebases.
-
 === CRITICAL: READ-ONLY MODE - NO FILE MODIFICATIONS ===
 This is a READ-ONLY exploration task.
 ${READ_ONLY_MODIFICATION_PROHIBITIONS}
-
 Your role is EXCLUSIVELY to search and analyze existing code. You do NOT have access to file editing tools - attempting to edit files will fail.
-
 Your strengths:
 - Rapidly finding files using glob patterns
 - Searching code and text with powerful regex patterns
 - Reading and analyzing file contents
-
 Guidelines:
 ${globGuidance}
 ${grepGuidance}
@@ -47,19 +39,14 @@ ${grepGuidance}
 - NEVER use ${BASH_TOOL_NAME} for: ${READ_ONLY_BASH_DENYLIST}
 - Adapt your search approach based on the thoroughness level specified by the caller
 - Communicate your final report directly as a regular message - do NOT attempt to create files
-
 NOTE: You are meant to be a fast agent that returns output as quickly as possible. In order to achieve this you must:
 - Make efficient use of the tools that you have at your disposal: be smart about how you search for files and implementations
 - Wherever possible you should try to spawn multiple parallel tool calls for grepping and reading files
-
 Complete the user's search request efficiently and report your findings clearly.`
 }
-
 export const EXPLORE_AGENT_MIN_QUERIES = 3
-
 const EXPLORE_WHEN_TO_USE =
-  'Fast agent specialized for exploring codebases. Use this when you need to quickly find files by patterns (eg. "src/components/**/*.tsx"), search code for keywords (eg. "API endpoints"), or answer questions about the codebase (eg. "how do API endpoints work?"). When calling this agent, specify the desired thoroughness level: "quick" for basic searches, "medium" for moderate exploration, or "very thorough" for comprehensive analysis across multiple locations and naming conventions.'
-
+  'Fast agent specialized for exploring codebases. Use this when you need to quickly find files by patterns (eg. "src/components*.tsx"), search code for keywords (eg. "API endpoints"), or answer questions about the codebase (eg. "how do API endpoints work?"). When calling this agent, specify the desired thoroughness level: "quick" for basic searches, "medium" for moderate exploration, or "very thorough" for comprehensive analysis across multiple locations and naming conventions.'
 export const EXPLORE_AGENT: BuiltInAgentDefinition = {
   agentType: 'Explore',
   whenToUse: EXPLORE_WHEN_TO_USE,
@@ -72,11 +59,7 @@ export const EXPLORE_AGENT: BuiltInAgentDefinition = {
   ],
   source: 'built-in',
   baseDir: 'built-in',
-  // Ants get inherit to use the main agent's model; external users get haiku for speed
-  // Note: For ants, getAgentModel() checks open_code_cli_explore_agent GrowthBook flag at runtime
   model: process.env.USER_TYPE === 'ant' ? 'inherit' : 'haiku',
-  // Explore is a fast read-only search agent — it doesn't need commit/PR/lint
-  // rules from OPEN_CODE.md. The main agent has full context and interprets results.
   omitOpenCodeMd: true,
   getSystemPrompt: () => getExploreSystemPrompt(),
 }

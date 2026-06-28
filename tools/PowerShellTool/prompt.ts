@@ -14,23 +14,19 @@ import { FILE_WRITE_TOOL_NAME } from '../FileWriteTool/prompt.js'
 import { GLOB_TOOL_NAME } from '../GlobTool/prompt.js'
 import { GREP_TOOL_NAME } from '../GrepTool/prompt.js'
 import { POWERSHELL_TOOL_NAME } from './toolName.js'
-
 import { getOpenCodeCliEnv } from '../../utils/envUtils.js';
 export function getDefaultTimeoutMs(): number {
   return getDefaultBashTimeoutMs()
 }
-
 export function getMaxTimeoutMs(): number {
   return getMaxBashTimeoutMs()
 }
-
 function getBackgroundUsageNote(): string | null {
   if (isEnvTruthy(getOpenCodeCliEnv('DISABLE_BACKGROUND_TASKS'))) {
     return null
   }
   return `  - You can use the \`run_in_background\` parameter to run the command in the background. Only use this if you don't need the result immediately and are OK being notified when the command completes later. You do not need to check the output right away - you'll be notified when it finishes.`
 }
-
 function getSleepGuidance(): string | null {
   if (isEnvTruthy(getOpenCodeCliEnv('DISABLE_BACKGROUND_TASKS'))) {
     return null
@@ -43,12 +39,6 @@ function getSleepGuidance(): string | null {
     - If you must poll an external process, use a check command rather than sleeping first.
     - If you must sleep, keep the duration short (1-5 seconds) to avoid blocking the user.`
 }
-
-/**
- * Version-specific syntax guidance. The model's training data covers both
- * editions but it can't tell which one it's targeting, so it either emits
- * pwsh-7 syntax on 5.1 (parser error → exit 1) or needlessly avoids && on 7.
- */
 function getEditionSection(edition: PowerShellEdition | null): string {
   if (edition === 'desktop') {
     return `PowerShell edition: Windows PowerShell 5.1 (powershell.exe)
@@ -64,33 +54,23 @@ function getEditionSection(edition: PowerShellEdition | null): string {
    - Ternary (\`$cond ? $a : $b\`), null-coalescing (\`??\`), and null-conditional (\`?.\`) operators are available.
    - Default file encoding is UTF-8 without BOM.`
   }
-  // Detection not yet resolved (first prompt build before any tool call) or
-  // PS not installed. Give the conservative 5.1-safe guidance.
   return `PowerShell edition: unknown — assume Windows PowerShell 5.1 for compatibility
    - Do NOT use \`&&\`, \`||\`, ternary \`?:\`, null-coalescing \`??\`, or null-conditional \`?.\`. These are PowerShell 7+ only and parser-error on 5.1.
    - To chain commands conditionally: \`A; if ($?) { B }\`. Unconditionally: \`A; B\`.`
 }
-
 export async function getPrompt(): Promise<string> {
   const backgroundNote = getBackgroundUsageNote()
   const sleepGuidance = getSleepGuidance()
   const edition = await getPowerShellEdition()
-
   return `Executes a given PowerShell command with optional timeout. Working directory persists between commands; shell state (variables, functions) does not.
-
 IMPORTANT: This tool is for terminal operations via PowerShell: git, npm, docker, and PS cmdlets. DO NOT use it for file operations (reading, writing, editing, searching, finding files) - use the specialized tools for this instead.
-
 ${getEditionSection(edition)}
-
 Before executing the command, please follow these steps:
-
 1. Directory Verification:
    - If the command will create new directories or files, first use \`Get-ChildItem\` (or \`ls\`) to verify the parent directory exists and is the correct location
-
 2. Command Execution:
    - Always quote file paths that contain spaces with double quotes
    - Capture the output of the command.
-
 PowerShell Syntax Notes:
    - Variables use $ prefix: $myVar = "value"
    - Escape character is backtick (\`), not backslash
@@ -102,12 +82,10 @@ PowerShell Syntax Notes:
    - Registry access uses PSDrive prefixes: \`HKLM:\\SOFTWARE\\...\`, \`HKCU:\\...\` — NOT raw \`HKEY_LOCAL_MACHINE\\...\`
    - Environment variables: read with \`$env:NAME\`, set with \`$env:NAME = "value"\` (NOT \`Set-Variable\` or bash \`export\`)
    - Call native exe with spaces in path via call operator: \`& "C:\\Program Files\\App\\app.exe" arg1 arg2\`
-
 Interactive and blocking commands (will hang — this tool runs with -NonInteractive):
    - NEVER use \`Read-Host\`, \`Get-Credential\`, \`Out-GridView\`, \`$Host.UI.PromptForChoice\`, or \`pause\`
    - Destructive cmdlets (\`Remove-Item\`, \`Stop-Process\`, \`Clear-Content\`, etc.) may prompt for confirmation. Add \`-Confirm:$false\` when you intend the action to proceed. Use \`-Force\` for read-only/hidden items.
    - Never use \`git rebase -i\`, \`git add -i\`, or other commands that open an interactive editor
-
 Passing multiline strings (commit messages, file content) to native executables:
    - Use a single-quoted here-string so PowerShell does not expand \`$\` or backticks inside. The closing \`'@\` MUST be at column 0 (no leading whitespace) on its own line — indenting it is a parse error:
 <example>
@@ -118,7 +96,6 @@ Second line with $literal dollar signs.
 </example>
    - Use \`@'...'@\` (single-quoted, literal) not \`@"..."@\` (double-quoted, interpolated) unless you need variable expansion
    - For arguments containing \`-\`, \`@\`, or other characters PowerShell parses as operators, use the stop-parsing token: \`git log --% --format=%H\`
-
 Usage notes:
   - The command argument is required.
   - You can specify an optional timeout in milliseconds (up to ${getMaxTimeoutMs()}ms / ${getMaxTimeoutMs() / 60000} minutes). If not specified, commands will timeout after ${getDefaultTimeoutMs()}ms (${getDefaultTimeoutMs() / 60000} minutes).

@@ -17,13 +17,11 @@ import {
 } from '../../utils/sessionStorage.js'
 import { isTeammate } from '../../utils/teammate.js'
 import { generateSessionName } from './generateSessionName.js'
-
 export async function call(
   onDone: LocalJSXCommandOnDone,
   context: ToolUseContext & LocalJSXCommandContext,
   args: string,
 ): Promise<null> {
-  // Prevent teammates from renaming - their names are set by team leader
   if (isTeammate()) {
     onDone(
       'Cannot rename: This session is a swarm teammate. Teammate names are set by the team leader.',
@@ -31,7 +29,6 @@ export async function call(
     )
     return null
   }
-
   let newName: string
   if (!args || args.trim() === '') {
     const generated = await generateSessionName(
@@ -49,16 +46,9 @@ export async function call(
   } else {
     newName = args.trim()
   }
-
   const sessionId = getSessionId() as UUID
   const fullPath = getTranscriptPath()
-
-  // Always save the custom title (session name)
   await saveCustomTitle(sessionId, newName, fullPath)
-
-  // Sync title to bridge session on open-code-cli.dev/code (optional, non-blocking).
-  // v2 env-less bridge stores cse_* in replBridgeSessionId —
-  // updateBridgeSessionTitle retags internally for the compat endpoint.
   const appState = context.getAppState()
   const bridgeSessionId = appState.replBridgeSessionId
   if (bridgeSessionId) {
@@ -71,8 +61,6 @@ export async function call(
         }).catch(() => {}),
     )
   }
-
-  // Also persist as the session's agent name for prompt-bar display
   await saveAgentName(sessionId, newName, fullPath)
   context.setAppState(prev => ({
     ...prev,
@@ -81,7 +69,6 @@ export async function call(
       name: newName,
     },
   }))
-
   onDone(`Session renamed to: ${newName}`, { display: 'system' })
   return null
 }

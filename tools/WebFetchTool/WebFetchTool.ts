@@ -20,7 +20,6 @@ import {
   isPreapprovedUrl,
   MAX_MARKDOWN_LENGTH,
 } from './utils.js'
-
 const inputSchema = lazySchema(() =>
   z.strictObject({
     url: z.string().url().describe('The URL to fetch content from'),
@@ -28,7 +27,6 @@ const inputSchema = lazySchema(() =>
   }),
 )
 type InputSchema = ReturnType<typeof inputSchema>
-
 const outputSchema = lazySchema(() =>
   z.object({
     bytes: z.number().describe('Size of the fetched content in bytes'),
@@ -44,9 +42,7 @@ const outputSchema = lazySchema(() =>
   }),
 )
 type OutputSchema = ReturnType<typeof outputSchema>
-
 export type Output = z.infer<OutputSchema>
-
 function webFetchToolInputToPermissionRuleContent(input: {
   [k: string]: unknown
 }): string {
@@ -62,11 +58,9 @@ function webFetchToolInputToPermissionRuleContent(input: {
     return `input:${input.toString()}`
   }
 }
-
 export const WebFetchTool = buildTool({
   name: WEB_FETCH_TOOL_NAME,
   searchHint: 'fetch and extract content from a URL',
-  // 100K chars - tool result persistence threshold
   maxResultSizeChars: 100_000,
   shouldDefer: true,
   async description(input) {
@@ -104,8 +98,6 @@ export const WebFetchTool = buildTool({
   async checkPermissions(input, context): Promise<PermissionDecision> {
     const appState = context.getAppState()
     const permissionContext = appState.toolPermissionContext
-
-    // Check if the hostname is in the preapproved list
     try {
       const { url } = input as { url: string }
       const parsedUrl = new URL(url)
@@ -117,12 +109,8 @@ export const WebFetchTool = buildTool({
         }
       }
     } catch {
-      // If URL parsing fails, continue with normal permission checks
     }
-
-    // Check for a rule specific to the tool input (matching hostname)
     const ruleContent = webFetchToolInputToPermissionRuleContent(input)
-
     const denyRule = getRuleByContentsForTool(
       permissionContext,
       WebFetchTool,
@@ -138,7 +126,6 @@ export const WebFetchTool = buildTool({
         },
       }
     }
-
     const askRule = getRuleByContentsForTool(
       permissionContext,
       WebFetchTool,
@@ -155,7 +142,6 @@ export const WebFetchTool = buildTool({
         suggestions: buildSuggestions(ruleContent),
       }
     }
-
     const allowRule = getRuleByContentsForTool(
       permissionContext,
       WebFetchTool,
@@ -171,7 +157,6 @@ export const WebFetchTool = buildTool({
         },
       }
     }
-
     return {
       behavior: 'ask',
       message: `Open Code CLI requested permissions to use ${WebFetchTool.name}, but you haven't granted it yet.`,
@@ -179,12 +164,6 @@ export const WebFetchTool = buildTool({
     }
   },
   async prompt(_options) {
-    // Always include the auth warning regardless of whether ToolSearch is
-    // currently in the tools list. Conditionally toggling this prefix based
-    // on ToolSearch availability caused the tool description to flicker
-    // between SDK query() calls (when ToolSearch enablement varies due to
-    // MCP tool count thresholds), invalidating the OpenAICompatible API prompt
-    // cache on each toggle — two consecutive cache misses per flicker event.
     return `IMPORTANT: WebFetch WILL FAIL for authenticated or private URLs. Before using this tool, check if the URL points to an authenticated service (e.g. Google Docs, Confluence, Jira, GitHub). If so, look for a specialized MCP tool that provides authenticated access.
 ${DESCRIPTION}`
   },
@@ -210,10 +189,7 @@ ${DESCRIPTION}`
     { abortController, options: { isNonInteractiveSession } },
   ) {
     const start = Date.now()
-
     const response = await getURLMarkdownContent(url, abortController)
-
-    // Check if we got a redirect to a different host
     if ('type' in response && response.type === 'redirect') {
       const statusText =
         response.statusCode === 301
@@ -223,17 +199,13 @@ ${DESCRIPTION}`
             : response.statusCode === 307
               ? 'Temporary Redirect'
               : 'Found'
-
       const message = `REDIRECT DETECTED: The URL redirects to a different host.
-
 Original URL: ${response.originalUrl}
 Redirect URL: ${response.redirectUrl}
 Status: ${response.statusCode} ${statusText}
-
 To complete your request, I need to fetch content from the redirected URL. Please use WebFetch again with these parameters:
 - url: "${response.redirectUrl}"
 - prompt: "${prompt}"`
-
       const output: Output = {
         bytes: Buffer.byteLength(message),
         code: response.statusCode,
@@ -242,12 +214,10 @@ To complete your request, I need to fetch content from the redirected URL. Pleas
         durationMs: Date.now() - start,
         url,
       }
-
       return {
         data: output,
       }
     }
-
     const {
       content,
       bytes,
@@ -257,9 +227,7 @@ To complete your request, I need to fetch content from the redirected URL. Pleas
       persistedPath,
       persistedSize,
     } = response as FetchedContent
-
     const isPreapproved = isPreapprovedUrl(url)
-
     let result: string
     if (
       isPreapproved &&
@@ -276,14 +244,9 @@ To complete your request, I need to fetch content from the redirected URL. Pleas
         isPreapproved,
       )
     }
-
-    // Binary content (PDFs, etc.) was additionally saved to disk with a
-    // mime-derived extension. Note it so Open Code CLI can inspect the raw file
-    // if the Haiku summary above isn't enough.
     if (persistedPath) {
       result += `\n\n[Binary content (${contentType}, ${formatFileSize(persistedSize ?? bytes)}) also saved to ${persistedPath}]`
     }
-
     const output: Output = {
       bytes,
       code,
@@ -292,7 +255,6 @@ To complete your request, I need to fetch content from the redirected URL. Pleas
       durationMs: Date.now() - start,
       url,
     }
-
     return {
       data: output,
     }
@@ -305,7 +267,6 @@ To complete your request, I need to fetch content from the redirected URL. Pleas
     }
   },
 } satisfies ToolDef<InputSchema, Output>)
-
 function buildSuggestions(ruleContent: string): PermissionUpdate[] {
   return [
     {

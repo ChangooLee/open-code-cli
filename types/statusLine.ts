@@ -1,6 +1,3 @@
-/**
- * Fields shared by all hook command inputs (see createBaseHookInput).
- */
 interface BaseHookCommandInput {
   session_id: string
   transcript_path: string
@@ -9,10 +6,6 @@ interface BaseHookCommandInput {
   agent_id?: string
   agent_type?: string
 }
-
-/**
- * Structured input passed (as JSON) to a user's statusLine hook command.
- */
 export interface StatusLineCommandInput extends BaseHookCommandInput {
   session_name?: string
   model: {

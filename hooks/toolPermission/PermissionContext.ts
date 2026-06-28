@@ -41,37 +41,24 @@ import {
   logPermissionDecision,
   type PermissionDecisionArgs,
 } from './permissionLogging.js'
-
 type PermissionApprovalSource =
   | { type: 'hook'; permanent?: boolean }
   | { type: 'user'; permanent: boolean }
   | { type: 'classifier' }
-
 type PermissionRejectionSource =
   | { type: 'hook' }
   | { type: 'user_abort' }
   | { type: 'user_reject'; hasFeedback: boolean }
-
-// Generic interface for permission queue operations, decoupled from React.
-// In the REPL, these are backed by React state.
 type PermissionQueueOps = {
   push(item: ToolUseConfirm): void
   remove(toolUseID: string): void
   update(toolUseID: string, patch: Partial<ToolUseConfirm>): void
 }
-
 type ResolveOnce<T> = {
   resolve(value: T): void
   isResolved(): boolean
-  /**
-   * Atomically check-and-mark as resolved. Returns true if this caller
-   * won the race (nobody else has resolved yet), false otherwise.
-   * Use this in async callbacks BEFORE awaiting, to close the window
-   * between the `isResolved()` check and the actual `resolve()` call.
-   */
   claim(): boolean
 }
-
 function createResolveOnce<T>(resolve: (value: T) => void): ResolveOnce<T> {
   let claimed = false
   let delivered = false
@@ -92,7 +79,6 @@ function createResolveOnce<T>(resolve: (value: T) => void): ResolveOnce<T> {
     },
   }
 }
-
 function createPermissionContext(
   tool: ToolType,
   input: Record<string, unknown>,
@@ -346,14 +332,7 @@ function createPermissionContext(
   }
   return Object.freeze(ctx)
 }
-
 type PermissionContext = ReturnType<typeof createPermissionContext>
-
-/**
- * Create a PermissionQueueOps backed by a React state setter.
- * This is the bridge between React's `setToolUseConfirmQueue` and the
- * generic queue interface used by PermissionContext.
- */
 function createPermissionQueueOps(
   setToolUseConfirmQueue: React.Dispatch<
     React.SetStateAction<ToolUseConfirm[]>
@@ -377,7 +356,6 @@ function createPermissionQueueOps(
     },
   }
 }
-
 export { createPermissionContext, createPermissionQueueOps, createResolveOnce }
 export type {
   PermissionContext,

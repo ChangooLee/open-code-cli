@@ -1,13 +1,10 @@
 import { useMemo } from 'react'
 import type { MCPServerConnection } from '../services/mcp/types.js'
-
 export type IdeStatus = 'connected' | 'disconnected' | 'pending' | null
-
 type IdeConnectionResult = {
   status: IdeStatus
   ideName: string | null
 }
-
 export function useIdeConnectionStatus(
   mcpClients?: MCPServerConnection[],
 ): IdeConnectionResult {
@@ -16,7 +13,6 @@ export function useIdeConnectionStatus(
     if (!ideClient) {
       return { status: null, ideName: null }
     }
-    // Extract IDE name from config if available
     const config = ideClient.config
     const ideName =
       config.type === 'sse-ide' || config.type === 'ws-ide'

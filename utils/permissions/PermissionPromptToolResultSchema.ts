@@ -11,7 +11,6 @@ import {
   persistPermissionUpdates,
 } from './PermissionUpdate.js'
 import { permissionUpdateSchema } from './PermissionUpdateSchema.js'
-
 export const inputSchema = lazySchema(() =>
   z.object({
     tool_name: z
@@ -24,29 +23,17 @@ export const inputSchema = lazySchema(() =>
       .describe('The unique tool use request ID'),
   }),
 )
-
 export type Input = z.infer<ReturnType<typeof inputSchema>>
-
-// Zod schema for permission results
-// This schema is used to validate the MCP permission prompt tool
-// so we maintain it as a subset of the real PermissionDecision type
-
-// Matches PermissionDecisionClassificationSchema in entrypoints/sdk/coreSchemas.ts.
-// Malformed values fall through to undefined (same pattern as updatedPermissions
-// below) so a bad string from the SDK host doesn't reject the whole decision.
 const decisionClassificationField = lazySchema(() =>
   z
     .enum(['user_temporary', 'user_permanent', 'user_reject'])
     .optional()
     .catch(undefined),
 )
-
 const PermissionAllowResultSchema = lazySchema(() =>
   z.object({
     behavior: z.literal('allow'),
     updatedInput: z.record(z.string(), z.unknown()),
-    // SDK hosts may send malformed entries; fall back to undefined rather
-    // than rejecting the entire allow decision (open-code-cli/open-code-cli#29440)
     updatedPermissions: z
       .array(permissionUpdateSchema())
       .optional()
@@ -61,7 +48,6 @@ const PermissionAllowResultSchema = lazySchema(() =>
     decisionClassification: decisionClassificationField(),
   }),
 )
-
 const PermissionDenyResultSchema = lazySchema(() =>
   z.object({
     behavior: z.literal('deny'),
@@ -71,16 +57,10 @@ const PermissionDenyResultSchema = lazySchema(() =>
     decisionClassification: decisionClassificationField(),
   }),
 )
-
 export const outputSchema = lazySchema(() =>
   z.union([PermissionAllowResultSchema(), PermissionDenyResultSchema()]),
 )
-
 export type Output = z.infer<ReturnType<typeof outputSchema>>
-
-/**
- * Normalizes the result of a permission prompt tool to a PermissionDecision.
- */
 export function permissionPromptToolResultToPermissionDecision(
   result: Output,
   tool: Tool,
@@ -104,9 +84,6 @@ export function permissionPromptToolResultToPermissionDecision(
       }))
       persistPermissionUpdates(updatedPermissions)
     }
-    // Mobile clients responding from a push notification don't have the
-    // original tool input, so they send `{}` to satisfy the schema. Treat an
-    // empty object as "use original" so the tool doesn't run with no args.
     const updatedInput =
       Object.keys(result.updatedInput).length > 0 ? result.updatedInput : input
     return {

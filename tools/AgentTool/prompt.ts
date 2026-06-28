@@ -11,15 +11,12 @@ import { SEND_MESSAGE_TOOL_NAME } from '../SendMessageTool/constants.js'
 import { AGENT_TOOL_NAME } from './constants.js'
 import { isForkSubagentEnabled } from './forkSubagent.js'
 import type { AgentDefinition } from './loadAgentsDir.js'
-
 import { getOpenCodeCliEnv } from '../../utils/envUtils.js';
 function getToolsDescription(agent: AgentDefinition): string {
   const { tools, disallowedTools } = agent
   const hasAllowlist = tools && tools.length > 0
   const hasDenylist = disallowedTools && disallowedTools.length > 0
-
   if (hasAllowlist && hasDenylist) {
-    // Both defined: filter allowlist by denylist to match runtime behavior
     const denySet = new Set(disallowedTools)
     const effectiveTools = tools.filter(t => !denySet.has(t))
     if (effectiveTools.length === 0) {
@@ -27,94 +24,55 @@ function getToolsDescription(agent: AgentDefinition): string {
     }
     return effectiveTools.join(', ')
   } else if (hasAllowlist) {
-    // Allowlist only: show the specific tools available
     return tools.join(', ')
   } else if (hasDenylist) {
-    // Denylist only: show "All tools except X, Y, Z"
     return `All tools except ${disallowedTools.join(', ')}`
   }
-  // No restrictions
   return 'All tools'
 }
-
-/**
- * Format one agent line for the agent_listing_delta attachment message:
- * `- type: whenToUse (Tools: ...)`.
- */
 export function formatAgentLine(agent: AgentDefinition): string {
   const toolsDescription = getToolsDescription(agent)
   return `- ${agent.agentType}: ${agent.whenToUse} (Tools: ${toolsDescription})`
 }
-
-/**
- * Whether the agent list should be injected as an attachment message instead
- * of embedded in the tool description. When true, getPrompt() returns a static
- * description and attachments.ts emits an agent_listing_delta attachment.
- *
- * The dynamic agent list was ~10.2% of fleet cache_creation tokens: MCP async
- * connect, /reload-plugins, or permission-mode changes mutate the list →
- * description changes → full tool-schema cache bust.
- *
- * Override with OPEN_CODE_CLI_AGENT_LIST_IN_MESSAGES=true/false for testing.
- */
 export function shouldInjectAgentListInMessages(): boolean {
   if (isEnvTruthy(process.env.OPEN_CODE_CLI_AGENT_LIST_IN_MESSAGES)) return true
   if (isEnvDefinedFalsy(process.env.OPEN_CODE_CLI_AGENT_LIST_IN_MESSAGES))
     return false
   return getFeatureValue_CACHED_MAY_BE_STALE('open_code_cli_agent_list_attach', false)
 }
-
 export async function getPrompt(
   agentDefinitions: AgentDefinition[],
   isCoordinator?: boolean,
   allowedAgentTypes?: string[],
 ): Promise<string> {
-  // Filter agents by allowed types when Agent(x,y) restricts which agents can be spawned
   const effectiveAgents = allowedAgentTypes
     ? agentDefinitions.filter(a => allowedAgentTypes.includes(a.agentType))
     : agentDefinitions
-
-  // Fork subagent feature: when enabled, insert the "When to fork" section
-  // (fork semantics, directive-style prompts) and swap in fork-aware examples.
   const forkEnabled = isForkSubagentEnabled()
-
   const whenToForkSection = forkEnabled
     ? `
-
 ## When to fork
-
 Fork yourself (omit \`subagent_type\`) when the intermediate tool output isn't worth keeping in your context. The criterion is qualitative \u2014 "will I need this output again" \u2014 not task size.
 - **Research**: fork open-ended questions. If research can be broken into independent questions, launch parallel forks in one message. A fork beats a fresh subagent for this \u2014 it inherits context and shares your cache.
 - **Implementation**: prefer to fork implementation work that requires more than a couple of edits. Do research before jumping to implementation.
-
 Forks are cheap because they share your prompt cache. Don't set \`model\` on a fork \u2014 a different model can't reuse the parent's cache. Pass a short \`name\` (one or two words, lowercase) so the user can see the fork in the teams panel and steer it mid-run.
-
 **Don't peek.** The tool result includes an \`output_file\` path — do not Read or tail it unless the user explicitly asks for a progress check. You get a completion notification; trust it. Reading the transcript mid-flight pulls the fork's tool noise into your context, which defeats the point of forking.
-
 **Don't race.** After launching, you know nothing about what the fork found. Never fabricate or predict fork results in any format — not as prose, summary, or structured output. The notification arrives as a user-role message in a later turn; it is never something you write yourself. If the user asks a follow-up before the notification lands, tell them the fork is still running — give status, not a guess.
-
 **Writing a fork prompt.** Since the fork inherits your context, the prompt is a *directive* — what to do, not what the situation is. Be specific about scope: what's in, what's out, what another agent is handling. Don't re-explain background.
 `
     : ''
-
   const writingThePromptSection = `
-
 ## Writing the prompt
-
 ${forkEnabled ? 'When spawning a fresh agent (with a `subagent_type`), it starts with zero context. ' : ''}Brief the agent like a smart colleague who just walked into the room — it hasn't seen this conversation, doesn't know what you've tried, doesn't understand why this task matters.
 - Explain what you're trying to accomplish and why.
 - Describe what you've already learned or ruled out.
 - Give enough context about the surrounding problem that the agent can make judgment calls rather than just following a narrow instruction.
 - If you need a short response, say so ("report in under 200 words").
 - Lookups: hand over the exact command. Investigations: hand over the question — prescribed steps become dead weight when the premise is wrong.
-
 ${forkEnabled ? 'For fresh agents, terse' : 'Terse'} command-style prompts produce shallow, generic work.
-
 **Never delegate understanding.** Don't write "based on your findings, fix the bug" or "based on the research, implement it." Those phrases push synthesis onto the agent instead of doing it yourself. Write prompts that prove you understood: include file paths, line numbers, what specifically to change.
 `
-
   const forkExamples = `Example usage:
-
 <example>
 user: "What's left on this branch before we can ship?"
 assistant: <thinking>Forking this \u2014 it's a survey question. I want the punch list, not the git output in my context.</thinking>
@@ -130,7 +88,6 @@ Turn ends here. The coordinator knows nothing about the findings yet. What follo
 [later turn \u2014 notification arrives as user message]
 assistant: Audit's back. Three blockers: no tests for the new prompt path, GrowthBook gate wired but not in build_flags.yaml, and one uncommitted file.
 </example>
-
 <example>
 user: "so is the gate wired up or not"
 <commentary>
@@ -138,7 +95,6 @@ User asks mid-wait. The audit fork was launched to answer exactly this, and it h
 </commentary>
 assistant: Still waiting on the audit \u2014 that's one of the things it's checking. Should land shortly.
 </example>
-
 <example>
 user: "Can you get a second opinion on whether this migration is safe?"
 assistant: <thinking>I'll ask the code-reviewer agent — it won't see my analysis, so it can give an independent read.</thinking>
@@ -153,14 +109,11 @@ ${AGENT_TOOL_NAME}({
 })
 </example>
 `
-
   const currentExamples = `Example usage:
-
 <example_agent_descriptions>
 "test-runner": use this agent after you are done writing code to run tests
 "greeting-responder": use this agent to respond to user greetings with a friendly joke
 </example_agent_descriptions>
-
 <example>
 user: "Please write a function that checks if a number is prime"
 assistant: I'm going to use the ${FILE_WRITE_TOOL_NAME} tool to write the following code:
@@ -178,7 +131,6 @@ Since a significant piece of code was written and the task was completed, now us
 </commentary>
 assistant: Uses the ${AGENT_TOOL_NAME} tool to launch the test-runner agent
 </example>
-
 <example>
 user: "Hello"
 <commentary>
@@ -187,46 +139,26 @@ Since the user is greeting, use the greeting-responder agent to respond with a f
 assistant: "I'm going to use the ${AGENT_TOOL_NAME} tool to launch the greeting-responder agent"
 </example>
 `
-
-  // When the gate is on, the agent list lives in an agent_listing_delta
-  // attachment (see attachments.ts) instead of inline here. This keeps the
-  // tool description static across MCP/plugin/permission changes so the
-  // tools-block prompt cache doesn't bust every time an agent loads.
   const listViaAttachment = shouldInjectAgentListInMessages()
-
   const agentListSection = listViaAttachment
     ? `Available agent types are listed in <system-reminder> messages in the conversation.`
     : `Available agent types and the tools they have access to:
 ${effectiveAgents.map(agent => formatAgentLine(agent)).join('\n')}`
-
-  // Shared core prompt used by both coordinator and non-coordinator modes
   const shared = `Launch a new agent to handle complex, multi-step tasks autonomously.
-
 The ${AGENT_TOOL_NAME} tool launches specialized agents (subprocesses) that autonomously handle complex tasks. Each agent type has specific capabilities and tools available to it.
-
 ${agentListSection}
-
 ${
   forkEnabled
     ? `When using the ${AGENT_TOOL_NAME} tool, specify a subagent_type to use a specialized agent, or omit it to fork yourself — a fork inherits your full conversation context.`
     : `When using the ${AGENT_TOOL_NAME} tool, specify a subagent_type parameter to select which agent type to use. If omitted, the general-purpose agent is used.`
 }`
-
-  // Coordinator mode gets the slim prompt -- the coordinator system prompt
-  // already covers usage notes, examples, and when-not-to-use guidance.
   if (isCoordinator) {
     return shared
   }
-
-  // Ant-native builds alias find/grep to embedded bfs/ugrep and remove the
-  // dedicated Glob/Grep tools, so point at find via Bash instead.
   const embedded = hasEmbeddedSearchTools()
   const fileSearchHint = embedded
     ? '`find` via the Bash tool'
     : `the ${GLOB_TOOL_NAME} tool`
-  // The "class Foo" example is about content search. Non-embedded stays Glob
-  // (original intent: find-the-file-containing). Embedded gets grep because
-  // find -name doesn't look at file contents.
   const contentSearchHint = embedded
     ? '`grep` via the Bash tool'
     : `the ${GLOB_TOOL_NAME} tool`
@@ -239,24 +171,16 @@ When NOT to use the ${AGENT_TOOL_NAME} tool:
 - If you are searching for code within a specific file or set of 2-3 files, use the ${FILE_READ_TOOL_NAME} tool instead of the ${AGENT_TOOL_NAME} tool, to find the match more quickly
 - Other tasks that are not related to the agent descriptions above
 `
-
-  // When listing via attachment, the "launch multiple agents" note is in the
-  // attachment message (conditioned on subscription there). When inline, keep
-  // the existing per-call getSubscriptionType() check.
   const concurrencyNote =
     !listViaAttachment && getSubscriptionType() !== 'pro'
       ? `
 - Launch multiple agents concurrently whenever possible, to maximize performance; to do that, use a single message with multiple tool uses`
       : ''
-
-  // Non-coordinator gets the full prompt with all sections
   return `${shared}
 ${whenNotToUseSection}
-
 Usage notes:
 - Always include a short description (3-5 words) summarizing what the agent will do${concurrencyNote}
 - When the agent is done, it will return a single message back to you. The result returned by the agent is not visible to the user. To show the user the result, you should send a text message back to the user with a concise summary of the result.${
-    // eslint-disable-next-line custom-rules/no-process-env-top-level
     !isEnvTruthy(getOpenCodeCliEnv('DISABLE_BACKGROUND_TASKS')) &&
     !isInProcessTeammate() &&
     !forkEnabled
@@ -283,6 +207,5 @@ Usage notes:
 - The name, team_name, and mode parameters are not available in this context — teammates cannot spawn other teammates. Omit them to spawn a subagent.`
         : ''
   }${whenToForkSection}${writingThePromptSection}
-
 ${forkEnabled ? forkExamples : currentExamples}`
 }

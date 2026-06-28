@@ -21,7 +21,6 @@ import type {
   FileOperationType,
   PermissionOption,
 } from './permissionOptions.js'
-
 function logPermissionEvent(
   event: 'accept' | 'reject',
   completionType: CompletionType,
@@ -40,7 +39,6 @@ function logPermissionEvent(
     },
   })
 }
-
 export type PermissionHandlerParams = {
   messageId: string
   path: string | null
@@ -52,24 +50,19 @@ export type PermissionHandlerParams = {
   languageName: string | Promise<string>
   operationType: FileOperationType
 }
-
 export type PermissionHandlerOptions = {
   hasFeedback?: boolean
   feedback?: string
   enteredFeedbackMode?: boolean
   scope?: 'open-code-cli-folder' | 'global-open-code-cli-folder'
 }
-
 function handleAcceptOnce(
   params: PermissionHandlerParams,
   options?: PermissionHandlerOptions,
 ): void {
   const { messageId, toolUseConfirm, onDone, completionType, languageName } =
     params
-
   logPermissionEvent('accept', completionType, languageName, messageId)
-
-  // Log accept submission with feedback context
   logEvent('open_code_cli_accept_submitted', {
     toolName: sanitizeToolNameForAnalytics(
       toolUseConfirm.tool.name,
@@ -79,11 +72,9 @@ function handleAcceptOnce(
     instructions_length: options?.feedback?.length ?? 0,
     entered_feedback_mode: options?.enteredFeedbackMode ?? false,
   })
-
   onDone()
   toolUseConfirm.onAllow(toolUseConfirm.input, [], options?.feedback)
 }
-
 function handleAcceptSession(
   params: PermissionHandlerParams,
   options?: PermissionHandlerOptions,
@@ -98,10 +89,7 @@ function handleAcceptSession(
     languageName,
     operationType,
   } = params
-
   logPermissionEvent('accept', completionType, languageName, messageId)
-
-  // For open-code-cli-folder scope, grant session-level access to all .open-code-cli/ files
   if (
     options?.scope === 'open-code-cli-folder' ||
     options?.scope === 'global-open-code-cli-folder'
@@ -127,17 +115,12 @@ function handleAcceptSession(
     toolUseConfirm.onAllow(toolUseConfirm.input, suggestions)
     return
   }
-
-  // Generate permission updates if path is provided
   const suggestions = path
     ? generateSuggestions(path, operationType, toolPermissionContext)
     : []
-
   onDone()
-  // Pass permission updates directly to onAllow
   toolUseConfirm.onAllow(toolUseConfirm.input, suggestions)
 }
-
 function handleReject(
   params: PermissionHandlerParams,
   options?: PermissionHandlerOptions,
@@ -150,7 +133,6 @@ function handleReject(
     completionType,
     languageName,
   } = params
-
   logPermissionEvent(
     'reject',
     completionType,
@@ -158,8 +140,6 @@ function handleReject(
     messageId,
     options?.hasFeedback,
   )
-
-  // Log reject submission with feedback context
   logEvent('open_code_cli_reject_submitted', {
     toolName: sanitizeToolNameForAnalytics(
       toolUseConfirm.tool.name,
@@ -169,12 +149,10 @@ function handleReject(
     instructions_length: options?.feedback?.length ?? 0,
     entered_feedback_mode: options?.enteredFeedbackMode ?? false,
   })
-
   onDone()
   onReject()
   toolUseConfirm.onReject(options?.feedback)
 }
-
 export const PERMISSION_HANDLERS: Record<
   PermissionOption['type'],
   (params: PermissionHandlerParams, options?: PermissionHandlerOptions) => void

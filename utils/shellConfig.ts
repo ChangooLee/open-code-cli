@@ -1,28 +1,14 @@
-/**
- * Utilities for managing shell configuration files (like .bashrc, .zshrc)
- * Used for managing Open Code CLI aliases and PATH entries
- */
-
 import { open, readFile, stat } from 'fs/promises'
 import { homedir as osHomedir } from 'os'
 import { join } from 'path'
 import { isFsInaccessible } from './errors.js'
 import { getLocalOpenCodeCliPath } from './localInstaller.js'
-
 export const OPEN_CODE_CLI_ALIAS_REGEX = /^\s*alias\s+open-code-cli\s*=/
-
 type EnvLike = Record<string, string | undefined>
-
 type ShellConfigOptions = {
   env?: EnvLike
   homedir?: string
 }
-
-/**
- * Get the paths to shell configuration files
- * Respects ZDOTDIR for zsh users
- * @param options Optional overrides for testing (env, homedir)
- */
 export function getShellConfigPaths(
   options?: ShellConfigOptions,
 ): Record<string, string> {
@@ -35,49 +21,29 @@ export function getShellConfigPaths(
     fish: join(home, '.config/fish/config.fish'),
   }
 }
-
-/**
- * Filter out installer-created Open Code CLI aliases from an array of lines
- * Only removes aliases pointing to $HOME/.open-code-cli/local/open-code-cli
- * Preserves custom user aliases that point to other locations
- * Returns the filtered lines and whether our default installer alias was found
- */
 export function filterOpenCodeCliAliases(lines: string[]): {
   filtered: string[]
   hadAlias: boolean
 } {
   let hadAlias = false
   const filtered = lines.filter(line => {
-    // Check if this is a Open Code CLI alias
     if (OPEN_CODE_CLI_ALIAS_REGEX.test(line)) {
-      // Extract the alias target - handle spaces, quotes, and various formats
-      // First try with quotes
       let match = line.match(/alias\s+open-code-cli\s*=\s*["']([^"']+)["']/)
       if (!match) {
-        // Try without quotes (capturing until end of line or comment)
         match = line.match(/alias\s+open-code-cli\s*=\s*([^#\n]+)/)
       }
-
       if (match && match[1]) {
         const target = match[1].trim()
-        // Only remove if it points to the installer location
-        // The installer always creates aliases with the full expanded path
         if (target === getLocalOpenCodeCliPath()) {
           hadAlias = true
-          return false // Remove this line
+          return false 
         }
       }
-      // Keep custom aliases that don't point to the installer location
     }
     return true
   })
   return { filtered, hadAlias }
 }
-
-/**
- * Read a file and split it into lines
- * Returns null if file doesn't exist or can't be read
- */
 export async function readFileLines(
   filePath: string,
 ): Promise<string[] | null> {
@@ -89,10 +55,6 @@ export async function readFileLines(
     throw e
   }
 }
-
-/**
- * Write lines back to a file
- */
 export async function writeFileLines(
   filePath: string,
   lines: string[],
@@ -105,24 +67,15 @@ export async function writeFileLines(
     await fh.close()
   }
 }
-
-/**
- * Check if a Open Code CLI alias exists in any shell config file
- * Returns the alias target if found, null otherwise
- * @param options Optional overrides for testing (env, homedir)
- */
 export async function findOpenCodeCliAlias(
   options?: ShellConfigOptions,
 ): Promise<string | null> {
   const configs = getShellConfigPaths(options)
-
   for (const configPath of Object.values(configs)) {
     const lines = await readFileLines(configPath)
     if (!lines) continue
-
     for (const line of lines) {
       if (OPEN_CODE_CLI_ALIAS_REGEX.test(line)) {
-        // Extract the alias target
         const match = line.match(/alias\s+open-code-cli=["']?([^"'\s]+)/)
         if (match && match[1]) {
           return match[1]
@@ -130,38 +83,23 @@ export async function findOpenCodeCliAlias(
       }
     }
   }
-
   return null
 }
-
-/**
- * Check if a Open Code CLI alias exists and points to a valid executable
- * Returns the alias target if valid, null otherwise
- * @param options Optional overrides for testing (env, homedir)
- */
 export async function findValidOpenCodeCliAlias(
   options?: ShellConfigOptions,
 ): Promise<string | null> {
   const aliasTarget = await findOpenCodeCliAlias(options)
   if (!aliasTarget) return null
-
   const home = options?.homedir ?? osHomedir()
-
-  // Expand ~ to home directory
   const expandedPath = aliasTarget.startsWith('~')
     ? aliasTarget.replace('~', home)
     : aliasTarget
-
-  // Check if the target exists and is executable
   try {
     const stats = await stat(expandedPath)
-    // Check if it's a file (could be executable or symlink)
     if (stats.isFile() || stats.isSymbolicLink()) {
       return aliasTarget
     }
   } catch {
-    // Target doesn't exist or can't be accessed
   }
-
   return null
 }

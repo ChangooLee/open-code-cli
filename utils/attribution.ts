@@ -35,31 +35,19 @@ import { getTranscriptPath } from './sessionStorage.js'
 import { readTranscriptForLoad } from './sessionStoragePortable.js'
 import { getInitialSettings } from './settings/settings.js'
 import { isUndercover } from './undercover.js'
-
 import { getOpenCodeCliEnv } from '../utils/envUtils.js';
 export type AttributionTexts = {
   commit: string
   pr: string
 }
-
-/**
- * Returns attribution text for commits and PRs based on user settings.
- * Handles:
- * - Dynamic model name via getPublicModelName()
- * - Custom attribution settings (settings.attribution.commit/pr)
- * - Backward compatibility with deprecated includeCoAuthoredBy setting
- * - Remote mode: returns session URL for attribution
- */
 export function getAttributionTexts(): AttributionTexts {
   if (process.env.USER_TYPE === 'ant' && isUndercover()) {
     return { commit: '', pr: '' }
   }
-
   if (getClientType() === 'remote') {
     const remoteSessionId = getOpenCodeCliEnv('REMOTE_SESSION_ID')
     if (remoteSessionId) {
       const ingressUrl = process.env.SESSION_INGRESS_URL
-      // Skip for local dev - URLs won't persist
       if (!isRemoteSessionLocal(remoteSessionId, ingressUrl)) {
         const sessionUrl = getRemoteSessionUrl(remoteSessionId, ingressUrl)
         return { commit: sessionUrl, pr: sessionUrl }
@@ -67,10 +55,6 @@ export function getAttributionTexts(): AttributionTexts {
     }
     return { commit: '', pr: '' }
   }
-
-  // @[MODEL LAUNCH]: Update the hardcoded fallback model name below (guards against codename leaks).
-  // For internal repos, use the real model name. For external repos,
-  // fall back to "configured model 4.6" for unrecognized models to avoid leaking codenames.
   const model = getMainLoopModel()
   const isKnownPublicModel = getPublicModelDisplayName(model) !== null
   const modelName =
@@ -79,29 +63,18 @@ export function getAttributionTexts(): AttributionTexts {
       : 'configured model 4.6'
   const defaultAttribution = `🤖 Generated with [Open Code CLI](${PRODUCT_URL})`
   const defaultCommit = `Co-Authored-By: ${modelName} <noreply@openai-compatible.com>`
-
   const settings = getInitialSettings()
-
-  // New attribution setting takes precedence over deprecated includeCoAuthoredBy
   if (settings.attribution) {
     return {
       commit: settings.attribution.commit ?? defaultCommit,
       pr: settings.attribution.pr ?? defaultAttribution,
     }
   }
-
-  // Backward compatibility: deprecated includeCoAuthoredBy setting
   if (settings.includeCoAuthoredBy === false) {
     return { commit: '', pr: '' }
   }
-
   return { commit: defaultCommit, pr: defaultAttribution }
 }
-
-/**
- * Check if a message content string is terminal output rather than a user prompt.
- * Terminal output includes bash input/output tags and caveat messages about local commands.
- */
 function isTerminalOutput(content: string): boolean {
   for (const tag of TERMINAL_OUTPUT_TAGS) {
     if (content.includes(`<${tag}>`)) {
@@ -110,30 +83,19 @@ function isTerminalOutput(content: string): boolean {
   }
   return false
 }
-
-/**
- * Count user messages with visible text content in a list of non-sidechain messages.
- * Excludes tool_result blocks, terminal output, and empty messages.
- *
- * Callers should pass messages already filtered to exclude sidechain messages.
- */
 export function countUserPromptsInMessages(
   messages: ReadonlyArray<{ type: string; message?: { content?: unknown } }>,
 ): number {
   let count = 0
-
   for (const message of messages) {
     if (message.type !== 'user') {
       continue
     }
-
     const content = message.message?.content
     if (!content) {
       continue
     }
-
     let hasUserText = false
-
     if (typeof content === 'string') {
       if (isTerminalOutput(content)) {
         continue
@@ -153,22 +115,12 @@ export function countUserPromptsInMessages(
         )
       })
     }
-
     if (hasUserText) {
       count++
     }
   }
-
   return count
 }
-
-/**
- * Count non-sidechain user messages in transcript entries.
- * Used to calculate the number of "steers" (user prompts - 1).
- *
- * Counts user messages that contain actual user-typed text,
- * excluding tool_result blocks, sidechain messages, and terminal output.
- */
 function countUserPromptsFromEntries(entries: ReadonlyArray<Entry>): number {
   const nonSidechain = entries.filter(
     entry =>
@@ -176,33 +128,21 @@ function countUserPromptsFromEntries(entries: ReadonlyArray<Entry>): number {
   )
   return countUserPromptsInMessages(nonSidechain)
 }
-
-/**
- * Get full attribution data from the provided AppState's attribution state.
- * Uses ALL tracked files from the attribution state (not just staged files)
- * because for PR attribution, files may not be staged yet.
- * Returns null if no attribution data is available.
- */
 async function getPRAttributionData(
   appState: AppState,
 ): Promise<AttributionData | null> {
   const attribution = appState.attribution
-
   if (!attribution) {
     return null
   }
-
-  // Handle both Map and plain object (in case of serialization)
   const fileStates = attribution.fileStates
   const isMap = fileStates instanceof Map
   const trackedFiles = isMap
     ? Array.from(fileStates.keys())
     : Object.keys(fileStates)
-
   if (trackedFiles.length === 0) {
     return null
   }
-
   try {
     return await calculateCommitAttribution([attribution], trackedFiles)
   } catch (error) {
@@ -210,7 +150,6 @@ async function getPRAttributionData(
     return null
   }
 }
-
 const MEMORY_ACCESS_TOOL_NAMES = new Set([
   FILE_READ_TOOL_NAME,
   GREP_TOOL_NAME,
@@ -218,11 +157,6 @@ const MEMORY_ACCESS_TOOL_NAMES = new Set([
   FILE_EDIT_TOOL_NAME,
   FILE_WRITE_TOOL_NAME,
 ])
-
-/**
- * Count memory file accesses in transcript entries.
- * Uses the same detection conditions as the PostToolUse session file access hooks.
- */
 function countMemoryFileAccessFromEntries(
   entries: ReadonlyArray<Entry>,
 ): number {
@@ -242,13 +176,6 @@ function countMemoryFileAccessFromEntries(
   }
   return count
 }
-
-/**
- * Read session transcript entries and compute prompt count and memory access
- * count. Pre-compact entries are skipped — the N-shot count and memory-access
- * count should reflect only the current conversation arc, not accumulated
- * prompts from before a compaction boundary.
- */
 async function getTranscriptStats(): Promise<{
   promptCount: number
   memoryAccessCount: number
@@ -256,12 +183,6 @@ async function getTranscriptStats(): Promise<{
   try {
     const filePath = getTranscriptPath()
     const fileSize = (await stat(filePath)).size
-    // Fused reader: attr-snap lines (84% of a long session by bytes) are
-    // skipped at the fd level so peak scales with output, not file size. The
-    // one surviving attr-snap at EOF is a no-op for the count functions
-    // (neither checks type === 'attribution-snapshot'). When the last
-    // boundary has preservedSegment the reader returns full (no truncate);
-    // the findLastIndex below still slices to post-boundary.
     const scan = await readTranscriptForLoad(filePath, fileSize)
     const buf = scan.postBoundaryBuf
     const entries = parseJSONL<Entry>(buf)
@@ -281,56 +202,31 @@ async function getTranscriptStats(): Promise<{
     return { promptCount: 0, memoryAccessCount: 0 }
   }
 }
-
-/**
- * Get enhanced PR attribution text with Open Code CLI contribution stats.
- *
- * Format: "🤖 Generated with Open Code CLI (93% 3-shotted by openai/gpt-4.1)"
- *
- * Rules:
- * - Shows Open Code CLI contribution percentage from commit attribution
- * - Shows N-shotted where N is the prompt count (1-shotted, 2-shotted, etc.)
- * - Shows short model name (e.g., openai/gpt-4.1)
- * - Returns default attribution if stats can't be computed
- *
- * @param getAppState Function to get the current AppState (from command context)
- */
 export async function getEnhancedPRAttribution(
   getAppState: () => AppState,
 ): Promise<string> {
   if (process.env.USER_TYPE === 'ant' && isUndercover()) {
     return ''
   }
-
   if (getClientType() === 'remote') {
     const remoteSessionId = getOpenCodeCliEnv('REMOTE_SESSION_ID')
     if (remoteSessionId) {
       const ingressUrl = process.env.SESSION_INGRESS_URL
-      // Skip for local dev - URLs won't persist
       if (!isRemoteSessionLocal(remoteSessionId, ingressUrl)) {
         return getRemoteSessionUrl(remoteSessionId, ingressUrl)
       }
     }
     return ''
   }
-
   const settings = getInitialSettings()
-
-  // If user has custom PR attribution, use that
   if (settings.attribution?.pr) {
     return settings.attribution.pr
   }
-
-  // Backward compatibility: deprecated includeCoAuthoredBy setting
   if (settings.includeCoAuthoredBy === false) {
     return ''
   }
-
   const defaultAttribution = `🤖 Generated with [Open Code CLI](${PRODUCT_URL})`
-
-  // Get AppState first
   const appState = getAppState()
-
   logForDebugging(
     `PR Attribution: appState.attribution exists: ${!!appState.attribution}`,
   )
@@ -340,47 +236,29 @@ export async function getEnhancedPRAttribution(
     const fileCount = isMap ? fileStates.size : Object.keys(fileStates).length
     logForDebugging(`PR Attribution: fileStates count: ${fileCount}`)
   }
-
-  // Get attribution stats (transcript is read once for both prompt count and memory access)
   const [attributionData, { promptCount, memoryAccessCount }, isInternal] =
     await Promise.all([
       getPRAttributionData(appState),
       getTranscriptStats(),
       isInternalModelRepo(),
     ])
-
   const openCodeCliPercent = attributionData?.summary.openCodeCliPercent ?? 0
-
   logForDebugging(
     `PR Attribution: openCodeCliPercent: ${openCodeCliPercent}, promptCount: ${promptCount}, memoryAccessCount: ${memoryAccessCount}`,
   )
-
-  // Get short model name, sanitized for non-internal repos
   const rawModelName = getCanonicalName(getMainLoopModel())
   const shortModelName = isInternal
     ? rawModelName
     : sanitizeModelName(rawModelName)
-
-  // If no attribution data, return default
   if (openCodeCliPercent === 0 && promptCount === 0 && memoryAccessCount === 0) {
     logForDebugging('PR Attribution: returning default (no data)')
     return defaultAttribution
   }
-
-  // Build the enhanced attribution: "🤖 Generated with Open Code CLI (93% 3-shotted by openai/gpt-4.1, 2 memories recalled)"
   const memSuffix =
     memoryAccessCount > 0
       ? `, ${memoryAccessCount} ${memoryAccessCount === 1 ? 'memory' : 'memories'} recalled`
       : ''
   const summary = `🤖 Generated with [Open Code CLI](${PRODUCT_URL}) (${openCodeCliPercent}% ${promptCount}-shotted by ${shortModelName}${memSuffix})`
-
-  // Append trailer lines for squash-merge survival. Only for allowlisted repos
-  // (INTERNAL_MODEL_REPOS) and only in builds with COMMIT_ATTRIBUTION enabled —
-  // attributionTrailer.ts contains excluded strings, so reach it via dynamic
-  // import behind feature(). When the repo is configured with
-  // squash_merge_commit_message=PR_BODY (cli, apps), the PR body becomes the
-  // squash commit body verbatim — trailer lines at the end become proper git
-  // trailers on the squash commit.
   if (feature('COMMIT_ATTRIBUTION') && isInternal && attributionData) {
     const { buildPRTrailers } = await import('./attributionTrailer.js')
     const trailers = buildPRTrailers(attributionData, appState.attribution)
@@ -388,7 +266,6 @@ export async function getEnhancedPRAttribution(
     logForDebugging(`PR Attribution: returning with trailers: ${result}`)
     return result
   }
-
   logForDebugging(`PR Attribution: returning summary: ${summary}`)
   return summary
 }

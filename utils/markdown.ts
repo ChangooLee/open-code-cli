@@ -10,20 +10,11 @@ import { logForDebugging } from './debug.js'
 import { createHyperlink } from './hyperlink.js'
 import { stripPromptXMLTags } from './messages.js'
 import type { ThemeName } from './theme.js'
-
-// Use \n unconditionally — os.EOL is \r\n on Windows, and the extra \r
-// breaks the character-to-segment mapping in applyStylesToWrappedText,
-// causing styled text to shift right.
 const EOL = '\n'
-
 let markedConfigured = false
-
 export function configureMarked(): void {
   if (markedConfigured) return
   markedConfigured = true
-
-  // Disable strikethrough parsing - the model often uses ~ for "approximate"
-  // (e.g., ~100) and rarely intends actual strikethrough formatting
   marked.use({
     tokenizer: {
       del() {
@@ -32,7 +23,6 @@ export function configureMarked(): void {
     },
   })
 }
-
 export function applyMarkdown(
   content: string,
   theme: ThemeName,
@@ -45,7 +35,6 @@ export function applyMarkdown(
     .join('')
     .trim()
 }
-
 export function formatToken(
   token: Token,
   theme: ThemeName,
@@ -59,8 +48,6 @@ export function formatToken(
       const inner = (token.tokens ?? [])
         .map(_ => formatToken(_, theme, 0, null, null, highlight))
         .join('')
-      // Prefix each line with a dim vertical bar. Keep text italic but at
-      // normal brightness — chalk.dim is nearly invisible on dark themes.
       const bar = chalk.dim(BLOCKQUOTE_BAR)
       return inner
         .split(EOL)
@@ -86,7 +73,6 @@ export function formatToken(
       return highlight.highlight(token.text, { language }) + EOL
     }
     case 'codespan': {
-      // inline code
       return color('permission', theme)(token.text)
     }
     case 'em':
@@ -139,24 +125,17 @@ export function formatToken(
     case 'image':
       return token.href
     case 'link': {
-      // Prevent mailto links from being displayed as clickable links
       if (token.href.startsWith('mailto:')) {
-        // Extract email from mailto: link and display as plain text
         const email = token.href.replace(/^mailto:/, '')
         return email
       }
-      // Extract display text from the link's child tokens
       const linkText = (token.tokens ?? [])
         .map(_ => formatToken(_, theme, 0, null, token, highlight))
         .join('')
       const plainLinkText = stripAnsi(linkText)
-      // If the link has meaningful display text (different from the URL),
-      // show it as a clickable hyperlink. In terminals that support OSC 8,
-      // users see the text and can hover/click to see the URL.
       if (plainLinkText && plainLinkText !== token.href) {
         return createHyperlink(token.href, linkText)
       }
-      // When the display text matches the URL (or is empty), just show the URL
       return createHyperlink(token.href)
     }
     case 'list': {
@@ -192,10 +171,6 @@ export function formatToken(
       return EOL
     case 'text':
       if (parent?.type === 'link') {
-        // Already inside a markdown link — the link handler will wrap this
-        // in an OSC 8 hyperlink. Linkifying here would nest a second OSC 8
-        // sequence, and terminals honor the innermost one, overriding the
-        // link's actual href.
         return token.text
       }
       if (parent?.type === 'list_item') {
@@ -204,8 +179,6 @@ export function formatToken(
       return linkifyIssueReferences(token.text)
     case 'table': {
       const tableToken = token as Tokens.Table
-
-      // Helper function to get the text content that will be displayed (after stripAnsi)
       function getDisplayText(tokens: Token[] | undefined): string {
         return stripAnsi(
           tokens
@@ -213,18 +186,14 @@ export function formatToken(
             .join('') ?? '',
         )
       }
-
-      // Determine column widths based on displayed content (without formatting)
       const columnWidths = tableToken.header.map((header, index) => {
         let maxWidth = stringWidth(getDisplayText(header.tokens))
         for (const row of tableToken.rows) {
           const cellLength = stringWidth(getDisplayText(row[index]?.tokens))
           maxWidth = Math.max(maxWidth, cellLength)
         }
-        return Math.max(maxWidth, 3) // Minimum width of 3
+        return Math.max(maxWidth, 3) 
       })
-
-      // Format header row
       let tableOutput = '| '
       tableToken.header.forEach((header, index) => {
         const content =
@@ -238,17 +207,12 @@ export function formatToken(
           padAligned(content, stringWidth(displayText), width, align) + ' | '
       })
       tableOutput = tableOutput.trimEnd() + EOL
-
-      // Add separator row
       tableOutput += '|'
       columnWidths.forEach(width => {
-        // Always use dashes, don't show alignment colons in the output
-        const separator = '-'.repeat(width + 2) // +2 for spaces on each side
+        const separator = '-'.repeat(width + 2) 
         tableOutput += separator + '|'
       })
       tableOutput += EOL
-
-      // Format data rows
       tableToken.rows.forEach(row => {
         tableOutput += '| '
         row.forEach((cell, index) => {
@@ -264,34 +228,19 @@ export function formatToken(
         })
         tableOutput = tableOutput.trimEnd() + EOL
       })
-
       return tableOutput + EOL
     }
     case 'escape':
-      // Markdown escape: \) → ), \\ → \, etc.
       return token.text
     case 'def':
     case 'del':
     case 'html':
-      // These token types are not rendered
       return ''
   }
   return ''
 }
-
-// Matches owner/repo#NNN style GitHub issue/PR references. The qualified form
-// is unambiguous — bare #NNN was removed because it guessed the current repo
-// and was wrong whenever the assistant discussed a different one.
-// Owner segment disallows dots (GitHub usernames are alphanumerics + hyphens
-// only) so hostnames like docs.github.io/guide#42 don't false-positive. Repo
-// segment allows dots (e.g. cc.kurs.web). Lookbehind is avoided — it defeats
-// YARR JIT in JSC.
 const ISSUE_REF_PATTERN =
   /(^|[^\w./-])([A-Za-z0-9][\w-]*\/[A-Za-z0-9][\w.-]*)#(\d+)\b/g
-
-/**
- * Replaces owner/repo#123 references with clickable hyperlinks to GitHub.
- */
 function linkifyIssueReferences(text: string): string {
   if (!supportsHyperlinks()) {
     return text
@@ -306,7 +255,6 @@ function linkifyIssueReferences(text: string): string {
       ),
   )
 }
-
 function numberToLetter(n: number): string {
   let result = ''
   while (n > 0) {
@@ -316,7 +264,6 @@ function numberToLetter(n: number): string {
   }
   return result
 }
-
 const ROMAN_VALUES: ReadonlyArray<[number, string]> = [
   [1000, 'm'],
   [900, 'cm'],
@@ -332,7 +279,6 @@ const ROMAN_VALUES: ReadonlyArray<[number, string]> = [
   [4, 'iv'],
   [1, 'i'],
 ]
-
 function numberToRoman(n: number): string {
   let result = ''
   for (const [value, numeral] of ROMAN_VALUES) {
@@ -343,7 +289,6 @@ function numberToRoman(n: number): string {
   }
   return result
 }
-
 function getListNumber(listDepth: number, orderedListNumber: number): string {
   switch (listDepth) {
     case 0:
@@ -357,12 +302,6 @@ function getListNumber(listDepth: number, orderedListNumber: number): string {
       return orderedListNumber.toString()
   }
 }
-
-/**
- * Pad `content` to `targetWidth` according to alignment. `displayWidth` is the
- * visible width of `content` (caller computes this, e.g. via stringWidth on
- * stripAnsi'd text, so ANSI codes in `content` don't affect padding).
- */
 export function padAligned(
   content: string,
   displayWidth: number,

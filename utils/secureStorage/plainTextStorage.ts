@@ -9,17 +9,14 @@ import {
   writeFileSync_DEPRECATED,
 } from '../slowOperations.js'
 import type { SecureStorage, SecureStorageData } from './types.js'
-
 function getStoragePath(): { storageDir: string; storagePath: string } {
   const storageDir = getOpenCodeCliConfigHomeDir()
   const storageFileName = '.credentials.json'
   return { storageDir, storagePath: join(storageDir, storageFileName) }
 }
-
 export const plainTextStorage = {
   name: 'plaintext',
   read(): SecureStorageData | null {
-    // sync IO: called from sync context (SecureStorage interface)
     const { storagePath } = getStoragePath()
     try {
       const data = getFsImplementation().readFileSync(storagePath, {
@@ -42,7 +39,6 @@ export const plainTextStorage = {
     }
   },
   update(data: SecureStorageData): { success: boolean; warning?: string } {
-    // sync IO: called from sync context (SecureStorage interface)
     try {
       const { storageDir, storagePath } = getStoragePath()
       try {
@@ -53,7 +49,6 @@ export const plainTextStorage = {
           throw e
         }
       }
-
       writeFileSync_DEPRECATED(storagePath, jsonStringify(data), {
         encoding: 'utf8',
         flush: false,
@@ -68,7 +63,6 @@ export const plainTextStorage = {
     }
   },
   delete(): boolean {
-    // sync IO: called from sync context (SecureStorage interface)
     const { storagePath } = getStoragePath()
     try {
       getFsImplementation().unlinkSync(storagePath)

@@ -67,7 +67,6 @@ export {
   getModelUsage,
   getUsageForModel,
 }
-
 type StoredCostState = {
   totalCostUSD: number
   totalAPIDuration: number
@@ -78,23 +77,13 @@ type StoredCostState = {
   lastDuration: number | undefined
   modelUsage: { [modelName: string]: ModelUsage } | undefined
 }
-
-/**
- * Gets stored cost state from project config for a specific session.
- * Returns the cost data if the session ID matches, or undefined otherwise.
- * Use this to read costs BEFORE overwriting the config with saveCurrentSessionCosts().
- */
 export function getStoredSessionCosts(
   sessionId: string,
 ): StoredCostState | undefined {
   const projectConfig = getCurrentProjectConfig()
-
-  // Only return costs if this is the same session that was last saved
   if (projectConfig.lastSessionId !== sessionId) {
     return undefined
   }
-
-  // Build model usage with context windows
   let modelUsage: { [modelName: string]: ModelUsage } | undefined
   if (projectConfig.lastModelUsage) {
     modelUsage = Object.fromEntries(
@@ -108,7 +97,6 @@ export function getStoredSessionCosts(
       ]),
     )
   }
-
   return {
     totalCostUSD: projectConfig.lastCost ?? 0,
     totalAPIDuration: projectConfig.lastAPIDuration ?? 0,
@@ -121,12 +109,6 @@ export function getStoredSessionCosts(
     modelUsage,
   }
 }
-
-/**
- * Restores cost state from project config when resuming a session.
- * Only restores if the session ID matches the last saved session.
- * @returns true if cost state was restored, false otherwise
- */
 export function restoreCostStateForSession(sessionId: string): boolean {
   const data = getStoredSessionCosts(sessionId)
   if (!data) {
@@ -135,11 +117,6 @@ export function restoreCostStateForSession(sessionId: string): boolean {
   setCostStateForRestore(data)
   return true
 }
-
-/**
- * Saves the current session's costs to project config.
- * Call this before switching sessions to avoid losing accumulated costs.
- */
 export function saveCurrentSessionCosts(fpsMetrics?: FpsMetrics): void {
   saveCurrentProjectConfig(current => ({
     ...current,
@@ -173,18 +150,14 @@ export function saveCurrentSessionCosts(fpsMetrics?: FpsMetrics): void {
     lastSessionId: getSessionId(),
   }))
 }
-
 function formatCost(cost: number, maxDecimalPlaces: number = 4): string {
   return `$${cost > 0.5 ? round(cost, 100).toFixed(2) : cost.toFixed(maxDecimalPlaces)}`
 }
-
 function formatModelUsage(): string {
   const modelUsageMap = getModelUsage()
   if (Object.keys(modelUsageMap).length === 0) {
     return 'Usage:                 0 input, 0 output, 0 cache read, 0 cache write'
   }
-
-  // Accumulate usage by short name
   const usageByShortName: { [shortName: string]: ModelUsage } = {}
   for (const [model, usage] of Object.entries(modelUsageMap)) {
     const shortName = getCanonicalName(model)
@@ -208,7 +181,6 @@ function formatModelUsage(): string {
     accumulated.webSearchRequests += usage.webSearchRequests
     accumulated.costUSD += usage.costUSD
   }
-
   let result = 'Usage by model:'
   for (const [shortName, usage] of Object.entries(usageByShortName)) {
     const usageString =
@@ -224,16 +196,13 @@ function formatModelUsage(): string {
   }
   return result
 }
-
 export function formatTotalCost(): string {
   const costDisplay =
     formatCost(getTotalCostUSD()) +
     (hasUnknownModelCost()
       ? ' (costs may be inaccurate due to usage of unknown models)'
       : '')
-
   const modelUsageDisplay = formatModelUsage()
-
   return chalk.dim(
     `Total cost:            ${costDisplay}\n` +
       `Total duration (API):  ${formatDuration(getTotalAPIDuration())}
@@ -242,11 +211,9 @@ Total code changes:    ${getTotalLinesAdded()} ${getTotalLinesAdded() === 1 ? 'l
 ${modelUsageDisplay}`,
   )
 }
-
 function round(number: number, precision: number): number {
   return Math.round(number * precision) / precision
 }
-
 function addToTotalModelUsage(
   cost: number,
   usage: Usage,
@@ -262,7 +229,6 @@ function addToTotalModelUsage(
     contextWindow: 0,
     maxOutputTokens: 0,
   }
-
   modelUsage.inputTokens += usage.input_tokens
   modelUsage.outputTokens += usage.output_tokens
   modelUsage.cacheReadInputTokens += usage.cache_read_input_tokens ?? 0
@@ -274,7 +240,6 @@ function addToTotalModelUsage(
   modelUsage.maxOutputTokens = getModelMaxOutputTokens(model).default
   return modelUsage
 }
-
 export function addToTotalSessionCost(
   cost: number,
   usage: Usage,
@@ -282,12 +247,10 @@ export function addToTotalSessionCost(
 ): number {
   const modelUsage = addToTotalModelUsage(cost, usage, model)
   addToTotalCostState(cost, modelUsage, model)
-
   const attrs =
     isFastModeEnabled() && usage.speed === 'fast'
       ? { model, speed: 'fast' }
       : { model }
-
   getCostCounter()?.add(cost, attrs)
   getTokenCounter()?.add(usage.input_tokens ?? 0, { ...attrs, type: 'input' })
   getTokenCounter()?.add(usage.output_tokens ?? 0, { ...attrs, type: 'output' })
@@ -299,7 +262,6 @@ export function addToTotalSessionCost(
     ...attrs,
     type: 'cacheCreation',
   })
-
   let totalCost = cost
   for (const advisorUsage of getAdvisorUsage(usage)) {
     const advisorCost = calculateUSDCost(advisorUsage.model, advisorUsage)

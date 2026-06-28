@@ -1,16 +1,9 @@
 import { DIAMOND_FILLED, DIAMOND_OPEN } from '../constants/figures.js'
 import { count } from '../utils/array.js'
 import type { BackgroundTaskState } from './types.js'
-
-/**
- * Produces the compact footer-pill label for a set of background tasks.
- * Used by both the footer pill and the turn-duration transcript line so the
- * two surfaces agree on terminology.
- */
 export function getPillLabel(tasks: BackgroundTaskState[]): string {
   const n = tasks.length
   const allSameType = tasks.every(t => t.type === tasks[0]!.type)
-
   if (allSameType) {
     switch (tasks[0]!.type) {
       case 'local_bash': {
@@ -38,8 +31,6 @@ export function getPillLabel(tasks: BackgroundTaskState[]): string {
         return n === 1 ? '1 local agent' : `${n} local agents`
       case 'remote_agent': {
         const first = tasks[0]!
-        // Per design mockup: ◇ open diamond while running/needs-input,
-        // ◆ filled once ExitPlanMode is awaiting approval.
         if (n === 1 && first.type === 'remote_agent' && first.isUltraplan) {
           switch (first.ultraplanPhase) {
             case 'plan_ready':
@@ -62,15 +53,8 @@ export function getPillLabel(tasks: BackgroundTaskState[]): string {
         return 'dreaming'
     }
   }
-
   return `${n} background ${n === 1 ? 'task' : 'tasks'}`
 }
-
-/**
- * True when the pill should show the dimmed " · ↓ to view" call-to-action.
- * Per the state diagram: only the two attention states (needs_input,
- * plan_ready) surface the CTA; plain running shows just the diamond + label.
- */
 export function pillNeedsCta(tasks: BackgroundTaskState[]): boolean {
   if (tasks.length !== 1) return false
   const t = tasks[0]!

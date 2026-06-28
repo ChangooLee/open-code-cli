@@ -7,15 +7,11 @@ import { logForDebugging } from './debug.js'
 import { execFileNoThrow } from './execFileNoThrow.js'
 import { pathExists } from './file.js'
 import { gte as semverGte } from './semver.js'
-
 const MIN_DESKTOP_VERSION = '1.1.2396'
-
 function isDevMode(): boolean {
   if ((process.env.NODE_ENV as string) === 'development') {
     return true
   }
-
-  // Local builds from build directories are dev mode even with NODE_ENV=production
   const pathsToCheck = [process.argv[1] || '', process.execPath || '']
   const buildDirs = [
     '/build-ant/',
@@ -23,15 +19,8 @@ function isDevMode(): boolean {
     '/build-external/',
     '/build-external-native/',
   ]
-
   return pathsToCheck.some(p => buildDirs.some(dir => p.includes(dir)))
 }
-
-/**
- * Builds a deep link URL for Open Code Desktop to resume a CLI session.
- * Format: open-code-cli://resume?session={sessionId}&cwd={cwd}
- * In dev mode: open-code-cli-dev://resume?session={sessionId}&cwd={cwd}
- */
 function buildDesktopDeepLink(sessionId: string): string {
   const protocol = isDevMode() ? 'open-code-cli-dev' : 'open-code-cli'
   const url = new URL(`${protocol}://resume`)
@@ -39,28 +28,14 @@ function buildDesktopDeepLink(sessionId: string): string {
   url.searchParams.set('cwd', getCwd())
   return url.toString()
 }
-
-/**
- * Check if Open Code Desktop app is installed.
- * On macOS, checks for /Applications/Open Code CLI.app.
- * On Linux, checks if xdg-open can handle open-code-cli:// protocol.
- * On Windows, checks if the protocol handler exists.
- * In dev mode, always returns true (assumes dev Desktop is running).
- */
 async function isDesktopInstalled(): Promise<boolean> {
-  // In dev mode, assume the dev Desktop app is running
   if (isDevMode()) {
     return true
   }
-
   const platform = process.platform
-
   if (platform === 'darwin') {
-    // Check for Open Code CLI.app in /Applications
     return pathExists('/Applications/Open Code CLI.app')
   } else if (platform === 'linux') {
-    // Check if xdg-mime can find a handler for open-code-cli://
-    // Note: xdg-mime returns exit code 0 even with no handler, so check stdout too
     const { code, stdout } = await execFileNoThrow('xdg-mime', [
       'query',
       'default',
@@ -68,7 +43,6 @@ async function isDesktopInstalled(): Promise<boolean> {
     ])
     return code === 0 && stdout.trim().length > 0
   } else if (platform === 'win32') {
-    // On Windows, try to query the registry for the protocol handler
     const { code } = await execFileNoThrow('reg', [
       'query',
       'HKEY_CLASSES_ROOT\\open-code-cli',
@@ -76,19 +50,10 @@ async function isDesktopInstalled(): Promise<boolean> {
     ])
     return code === 0
   }
-
   return false
 }
-
-/**
- * Detect the installed Open Code Desktop version.
- * On macOS, reads CFBundleShortVersionString from the app plist.
- * On Windows, finds the highest app-X.Y.Z directory in the Squirrel install.
- * Returns null if version cannot be determined.
- */
 async function getDesktopVersion(): Promise<string | null> {
   const platform = process.platform
-
   if (platform === 'darwin') {
     const { code, stdout } = await execFileNoThrow('defaults', [
       'read',
@@ -122,58 +87,37 @@ async function getDesktopVersion(): Promise<string | null> {
       return null
     }
   }
-
   return null
 }
-
 export type DesktopInstallStatus =
   | { status: 'not-installed' }
   | { status: 'version-too-old'; version: string }
   | { status: 'ready'; version: string }
-
-/**
- * Check Desktop install status including version compatibility.
- */
 export async function getDesktopInstallStatus(): Promise<DesktopInstallStatus> {
   const installed = await isDesktopInstalled()
   if (!installed) {
     return { status: 'not-installed' }
   }
-
   let version: string | null
   try {
     version = await getDesktopVersion()
   } catch {
-    // Optional — proceed with handoff if version detection fails
     return { status: 'ready', version: 'unknown' }
   }
-
   if (!version) {
-    // Can't determine version — assume it's ready (dev mode or unknown install)
     return { status: 'ready', version: 'unknown' }
   }
-
   const coerced = semverCoerce(version)
   if (!coerced || !semverGte(coerced.version, MIN_DESKTOP_VERSION)) {
     return { status: 'version-too-old', version }
   }
-
   return { status: 'ready', version }
 }
-
-/**
- * Opens a deep link URL using the platform-specific mechanism.
- * Returns true if the command succeeded, false otherwise.
- */
 async function openDeepLink(deepLinkUrl: string): Promise<boolean> {
   const platform = process.platform
   logForDebugging(`Opening deep link: ${deepLinkUrl}`)
-
   if (platform === 'darwin') {
     if (isDevMode()) {
-      // In dev mode, `open` launches a bare Electron binary (without app code)
-      // because setAsDefaultProtocolClient registers just the Electron executable.
-      // Use AppleScript to route the URL to the already-running Electron app.
       const { code } = await execFileNoThrow('osascript', [
         '-e',
         `tell application "Electron" to open location "${deepLinkUrl}"`,
@@ -186,7 +130,6 @@ async function openDeepLink(deepLinkUrl: string): Promise<boolean> {
     const { code } = await execFileNoThrow('xdg-open', [deepLinkUrl])
     return code === 0
   } else if (platform === 'win32') {
-    // On Windows, use cmd /c start to open URLs
     const { code } = await execFileNoThrow('cmd', [
       '/c',
       'start',
@@ -195,22 +138,14 @@ async function openDeepLink(deepLinkUrl: string): Promise<boolean> {
     ])
     return code === 0
   }
-
   return false
 }
-
-/**
- * Build and open a deep link to resume the current session in Open Code Desktop.
- * Returns an object with success status and any error message.
- */
 export async function openCurrentSessionInDesktop(): Promise<{
   success: boolean
   error?: string
   deepLinkUrl?: string
 }> {
   const sessionId = getSessionId()
-
-  // Check if Desktop is installed
   const installed = await isDesktopInstalled()
   if (!installed) {
     return {
@@ -219,11 +154,8 @@ export async function openCurrentSessionInDesktop(): Promise<{
         'Open Code Desktop is not installed. Install it from https://Open Code CLI/download',
     }
   }
-
-  // Build and open the deep link
   const deepLinkUrl = buildDesktopDeepLink(sessionId)
   const opened = await openDeepLink(deepLinkUrl)
-
   if (!opened) {
     return {
       success: false,
@@ -231,6 +163,5 @@ export async function openCurrentSessionInDesktop(): Promise<{
       deepLinkUrl,
     }
   }
-
   return { success: true, deepLinkUrl }
 }

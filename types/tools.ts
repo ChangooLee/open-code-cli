@@ -1,10 +1,5 @@
-// Tool progress payload types carried by `ProgressMessage<P>` while a tool runs.
-// Used across tool UIs (BashTool/UI, WebSearchTool/UI, AgentTool/UI, etc.).
-
 import type { HookProgress } from './hooks.js'
 import type { Message, NormalizedMessage } from './message.js'
-
-/** Shared shell streaming progress (Bash + PowerShell render identically). */
 export type ShellProgress = {
   fullOutput: string
   output: string
@@ -14,11 +9,8 @@ export type ShellProgress = {
   timeoutMs?: number
   taskId?: string
 }
-
 export type BashProgress = ShellProgress & { type: 'bash_progress' }
 export type PowerShellProgress = ShellProgress & { type: 'powershell_progress' }
-
-/** Agent / sub-agent streaming progress carries normalized child messages. */
 export type AgentToolProgress = {
   type: 'agent_progress'
   message: NormalizedMessage
@@ -27,23 +19,19 @@ export type AgentToolProgress = {
   prompt?: string
   agentId?: string
 }
-
 export type SkillToolProgress = {
   type: 'skill_progress'
   message: NormalizedMessage | Message
 }
-
 export type MCPProgress = {
   type: 'mcp_progress'
   message?: string
   chunk?: string
   [key: string]: unknown
 }
-
 export type WebSearchProgress =
   | { type: 'query_update'; query: string }
   | { type: 'search_results_received'; query: string; resultCount: number }
-
 export type TaskOutputProgress = {
   type?: 'task_output_progress'
   retrieval_status: string
@@ -56,8 +44,6 @@ export type TaskOutputProgress = {
     error?: string
   }
 }
-
-/** Live progress emitted while a REPL tool call runs an inner tool. */
 export type REPLToolProgress = {
   type: 'repl_tool_call'
   phase?: 'start' | 'end' | string
@@ -65,15 +51,12 @@ export type REPLToolProgress = {
   toolInput?: unknown
   message?: NormalizedMessage
 }
-
 export type SdkWorkflowProgress = {
   type: 'sdk_workflow_progress'
   status?: string
   message?: string
   [key: string]: unknown
 }
-
-/** Catch-all union used by generic tool UI renderers. */
 export type ToolProgressData =
   | BashProgress
   | PowerShellProgress

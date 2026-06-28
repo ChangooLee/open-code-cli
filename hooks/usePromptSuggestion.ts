@@ -6,12 +6,10 @@ import {
 } from '../services/analytics/index.js'
 import { abortSpeculation } from '../services/PromptSuggestion/speculation.js'
 import { useAppState, useSetAppState } from '../state/AppState.js'
-
 type Props = {
   inputValue: string
   isAssistantResponding: boolean
 }
-
 export function usePromptSuggestion({
   inputValue,
   isAssistantResponding,
@@ -34,18 +32,12 @@ export function usePromptSuggestion({
     acceptedAt,
     generationRequestId,
   } = promptSuggestion
-
   const suggestion =
     isAssistantResponding || inputValue.length > 0 ? null : suggestionText
-
   const isValidSuggestion = suggestionText && shownAt > 0
-
-  // Track engagement depth for telemetry
   const firstKeystrokeAt = useRef<number>(0)
   const wasFocusedWhenShown = useRef<boolean>(true)
   const prevShownAt = useRef<number>(0)
-
-  // Capture focus state when a new suggestion appears (shownAt changes)
   if (shownAt > 0 && shownAt !== prevShownAt.current) {
     prevShownAt.current = shownAt
     wasFocusedWhenShown.current = isTerminalFocused
@@ -53,8 +45,6 @@ export function usePromptSuggestion({
   } else if (shownAt === 0) {
     prevShownAt.current = 0
   }
-
-  // Record first keystroke while suggestion is visible
   if (
     inputValue.length > 0 &&
     firstKeystrokeAt.current === 0 &&
@@ -62,10 +52,8 @@ export function usePromptSuggestion({
   ) {
     firstKeystrokeAt.current = Date.now()
   }
-
   const resetSuggestion = useCallback(() => {
     abortSpeculation(setAppState)
-
     setAppState(prev => ({
       ...prev,
       promptSuggestion: {
@@ -77,7 +65,6 @@ export function usePromptSuggestion({
       },
     }))
   }, [setAppState])
-
   const markAccepted = useCallback(() => {
     if (!isValidSuggestion) return
     setAppState(prev => ({
@@ -88,12 +75,8 @@ export function usePromptSuggestion({
       },
     }))
   }, [isValidSuggestion, setAppState])
-
   const markShown = useCallback(() => {
-    // Check shownAt inside setAppState callback to avoid depending on it
-    // (depending on shownAt causes infinite loop when this callback is called)
     setAppState(prev => {
-      // Only mark shown if not already shown and suggestion exists
       if (prev.promptSuggestion.shownAt !== 0 || !prev.promptSuggestion.text) {
         return prev
       }
@@ -106,17 +89,12 @@ export function usePromptSuggestion({
       }
     })
   }, [setAppState])
-
   const logOutcomeAtSubmission = useCallback(
     (finalInput: string, opts?: { skipReset: boolean }) => {
       if (!isValidSuggestion) return
-
-      // Determine if accepted: either Tab was pressed (acceptedAt set) OR
-      // final input matches suggestion (empty Enter case)
       const tabWasPressed = acceptedAt > shownAt
       const wasAccepted = tabWasPressed || finalInput === suggestionText
       const timeMs = wasAccepted ? acceptedAt || Date.now() : Date.now()
-
       logEvent('open_code_cli_prompt_suggestion', {
         source:
           'cli' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
@@ -167,7 +145,6 @@ export function usePromptSuggestion({
       resetSuggestion,
     ],
   )
-
   return {
     suggestion,
     markAccepted,

@@ -2,7 +2,6 @@ import { useMemo, useRef } from 'react'
 import { BASH_TOOL_NAME } from '../tools/BashTool/toolName.js'
 import type { Message } from '../types/message.js'
 import { getUserMessageText } from '../utils/messages.js'
-
 const EXTERNAL_COMMAND_PATTERNS = [
   /\bcurl\b/,
   /\bwget\b/,
@@ -23,25 +22,17 @@ const EXTERNAL_COMMAND_PATTERNS = [
   /\btelnet\b/,
   /\bftp\b/,
 ]
-
 const FRICTION_PATTERNS = [
-  // "No," or "No!" at start — comma/exclamation implies correction tone
-  // (avoids "No problem", "No thanks", "No I think we should...")
   /^no[,!]\s/i,
-  // Direct corrections about Open Code CLI's output
   /\bthat'?s (wrong|incorrect|not (what|right|correct))\b/i,
   /\bnot what I (asked|wanted|meant|said)\b/i,
-  // Referencing prior instructions Open Code CLI missed
   /\bI (said|asked|wanted|told you|already said)\b/i,
-  // Questioning Open Code CLI's actions
   /\bwhy did you\b/i,
   /\byou should(n'?t| not)? have\b/i,
   /\byou were supposed to\b/i,
-  // Explicit retry/revert of Open Code CLI's work
   /\btry again\b/i,
   /\b(undo|revert) (that|this|it|what you)\b/i,
 ]
-
 export function isSessionContainerCompatible(messages: Message[]): boolean {
   for (const msg of messages) {
     if (msg.type !== 'assistant') {
@@ -70,7 +61,6 @@ export function isSessionContainerCompatible(messages: Message[]): boolean {
   }
   return true
 }
-
 export function hasFrictionSignal(messages: Message[]): boolean {
   for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i]!
@@ -85,10 +75,8 @@ export function hasFrictionSignal(messages: Message[]): boolean {
   }
   return false
 }
-
 const MIN_SUBMIT_COUNT = 3
 const COOLDOWN_MS = 30 * 60 * 1000
-
 export function useIssueFlagBanner(
   messages: Message[],
   submitCount: number,
@@ -96,27 +84,15 @@ export function useIssueFlagBanner(
   if (process.env.USER_TYPE !== 'ant') {
     return false
   }
-
-  // biome-ignore lint/correctness/useHookAtTopLevel: process.env.USER_TYPE is a compile-time constant
   const lastTriggeredAtRef = useRef(0)
-  // biome-ignore lint/correctness/useHookAtTopLevel: process.env.USER_TYPE is a compile-time constant
   const activeForSubmitRef = useRef(-1)
-
-  // Memoize the O(messages) scans. This hook runs on every REPL render
-  // (including every keystroke), but messages is stable during typing.
-  // isSessionContainerCompatible walks all messages + regex-tests each
-  // bash command — by far the heaviest work here.
-  // biome-ignore lint/correctness/useHookAtTopLevel: process.env.USER_TYPE is a compile-time constant
   const shouldTrigger = useMemo(
     () => isSessionContainerCompatible(messages) && hasFrictionSignal(messages),
     [messages],
   )
-
-  // Keep showing the banner until the user submits another message
   if (activeForSubmitRef.current === submitCount) {
     return true
   }
-
   if (Date.now() - lastTriggeredAtRef.current < COOLDOWN_MS) {
     return false
   }
@@ -126,7 +102,6 @@ export function useIssueFlagBanner(
   if (!shouldTrigger) {
     return false
   }
-
   lastTriggeredAtRef.current = Date.now()
   activeForSubmitRef.current = submitCount
   return true

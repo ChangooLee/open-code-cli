@@ -54,10 +54,8 @@ import {
   logSuggestionSuppressed,
   shouldFilterSuggestion,
 } from './promptSuggestion.js'
-
 const MAX_SPECULATION_TURNS = 20
 const MAX_SPECULATION_MESSAGES = 100
-
 const WRITE_TOOLS = new Set(['Edit', 'Write', 'NotebookEdit'])
 const SAFE_READ_ONLY_TOOLS = new Set([
   'Read',
@@ -68,7 +66,6 @@ const SAFE_READ_ONLY_TOOLS = new Set([
   'TaskGet',
   'TaskList',
 ])
-
 function safeRemoveOverlay(overlayPath: string): void {
   rm(
     overlayPath,
@@ -76,11 +73,9 @@ function safeRemoveOverlay(overlayPath: string): void {
     () => {},
   )
 }
-
 function getOverlayPath(id: string): string {
   return join(getOpenCodeCliTempDir(), 'speculation', String(process.pid), id)
 }
-
 function denySpeculation(
   message: string,
   reason: string,
@@ -95,7 +90,6 @@ function denySpeculation(
     decisionReason: { type: 'other', reason },
   }
 }
-
 async function copyOverlayToMain(
   overlayPath: string,
   writtenPaths: Set<string>,
@@ -115,12 +109,10 @@ async function copyOverlayToMain(
   }
   return allCopied
 }
-
 export type ActiveSpeculationState = Extract<
   SpeculationState,
   { status: 'active' }
 >
-
 function logSpeculation(
   id: string,
   outcome: 'accepted' | 'aborted' | 'error',
@@ -151,7 +143,6 @@ function logSpeculation(
     ...extras,
   })
 }
-
 function countToolsInMessages(messages: Message[]): number {
   const blocks = messages
     .filter(isUserMessageWithArrayContent)
@@ -162,7 +153,6 @@ function countToolsInMessages(messages: Message[]): number {
     )
   return count(blocks, b => b.type === 'tool_result' && !b.is_error)
 }
-
 function getBoundaryTool(
   boundary: CompletionBoundary | null,
 ): string | undefined {
@@ -177,7 +167,6 @@ function getBoundaryTool(
       return undefined
   }
 }
-
 function getBoundaryDetail(
   boundary: CompletionBoundary | null,
 ): string | undefined {
@@ -193,16 +182,12 @@ function getBoundaryDetail(
       return undefined
   }
 }
-
 function isUserMessageWithArrayContent(
   m: Message,
 ): m is Message & { message: { content: unknown[] } } {
   return m.type === 'user' && 'message' in m && Array.isArray(m.message.content)
 }
-
 export function prepareMessagesForInjection(messages: Message[]): Message[] {
-  // Find tool_use IDs that have SUCCESSFUL results (not errors/interruptions)
-  // Pending tool_use blocks (no result) and interrupted ones will be stripped
   type ToolResult = {
     type: 'tool_result'
     tool_use_id: string
@@ -220,7 +205,6 @@ export function prepareMessagesForInjection(messages: Message[]): Message[] {
       typeof b.content === 'string' &&
       b.content.includes(INTERRUPT_MESSAGE_FOR_TOOL_USE)
     )
-
   const toolIdsWithSuccessfulResults = new Set(
     messages
       .filter(isUserMessageWithArrayContent)
@@ -229,7 +213,6 @@ export function prepareMessagesForInjection(messages: Message[]): Message[] {
       .filter(isSuccessful)
       .map(b => b.tool_use_id),
   )
-
   const keep = (b: {
     type: string
     id?: string
@@ -243,23 +226,17 @@ export function prepareMessagesForInjection(messages: Message[]): Message[] {
       b.type === 'tool_result' &&
       !toolIdsWithSuccessfulResults.has(b.tool_use_id!)
     ) &&
-    // Abort during speculation yields a standalone interrupt user message
-    // (query.ts createUserInterruptionMessage). Strip it so it isn't surfaced
-    // to the model as real user input.
     !(
       b.type === 'text' &&
       (b.text === INTERRUPT_MESSAGE ||
         b.text === INTERRUPT_MESSAGE_FOR_TOOL_USE)
     )
-
   return messages
     .map(msg => {
       if (!('message' in msg) || !Array.isArray(msg.message.content)) return msg
       const content = msg.message.content.filter(keep)
       if (content.length === msg.message.content.length) return msg
       if (content.length === 0) return null
-      // Drop messages where all remaining blocks are whitespace-only text
-      // (API rejects these with 400: "text content blocks must contain non-whitespace text")
       const hasNonWhitespaceContent = content.some(
         (b: { type: string; text?: string }) =>
           b.type !== 'text' || (b.text !== undefined && b.text.trim() !== ''),
@@ -269,7 +246,6 @@ export function prepareMessagesForInjection(messages: Message[]): Message[] {
     })
     .filter((m): m is Message => m !== null)
 }
-
 function createSpeculationFeedbackMessage(
   messages: Message[],
   boundary: CompletionBoundary | null,
@@ -277,12 +253,9 @@ function createSpeculationFeedbackMessage(
   sessionTotalMs: number,
 ): Message | null {
   if (process.env.USER_TYPE !== 'ant') return null
-
   if (messages.length === 0 || timeSavedMs === 0) return null
-
   const toolUses = countToolsInMessages(messages)
   const tokens = boundary?.type === 'complete' ? boundary.outputTokens : null
-
   const parts = []
   if (toolUses > 0) {
     parts.push(`Speculated ${toolUses} tool ${toolUses === 1 ? 'use' : 'uses'}`)
@@ -290,23 +263,19 @@ function createSpeculationFeedbackMessage(
     const turns = messages.length
     parts.push(`Speculated ${turns} ${turns === 1 ? 'turn' : 'turns'}`)
   }
-
   if (tokens !== null) {
     parts.push(`${formatNumber(tokens)} tokens`)
   }
-
   const savedText = `+${formatDuration(timeSavedMs)} saved`
   const sessionSuffix =
     sessionTotalMs !== timeSavedMs
       ? ` (${formatDuration(sessionTotalMs)} this session)`
       : ''
-
   return createSystemMessage(
     `[ANT-ONLY] ${parts.join(' · ')} · ${savedText}${sessionSuffix}`,
     'warning',
   )
 }
-
 function updateActiveSpeculationState(
   setAppState: SetAppState,
   updater: (state: ActiveSpeculationState) => Partial<ActiveSpeculationState>,
@@ -315,7 +284,6 @@ function updateActiveSpeculationState(
     if (prev.speculation.status !== 'active') return prev
     const current = prev.speculation as ActiveSpeculationState
     const updates = updater(current)
-    // Check if any values actually changed to avoid unnecessary re-renders
     const hasChanges = Object.entries(updates).some(
       ([key, value]) => current[key as keyof ActiveSpeculationState] !== value,
     )
@@ -326,14 +294,12 @@ function updateActiveSpeculationState(
     }
   })
 }
-
 function resetSpeculationState(setAppState: SetAppState): void {
   setAppState(prev => {
     if (prev.speculation.status === 'idle') return prev
     return { ...prev, speculation: IDLE_SPECULATION_STATE }
   })
 }
-
 export function isSpeculationEnabled(): boolean {
   const enabled =
     process.env.USER_TYPE === 'ant' &&
@@ -341,7 +307,6 @@ export function isSpeculationEnabled(): boolean {
   logForDebugging(`[Speculation] enabled=${enabled}`)
   return enabled
 }
-
 async function generatePipelinedSuggestion(
   context: REPLHookContext,
   suggestionText: string,
@@ -356,7 +321,6 @@ async function generatePipelinedSuggestion(
       logSuggestionSuppressed(`pipeline_${suppressReason}`)
       return
     }
-
     const augmentedContext: REPLHookContext = {
       ...context,
       messages: [
@@ -365,22 +329,18 @@ async function generatePipelinedSuggestion(
         ...speculatedMessages,
       ],
     }
-
     const pipelineAbortController = createChildAbortController(
       parentAbortController,
     )
     if (pipelineAbortController.signal.aborted) return
-
     const promptId = getPromptVariant()
     const { suggestion, generationRequestId } = await generateSuggestion(
       pipelineAbortController,
       promptId,
       createCacheSafeParams(augmentedContext),
     )
-
     if (pipelineAbortController.signal.aborted) return
     if (shouldFilterSuggestion(suggestion, promptId)) return
-
     logForDebugging(
       `[Speculation] Pipelined suggestion: "${suggestion!.slice(0, 50)}..."`,
     )
@@ -398,7 +358,6 @@ async function generatePipelinedSuggestion(
     )
   }
 }
-
 export async function startSpeculation(
   suggestionText: string,
   context: REPLHookContext,
@@ -407,33 +366,24 @@ export async function startSpeculation(
   cacheSafeParams?: CacheSafeParams,
 ): Promise<void> {
   if (!isSpeculationEnabled()) return
-
-  // Abort any existing speculation before starting a new one
   abortSpeculation(setAppState)
-
   const id = randomUUID().slice(0, 8)
-
   const abortController = createChildAbortController(
     context.toolUseContext.abortController,
   )
-
   if (abortController.signal.aborted) return
-
   const startTime = Date.now()
   const messagesRef = { current: [] as Message[] }
   const writtenPathsRef = { current: new Set<string>() }
   const overlayPath = getOverlayPath(id)
   const cwd = getCwdState()
-
   try {
     await mkdir(overlayPath, { recursive: true })
   } catch {
     logForDebugging('[Speculation] Failed to create overlay directory')
     return
   }
-
   const contextRef = { current: context }
-
   setAppState(prev => ({
     ...prev,
     speculation: {
@@ -450,9 +400,7 @@ export async function startSpeculation(
       contextRef,
     },
   }))
-
   logForDebugging(`[Speculation] Starting speculation ${id}`)
-
   try {
     const result = await runForkedAgent({
       promptMessages: [createUserMessage({ content: suggestionText })],
@@ -461,18 +409,14 @@ export async function startSpeculation(
       canUseTool: async (tool, input) => {
         const isWriteTool = WRITE_TOOLS.has(tool.name)
         const isSafeReadOnlyTool = SAFE_READ_ONLY_TOOLS.has(tool.name)
-
-        // Check permission mode BEFORE allowing file edits
         if (isWriteTool) {
           const appState = context.toolUseContext.getAppState()
           const { mode, isBypassPermissionsModeAvailable } =
             appState.toolPermissionContext
-
           const canAutoAcceptEdits =
             mode === 'acceptEdits' ||
             mode === 'bypassPermissions' ||
             (mode === 'plan' && isBypassPermissionsModeAvailable)
-
           if (!canAutoAcceptEdits) {
             logForDebugging(`[Speculation] Stopping at file edit: ${tool.name}`)
             const editPath = (
@@ -493,8 +437,6 @@ export async function startSpeculation(
             )
           }
         }
-
-        // Handle file path rewriting for overlay isolation
         if (isWriteTool || isSafeReadOnlyTool) {
           const pathKey =
             'notebook_path' in input
@@ -524,32 +466,25 @@ export async function startSpeculation(
                 },
               }
             }
-
             if (isWriteTool) {
-              // Copy-on-write: copy original to overlay if not yet there
               if (!writtenPathsRef.current.has(rel)) {
                 const overlayFile = join(overlayPath, rel)
                 await mkdir(dirname(overlayFile), { recursive: true })
                 try {
                   await copyFile(join(cwd, rel), overlayFile)
                 } catch {
-                  // Original may not exist (new file creation) - that's fine
                 }
                 writtenPathsRef.current.add(rel)
               }
               input = { ...input, [pathKey]: join(overlayPath, rel) }
             } else {
-              // Read: redirect to overlay if file was previously written
               if (writtenPathsRef.current.has(rel)) {
                 input = { ...input, [pathKey]: join(overlayPath, rel) }
               }
-              // Otherwise read from main (no rewrite)
             }
-
             logForDebugging(
               `[Speculation] ${isWriteTool ? 'Write' : 'Read'} ${filePath} -> ${input[pathKey]}`,
             )
-
             return {
               behavior: 'allow' as const,
               updatedInput: input,
@@ -559,7 +494,6 @@ export async function startSpeculation(
               },
             }
           }
-          // Read tools without explicit path (e.g. Glob/Grep defaulting to CWD) are safe
           if (isSafeReadOnlyTool) {
             return {
               behavior: 'allow' as const,
@@ -570,10 +504,7 @@ export async function startSpeculation(
               },
             }
           }
-          // Write tools with undefined path → fall through to default deny
         }
-
-        // Stop at non-read-only bash commands
         if (tool.name === 'Bash') {
           const command =
             'command' in input && typeof input.command === 'string'
@@ -596,7 +527,6 @@ export async function startSpeculation(
               'speculation_bash_boundary',
             )
           }
-          // Read-only bash command — allow during speculation
           return {
             behavior: 'allow' as const,
             updatedInput: input,
@@ -606,8 +536,6 @@ export async function startSpeculation(
             },
           }
         }
-
-        // Deny all other tools by default
         logForDebugging(`[Speculation] Stopping at denied tool: ${tool.name}`)
         const detail = String(
           ('url' in input && input.url) ||
@@ -654,9 +582,7 @@ export async function startSpeculation(
         }
       },
     })
-
     if (abortController.signal.aborted) return
-
     updateActiveSpeculationState(setAppState, () => ({
       boundary: {
         type: 'complete' as const,
@@ -664,12 +590,9 @@ export async function startSpeculation(
         outputTokens: result.totalUsage.output_tokens,
       },
     }))
-
     logForDebugging(
       `[Speculation] Complete: ${countToolsInMessages(messagesRef.current)} tools`,
     )
-
-    // Pipeline: generate the next suggestion while we wait for the user to accept
     void generatePipelinedSuggestion(
       contextRef.current,
       suggestionText,
@@ -679,18 +602,13 @@ export async function startSpeculation(
     )
   } catch (error) {
     abortController.abort()
-
     if (error instanceof Error && error.name === 'AbortError') {
       safeRemoveOverlay(overlayPath)
       resetSpeculationState(setAppState)
       return
     }
-
     safeRemoveOverlay(overlayPath)
-
-    // eslint-disable-next-line no-restricted-syntax -- custom fallback message, not toError(e)
     logError(error instanceof Error ? error : new Error('Speculation failed'))
-
     logSpeculation(
       id,
       'error',
@@ -709,18 +627,15 @@ export async function startSpeculation(
         is_pipelined: isPipelined,
       },
     )
-
     resetSpeculationState(setAppState)
   }
 }
-
 export async function acceptSpeculation(
   state: SpeculationState,
   setAppState: (f: (prev: AppState) => AppState) => void,
   cleanMessageCount: number,
 ): Promise<SpeculationResult | null> {
   if (state.status !== 'active') return null
-
   const {
     id,
     messagesRef,
@@ -733,21 +648,15 @@ export async function acceptSpeculation(
   const messages = messagesRef.current
   const overlayPath = getOverlayPath(id)
   const acceptedAt = Date.now()
-
   abort()
-
   if (cleanMessageCount > 0) {
     await copyOverlayToMain(overlayPath, writtenPathsRef.current, getCwdState())
   }
   safeRemoveOverlay(overlayPath)
-
-  // Use snapshot boundary as default (available since state.status === 'active' was checked above)
   let boundary: CompletionBoundary | null = state.boundary
   let timeSavedMs =
     Math.min(acceptedAt, boundary?.completedAt ?? Infinity) - startTime
-
   setAppState(prev => {
-    // Refine with latest React state if speculation is still active
     if (prev.speculation.status === 'active' && prev.speculation.boundary) {
       boundary = prev.speculation.boundary
       const endTime = Math.min(acceptedAt, boundary.completedAt ?? Infinity)
@@ -760,13 +669,11 @@ export async function acceptSpeculation(
         prev.speculationSessionTimeSavedMs + timeSavedMs,
     }
   })
-
   logForDebugging(
     boundary === null
       ? `[Speculation] Accept ${id}: still running, using ${messages.length} messages`
       : `[Speculation] Accept ${id}: already complete`,
   )
-
   logSpeculation(
     id,
     'accepted',
@@ -780,7 +687,6 @@ export async function acceptSpeculation(
       is_pipelined: isPipelined,
     },
   )
-
   if (timeSavedMs > 0) {
     const entry: SpeculationAcceptMessage = {
       type: 'speculation-accept',
@@ -795,14 +701,11 @@ export async function acceptSpeculation(
       )
     })
   }
-
   return { messages, boundary, timeSavedMs }
 }
-
 export function abortSpeculation(setAppState: SetAppState): void {
   setAppState(prev => {
     if (prev.speculation.status !== 'active') return prev
-
     const {
       id,
       abort,
@@ -812,9 +715,7 @@ export function abortSpeculation(setAppState: SetAppState): void {
       messagesRef,
       isPipelined,
     } = prev.speculation
-
     logForDebugging(`[Speculation] Aborting ${id}`)
-
     logSpeculation(
       id,
       'aborted',
@@ -824,14 +725,11 @@ export function abortSpeculation(setAppState: SetAppState): void {
       boundary,
       { abort_reason: 'user_typed', is_pipelined: isPipelined },
     )
-
     abort()
     safeRemoveOverlay(getOverlayPath(id))
-
     return { ...prev, speculation: IDLE_SPECULATION_STATE }
   })
 }
-
 export async function handleSpeculationAccept(
   speculationState: ActiveSpeculationState,
   speculationSessionTimeSavedMs: number,
@@ -845,9 +743,6 @@ export async function handleSpeculationAccept(
 ): Promise<{ queryRequired: boolean }> {
   try {
     const { setMessages, readFileState, cwd } = deps
-
-    // Clear prompt suggestion state. logOutcomeAtSubmission logged the accept
-    // but was called with skipReset to avoid aborting speculation before we use it.
     setAppState(prev => {
       if (
         prev.promptSuggestion.text === null &&
@@ -866,35 +761,22 @@ export async function handleSpeculationAccept(
         },
       }
     })
-
-    // Capture speculation messages before any state updates - must be stable reference
     const speculationMessages = speculationState.messagesRef.current
     let cleanMessages = prepareMessagesForInjection(speculationMessages)
-
-    // Inject user message first for instant visual feedback before any async work
     const userMessage = createUserMessage({ content: input })
     setMessages(prev => [...prev, userMessage])
-
     const result = await acceptSpeculation(
       speculationState,
       setAppState,
       cleanMessages.length,
     )
-
     const isComplete = result?.boundary?.type === 'complete'
-
-    // When speculation didn't complete, the follow-up query needs the
-    // conversation to end with a user message. Drop trailing assistant
-    // messages — models that don't support prefill
-    // reject conversations ending with an assistant turn. The model will
-    // regenerate this content in the follow-up query.
     if (!isComplete) {
       const lastNonAssistant = cleanMessages.findLastIndex(
         m => m.type !== 'assistant',
       )
       cleanMessages = cleanMessages.slice(0, lastNonAssistant + 1)
     }
-
     const timeSavedMs = result?.timeSavedMs ?? 0
     const newSessionTotal = speculationSessionTimeSavedMs + timeSavedMs
     const feedbackMessage = createSpeculationFeedbackMessage(
@@ -903,10 +785,7 @@ export async function handleSpeculationAccept(
       timeSavedMs,
       newSessionTotal,
     )
-
-    // Inject speculated messages
     setMessages(prev => [...prev, ...cleanMessages])
-
     const extracted = extractReadFilesFromMessages(
       cleanMessages,
       cwd,
@@ -916,16 +795,12 @@ export async function handleSpeculationAccept(
       readFileState.current,
       extracted,
     )
-
     if (feedbackMessage) {
       setMessages(prev => [...prev, feedbackMessage])
     }
-
     logForDebugging(
       `[Speculation] ${result?.boundary?.type ?? 'incomplete'}, injected ${cleanMessages.length} messages`,
     )
-
-    // Promote pipelined suggestion if speculation completed fully
     if (isComplete && speculationState.pipelinedSuggestion) {
       const { text, promptId, generationRequestId } =
         speculationState.pipelinedSuggestion
@@ -942,8 +817,6 @@ export async function handleSpeculationAccept(
           generationRequestId,
         },
       }))
-
-      // Start speculation on the pipelined suggestion
       const augmentedContext: REPLHookContext = {
         ...speculationState.contextRef.current,
         messages: [
@@ -954,17 +827,13 @@ export async function handleSpeculationAccept(
       }
       void startSpeculation(text, augmentedContext, setAppState, true)
     }
-
     return { queryRequired: !isComplete }
   } catch (error) {
-    // Fail open: log error and fall back to normal query flow
-    /* eslint-disable no-restricted-syntax -- custom fallback message, not toError(e) */
     logError(
       error instanceof Error
         ? error
         : new Error('handleSpeculationAccept failed'),
     )
-    /* eslint-enable no-restricted-syntax */
     logSpeculation(
       speculationState.id,
       'error',
@@ -985,7 +854,6 @@ export async function handleSpeculationAccept(
     )
     safeRemoveOverlay(getOverlayPath(speculationState.id))
     resetSpeculationState(setAppState)
-    // Query required so user's message is processed normally (without speculated work)
     return { queryRequired: true }
   }
 }

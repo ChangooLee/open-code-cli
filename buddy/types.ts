@@ -6,14 +6,7 @@ export const RARITIES = [
   'legendary',
 ] as const
 export type Rarity = (typeof RARITIES)[number]
-
-// One species name collides with a model-codename canary in excluded-strings.txt.
-// The check greps build output (not source), so runtime-constructing the value keeps
-// the literal out of the bundle while the check stays armed for the actual codename.
-// All species encoded uniformly; `as` casts are type-position only (erased pre-bundle).
 const c = String.fromCharCode
-// biome-ignore format: keep the species list compact
-
 export const duck = c(0x64,0x75,0x63,0x6b) as 'duck'
 export const goose = c(0x67, 0x6f, 0x6f, 0x73, 0x65) as 'goose'
 export const blob = c(0x62, 0x6c, 0x6f, 0x62) as 'blob'
@@ -50,7 +43,6 @@ export const mushroom = c(
   0x6d,
 ) as 'mushroom'
 export const chonk = c(0x63, 0x68, 0x6f, 0x6e, 0x6b) as 'chonk'
-
 export const SPECIES = [
   duck,
   goose,
@@ -71,11 +63,9 @@ export const SPECIES = [
   mushroom,
   chonk,
 ] as const
-export type Species = (typeof SPECIES)[number] // biome-ignore format: keep compact
-
+export type Species = (typeof SPECIES)[number] 
 export const EYES = ['·', '✦', '×', '◉', '@', '°'] as const
 export type Eye = (typeof EYES)[number]
-
 export const HATS = [
   'none',
   'crown',
@@ -87,7 +77,6 @@ export const HATS = [
   'tinyduck',
 ] as const
 export type Hat = (typeof HATS)[number]
-
 export const STAT_NAMES = [
   'DEBUGGING',
   'PATIENCE',
@@ -96,8 +85,6 @@ export const STAT_NAMES = [
   'SNARK',
 ] as const
 export type StatName = (typeof STAT_NAMES)[number]
-
-// Deterministic parts — based on hash(userId)
 export type CompanionBones = {
   rarity: Rarity
   species: Species
@@ -106,23 +93,15 @@ export type CompanionBones = {
   shiny: boolean
   stats: Record<StatName, number>
 }
-
-// Model-generated soul — stored in config after first hatch
 export type CompanionSoul = {
   name: string
   personality: string
 }
-
 export type Companion = CompanionBones &
   CompanionSoul & {
     hatchedAt: number
   }
-
-// What actually persists in config. Bones are regenerated from hash(userId)
-// on every read so species renames don't break stored companions and users
-// can't edit their way to a legendary.
 export type StoredCompanion = CompanionSoul & { hatchedAt: number }
-
 export const RARITY_WEIGHTS = {
   common: 60,
   uncommon: 25,
@@ -130,7 +109,6 @@ export const RARITY_WEIGHTS = {
   epic: 4,
   legendary: 1,
 } as const satisfies Record<Rarity, number>
-
 export const RARITY_STARS = {
   common: '★',
   uncommon: '★★',
@@ -138,7 +116,6 @@ export const RARITY_STARS = {
   epic: '★★★★',
   legendary: '★★★★★',
 } as const satisfies Record<Rarity, string>
-
 export const RARITY_COLORS = {
   common: 'inactive',
   uncommon: 'success',

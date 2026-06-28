@@ -1,10 +1,5 @@
 import type { MCPServerConnection } from '../../services/mcp/types.js'
 import type { LoadedPlugin, PluginError } from '../../types/plugin.js'
-
-/**
- * A row in the unified "Installed" list, which interleaves installed plugins,
- * flagged/failed plugins, and standalone or plugin-provided MCP servers.
- */
 export type UnifiedInstalledItem =
   | {
       type: 'plugin'

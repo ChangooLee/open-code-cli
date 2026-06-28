@@ -12,15 +12,6 @@ import {
   PluginMarketplaceEntrySchema,
   PluginMarketplaceSchema,
 } from './schemas.js'
-
-/**
- * Fields that belong in marketplace.json entries (PluginMarketplaceEntrySchema)
- * but not plugin.json (PluginManifestSchema). Plugin authors reasonably copy
- * one into the other. Surfaced as warnings by `open-code-cli plugin validate` since
- * they're a known confusion point — the load path silently strips all unknown
- * keys via zod's default behavior, so they're harmless at runtime but worth
- * flagging to authors.
- */
 const MARKETPLACE_ONLY_MANIFEST_FIELDS = new Set([
   'category',
   'source',
@@ -28,7 +19,6 @@ const MARKETPLACE_ONLY_MANIFEST_FIELDS = new Set([
   'strict',
   'id',
 ])
-
 export type ValidationResult = {
   success: boolean
   errors: ValidationError[]
@@ -36,42 +26,27 @@ export type ValidationResult = {
   filePath: string
   fileType: 'plugin' | 'marketplace' | 'skill' | 'agent' | 'command' | 'hooks'
 }
-
 export type ValidationError = {
   path: string
   message: string
   code?: string
 }
-
 export type ValidationWarning = {
   path: string
   message: string
 }
-
-/**
- * Detect whether a file is a plugin manifest or marketplace manifest
- */
 function detectManifestType(
   filePath: string,
 ): 'plugin' | 'marketplace' | 'unknown' {
   const fileName = path.basename(filePath)
   const dirName = path.basename(path.dirname(filePath))
-
-  // Check filename patterns
   if (fileName === 'plugin.json') return 'plugin'
   if (fileName === 'marketplace.json') return 'marketplace'
-
-  // Check if it's in .open-code-cli-plugin directory
   if (dirName === '.open-code-cli-plugin') {
-    return 'plugin' // Most likely plugin.json
+    return 'plugin' 
   }
-
   return 'unknown'
 }
-
-/**
- * Format Zod validation errors into a readable format
- */
 function formatZodErrors(zodError: z.ZodError): ValidationError[] {
   return zodError.issues.map(error => ({
     path: error.path.join('.') || 'root',
@@ -79,16 +54,6 @@ function formatZodErrors(zodError: z.ZodError): ValidationError[] {
     code: error.code,
   }))
 }
-
-/**
- * Check for parent-directory segments ('..') in a path string.
- *
- * For plugin.json component paths this is a security concern (escaping the plugin dir).
- * For marketplace.json source paths it's almost always a resolution-base misunderstanding:
- * paths resolve from the marketplace repo root, not from marketplace.json itself, so the
- * '..' a user added to "climb out of .open-code-cli-plugin/" is unnecessary. Callers pass `hint`
- * to attach the right explanation.
- */
 function checkPathTraversal(
   p: string,
   field: string,
@@ -104,16 +69,7 @@ function checkPathTraversal(
     })
   }
 }
-
-// Shown when a marketplace plugin source contains '..'. Most users hit this because
-// they expect paths to resolve relative to marketplace.json (inside .open-code-cli-plugin/),
-// but resolution actually starts at the marketplace repo root — see gh-29485.
-// Computes a tailored "use X instead of Y" suggestion from the user's actual path
-// rather than a hardcoded example (review feedback on #20895).
 function marketplaceSourceHint(p: string): string {
-  // Strip leading ../ segments: the '..' a user added to "climb out of
-  // .open-code-cli-plugin/" is unnecessary since paths already start at the repo root.
-  // If '..' appears mid-path (rare), fall back to a generic example.
   const stripped = p.replace(/^(\.\.\/)+/, '')
   const corrected = stripped !== p ? `./${stripped}` : './plugins/my-plugin'
   return (
@@ -122,18 +78,12 @@ function marketplaceSourceHint(p: string): string {
     `Use "${corrected}" instead of "${p}".`
   )
 }
-
-/**
- * Validate a plugin manifest file (plugin.json)
- */
 export async function validatePluginManifest(
   filePath: string,
 ): Promise<ValidationResult> {
   const errors: ValidationError[] = []
   const warnings: ValidationWarning[] = []
   const absolutePath = path.resolve(filePath)
-
-  // Read file content — handle ENOENT / EISDIR / permission errors directly
   let content: string
   try {
     content = await readFile(absolutePath, { encoding: 'utf-8' })
@@ -155,7 +105,6 @@ export async function validatePluginManifest(
       fileType: 'plugin',
     }
   }
-
   let parsed: unknown
   try {
     parsed = jsonParse(content)
@@ -173,13 +122,8 @@ export async function validatePluginManifest(
       fileType: 'plugin',
     }
   }
-
-  // Check for path traversal in the parsed JSON before schema validation
-  // This ensures we catch security issues even if schema validation fails
   if (parsed && typeof parsed === 'object') {
     const obj = parsed as Record<string, unknown>
-
-    // Check commands
     if (obj.commands) {
       const commands = Array.isArray(obj.commands)
         ? obj.commands
@@ -190,8 +134,6 @@ export async function validatePluginManifest(
         }
       })
     }
-
-    // Check agents
     if (obj.agents) {
       const agents = Array.isArray(obj.agents) ? obj.agents : [obj.agents]
       agents.forEach((agent, i) => {
@@ -200,8 +142,6 @@ export async function validatePluginManifest(
         }
       })
     }
-
-    // Check skills
     if (obj.skills) {
       const skills = Array.isArray(obj.skills) ? obj.skills : [obj.skills]
       skills.forEach((skill, i) => {
@@ -211,13 +151,6 @@ export async function validatePluginManifest(
       })
     }
   }
-
-  // Surface marketplace-only fields as a warning BEFORE validation flags
-  // them. `open-code-cli plugin validate` is a developer tool — authors running it
-  // want to know these fields don't belong here. But it's a warning, not an
-  // error: the plugin loads fine at runtime (the base schema strips unknown
-  // keys). We strip them here so the .strict() call below doesn't double-
-  // report them as unrecognized-key errors on top of the targeted warnings.
   let toValidate = parsed
   if (typeof parsed === 'object' && parsed !== null) {
     const obj = parsed as Record<string, unknown>
@@ -239,24 +172,12 @@ export async function validatePluginManifest(
       toValidate = stripped
     }
   }
-
-  // Validate against schema (post-strip, so marketplace fields don't fail it).
-  // We call .strict() locally here even though the base schema is lenient —
-  // the runtime load path silently strips unknown keys for resilience, but
-  // this is a developer tool and authors running it want typo feedback.
   const result = PluginManifestSchema().strict().safeParse(toValidate)
-
   if (!result.success) {
     errors.push(...formatZodErrors(result.error))
   }
-
-  // Check for common issues and add warnings
   if (result.success) {
     const manifest = result.data
-
-    // Warn if name isn't strict kebab-case. CC's schema only rejects spaces,
-    // but the Open Code CLI marketplace sync rejects non-kebab names. Surfacing
-    // this here lets authors catch it in CI before the sync fails on them.
     if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(manifest.name)) {
       warnings.push({
         path: 'name',
@@ -266,8 +187,6 @@ export async function validatePluginManifest(
           `(lowercase letters, digits, and hyphens only, e.g., "my-plugin").`,
       })
     }
-
-    // Warn if no version specified
     if (!manifest.version) {
       warnings.push({
         path: 'version',
@@ -275,8 +194,6 @@ export async function validatePluginManifest(
           'No version specified. Consider adding a version following semver (e.g., "1.0.0")',
       })
     }
-
-    // Warn if no description
     if (!manifest.description) {
       warnings.push({
         path: 'description',
@@ -284,8 +201,6 @@ export async function validatePluginManifest(
           'No description provided. Adding a description helps users understand what your plugin does',
       })
     }
-
-    // Warn if no author
     if (!manifest.author) {
       warnings.push({
         path: 'author',
@@ -294,7 +209,6 @@ export async function validatePluginManifest(
       })
     }
   }
-
   return {
     success: errors.length === 0,
     errors,
@@ -303,18 +217,12 @@ export async function validatePluginManifest(
     fileType: 'plugin',
   }
 }
-
-/**
- * Validate a marketplace manifest file (marketplace.json)
- */
 export async function validateMarketplaceManifest(
   filePath: string,
 ): Promise<ValidationResult> {
   const errors: ValidationError[] = []
   const warnings: ValidationWarning[] = []
   const absolutePath = path.resolve(filePath)
-
-  // Read file content — handle ENOENT / EISDIR / permission errors directly
   let content: string
   try {
     content = await readFile(absolutePath, { encoding: 'utf-8' })
@@ -336,7 +244,6 @@ export async function validateMarketplaceManifest(
       fileType: 'marketplace',
     }
   }
-
   let parsed: unknown
   try {
     parsed = jsonParse(content)
@@ -354,17 +261,12 @@ export async function validateMarketplaceManifest(
       fileType: 'marketplace',
     }
   }
-
-  // Check for path traversal in plugin sources before schema validation
-  // This ensures we catch security issues even if schema validation fails
   if (parsed && typeof parsed === 'object') {
     const obj = parsed as Record<string, unknown>
-
     if (Array.isArray(obj.plugins)) {
       obj.plugins.forEach((plugin: unknown, i: number) => {
         if (plugin && typeof plugin === 'object' && 'source' in plugin) {
           const source = (plugin as { source: unknown }).source
-          // Check string sources (relative paths)
           if (typeof source === 'string') {
             checkPathTraversal(
               source,
@@ -373,10 +275,6 @@ export async function validateMarketplaceManifest(
               marketplaceSourceHint(source),
             )
           }
-          // Check object-source .path (git-subdir: subdirectory within the
-          // remote repo, sparse-cloned). '..' here is a genuine traversal attempt
-          // within the remote repo tree, not a marketplace-root misunderstanding —
-          // keep the security framing (no marketplaceSourceHint). See #20895 review.
           if (
             source &&
             typeof source === 'object' &&
@@ -393,40 +291,25 @@ export async function validateMarketplaceManifest(
       })
     }
   }
-
-  // Validate against schema.
-  // The base schemas are lenient (strip unknown keys) for runtime resilience,
-  // but this is a developer tool — authors want typo feedback. We rebuild the
-  // schema with .strict() here. Note .strict() on the outer object does NOT
-  // propagate into z.array() elements, so we also override the plugins array
-  // with strict entries to catch typos inside individual plugin entries too.
   const strictMarketplaceSchema = PluginMarketplaceSchema()
     .extend({
       plugins: z.array(PluginMarketplaceEntrySchema().strict()),
     })
     .strict()
   const result = strictMarketplaceSchema.safeParse(parsed)
-
   if (!result.success) {
     errors.push(...formatZodErrors(result.error))
   }
-
-  // Check for common issues and add warnings
   if (result.success) {
     const marketplace = result.data
-
-    // Warn if no plugins
     if (!marketplace.plugins || marketplace.plugins.length === 0) {
       warnings.push({
         path: 'plugins',
         message: 'Marketplace has no plugins defined',
       })
     }
-
-    // Check each plugin entry
     if (marketplace.plugins) {
       marketplace.plugins.forEach((plugin, i) => {
-        // Check for duplicate plugin names
         const duplicates = marketplace.plugins.filter(
           p => p.name === plugin.name,
         )
@@ -437,14 +320,6 @@ export async function validateMarketplaceManifest(
           })
         }
       })
-
-      // Version-mismatch check: for local-source entries that declare a
-      // version, compare against the plugin's own plugin.json. At install
-      // time, calculatePluginVersion (pluginVersioning.ts) prefers the
-      // manifest version and silently ignores the entry version — so a
-      // stale entry.version is invisible user confusion (marketplace UI
-      // shows one version, /status shows another after install).
-      // Only local sources: remote sources would need cloning to check.
       const manifestDir = path.dirname(absolutePath)
       const marketplaceRoot =
         path.basename(manifestDir) === '.open-code-cli-plugin'
@@ -472,7 +347,6 @@ export async function validateMarketplaceManifest(
             manifestVersion = parsed.version
           }
         } catch {
-          // Missing/unreadable plugin.json is someone else's error to report
           continue
         }
         if (manifestVersion && manifestVersion !== entry.version) {
@@ -486,8 +360,6 @@ export async function validateMarketplaceManifest(
         }
       }
     }
-
-    // Warn if no description in metadata
     if (!marketplace.metadata?.description) {
       warnings.push({
         path: 'metadata.description',
@@ -496,7 +368,6 @@ export async function validateMarketplaceManifest(
       })
     }
   }
-
   return {
     success: errors.length === 0,
     errors,
@@ -505,15 +376,6 @@ export async function validateMarketplaceManifest(
     fileType: 'marketplace',
   }
 }
-/**
- * Validate the YAML frontmatter in a plugin component markdown file.
- *
- * The runtime loader (parseFrontmatter) silently drops unparseable YAML to a
- * debug log and returns an empty object. That's the right resilience choice
- * for the load path, but authors running `open-code-cli plugin validate` want a hard
- * signal. This re-parses the frontmatter block and surfaces what the loader
- * would silently swallow.
- */
 function validateComponentFile(
   filePath: string,
   content: string,
@@ -521,7 +383,6 @@ function validateComponentFile(
 ): ValidationResult {
   const errors: ValidationError[] = []
   const warnings: ValidationWarning[] = []
-
   const match = content.match(FRONTMATTER_REGEX)
   if (!match) {
     warnings.push({
@@ -532,7 +393,6 @@ function validateComponentFile(
     })
     return { success: true, errors, warnings, filePath, fileType }
   }
-
   const frontmatterText = match[1] || ''
   let parsed: unknown
   try {
@@ -547,7 +407,6 @@ function validateComponentFile(
     })
     return { success: false, errors, warnings, filePath, fileType }
   }
-
   if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
     errors.push({
       path: 'frontmatter',
@@ -557,10 +416,7 @@ function validateComponentFile(
     })
     return { success: false, errors, warnings, filePath, fileType }
   }
-
   const fm = parsed as Record<string, unknown>
-
-  // description: must be scalar. coerceDescriptionToString logs+drops arrays/objects at runtime.
   if (fm.description !== undefined) {
     const d = fm.description
     if (
@@ -584,9 +440,6 @@ function validateComponentFile(
         `understand when to use this ${fileType}.`,
     })
   }
-
-  // name: if present, must be a string (skills/commands use it as displayName;
-  // plugin agents use it as the agentType stem — non-strings would stringify to garbage)
   if (
     fm.name !== undefined &&
     fm.name !== null &&
@@ -597,8 +450,6 @@ function validateComponentFile(
       message: `name must be a string, got ${typeof fm.name}.`,
     })
   }
-
-  // allowed-tools: string or array of strings
   const at = fm['allowed-tools']
   if (at !== undefined && at !== null) {
     if (typeof at !== 'string' && !Array.isArray(at)) {
@@ -613,8 +464,6 @@ function validateComponentFile(
       })
     }
   }
-
-  // shell: 'bash' | 'powershell' (controls !`cmd` block routing)
   const sh = fm.shell
   if (sh !== undefined && sh !== null) {
     if (typeof sh !== 'string') {
@@ -623,8 +472,6 @@ function validateComponentFile(
         message: `shell must be a string, got ${typeof sh}.`,
       })
     } else {
-      // Normalize to match parseShellFrontmatter() runtime behavior —
-      // `shell: PowerShell` should not fail validation but work at runtime.
       const normalized = sh.trim().toLowerCase()
       if (normalized !== 'bash' && normalized !== 'powershell') {
         errors.push({
@@ -634,22 +481,14 @@ function validateComponentFile(
       }
     }
   }
-
   return { success: errors.length === 0, errors, warnings, filePath, fileType }
 }
-
-/**
- * Validate a plugin's hooks.json file. Unlike frontmatter, this one HARD-ERRORS
- * at runtime (pluginLoader uses .parse() not .safeParse()) — a bad hooks.json
- * breaks the whole plugin. Surfacing it here is essential.
- */
 async function validateHooksJson(filePath: string): Promise<ValidationResult> {
   let content: string
   try {
     content = await readFile(filePath, { encoding: 'utf-8' })
   } catch (e: unknown) {
     const code = getErrnoCode(e)
-    // ENOENT is fine — hooks are optional
     if (code === 'ENOENT') {
       return {
         success: true,
@@ -669,7 +508,6 @@ async function validateHooksJson(filePath: string): Promise<ValidationResult> {
       fileType: 'hooks',
     }
   }
-
   let parsed: unknown
   try {
     parsed = jsonParse(content)
@@ -689,7 +527,6 @@ async function validateHooksJson(filePath: string): Promise<ValidationResult> {
       fileType: 'hooks',
     }
   }
-
   const result = PluginHooksSchema().safeParse(parsed)
   if (!result.success) {
     return {
@@ -700,7 +537,6 @@ async function validateHooksJson(filePath: string): Promise<ValidationResult> {
       fileType: 'hooks',
     }
   }
-
   return {
     success: true,
     errors: [],
@@ -709,12 +545,6 @@ async function validateHooksJson(filePath: string): Promise<ValidationResult> {
     fileType: 'hooks',
   }
 }
-
-/**
- * Recursively collect .md files under a directory. Uses withFileTypes to
- * avoid a stat per entry. Returns absolute paths so error messages stay
- * readable.
- */
 async function collectMarkdown(
   dir: string,
   isSkillsDir: boolean,
@@ -727,18 +557,11 @@ async function collectMarkdown(
     if (code === 'ENOENT' || code === 'ENOTDIR') return []
     throw e
   }
-
-  // Skills use <name>/SKILL.md — only descend one level, only collect SKILL.md.
-  // Matches the runtime loader: single .md files in skills/ are NOT loaded,
-  // and subdirectories of a skill dir aren't scanned. Paths are speculative
-  // (the subdir may lack SKILL.md); the caller handles ENOENT.
   if (isSkillsDir) {
     return entries
       .filter(e => e.isDirectory())
       .map(e => path.join(dir, e.name, 'SKILL.md'))
   }
-
-  // Commands/agents: recurse and collect all .md files.
   const out: string[] = []
   for (const entry of entries) {
     const full = path.join(dir, entry.name)
@@ -750,27 +573,15 @@ async function collectMarkdown(
   }
   return out
 }
-
-/**
- * Validate the content files inside a plugin directory — skills, agents,
- * commands, and hooks.json. Scans the default component directories (the
- * manifest can declare custom paths but the default layout covers the vast
- * majority of plugins; this is a linter, not a loader).
- *
- * Returns one ValidationResult per file that has errors or warnings. A clean
- * plugin returns an empty array.
- */
 export async function validatePluginContents(
   pluginDir: string,
 ): Promise<ValidationResult[]> {
   const results: ValidationResult[] = []
-
   const dirs: Array<['skill' | 'agent' | 'command', string]> = [
     ['skill', path.join(pluginDir, 'skills')],
     ['agent', path.join(pluginDir, 'agents')],
     ['command', path.join(pluginDir, 'commands')],
   ]
-
   for (const [fileType, dir] of dirs) {
     const files = await collectMarkdown(dir, fileType === 'skill')
     for (const filePath of files) {
@@ -778,7 +589,6 @@ export async function validatePluginContents(
       try {
         content = await readFile(filePath, { encoding: 'utf-8' })
       } catch (e: unknown) {
-        // ENOENT is expected for speculative skill paths (subdirs without SKILL.md)
         if (isENOENT(e)) continue
         results.push({
           success: false,
@@ -797,26 +607,18 @@ export async function validatePluginContents(
       }
     }
   }
-
   const hooksResult = await validateHooksJson(
     path.join(pluginDir, 'hooks', 'hooks.json'),
   )
   if (hooksResult.errors.length > 0 || hooksResult.warnings.length > 0) {
     results.push(hooksResult)
   }
-
   return results
 }
-
-/**
- * Validate a manifest file or directory (auto-detects type)
- */
 export async function validateManifest(
   filePath: string,
 ): Promise<ValidationResult> {
   const absolutePath = path.resolve(filePath)
-
-  // Stat path to check if it's a directory — handle ENOENT inline
   let stats: Stats | null = null
   try {
     stats = await stat(absolutePath)
@@ -825,27 +627,21 @@ export async function validateManifest(
       throw e
     }
   }
-
   if (stats?.isDirectory()) {
-    // Look for manifest files in .open-code-cli-plugin directory
-    // Prefer marketplace.json over plugin.json
     const marketplacePath = path.join(
       absolutePath,
       '.open-code-cli-plugin',
       'marketplace.json',
     )
     const marketplaceResult = await validateMarketplaceManifest(marketplacePath)
-    // Only fall through if the marketplace file was not found (ENOENT)
     if (marketplaceResult.errors[0]?.code !== 'ENOENT') {
       return marketplaceResult
     }
-
     const pluginPath = path.join(absolutePath, '.open-code-cli-plugin', 'plugin.json')
     const pluginResult = await validatePluginManifest(pluginPath)
     if (pluginResult.errors[0]?.code !== 'ENOENT') {
       return pluginResult
     }
-
     return {
       success: false,
       errors: [
@@ -859,21 +655,16 @@ export async function validateManifest(
       fileType: 'plugin',
     }
   }
-
   const manifestType = detectManifestType(filePath)
-
   switch (manifestType) {
     case 'plugin':
       return validatePluginManifest(filePath)
     case 'marketplace':
       return validateMarketplaceManifest(filePath)
     case 'unknown': {
-      // Try to parse and guess based on content
       try {
         const content = await readFile(absolutePath, { encoding: 'utf-8' })
         const parsed = jsonParse(content) as Record<string, unknown>
-
-        // Heuristic: if it has a "plugins" array, it's probably a marketplace
         if (Array.isArray(parsed.plugins)) {
           return validateMarketplaceManifest(filePath)
         }
@@ -893,10 +684,7 @@ export async function validateManifest(
             fileType: 'plugin', // Default to plugin for error reporting
           }
         }
-        // Fall through to default validation for other errors (e.g., JSON parse)
       }
-
-      // Default: validate as plugin manifest
       return validatePluginManifest(filePath)
     }
   }

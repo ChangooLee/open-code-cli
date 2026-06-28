@@ -8,7 +8,6 @@ import type { ShellCommand } from '../ShellCommand.js'
 import { invalidateSessionEnvCache } from '../sessionEnvironment.js'
 import { jsonParse, jsonStringify } from '../slowOperations.js'
 import { emitHookResponse, startHookProgressInterval } from './hookEvents.js'
-
 export type PendingAsyncHook = {
   processId: string
   hookId: string
@@ -23,10 +22,7 @@ export type PendingAsyncHook = {
   shellCommand?: ShellCommand
   stopProgressInterval: () => void
 }
-
-// Global registry state
 const pendingHooks = new Map<string, PendingAsyncHook>()
-
 export function registerPendingAsyncHook({
   processId,
   hookId,
@@ -48,7 +44,7 @@ export function registerPendingAsyncHook({
   toolName?: string
   pluginId?: string
 }): void {
-  const timeout = asyncResponse.asyncTimeout || 15000 // Default 15s
+  const timeout = asyncResponse.asyncTimeout || 15000 
   logForDebugging(
     `Hooks: Registering async hook ${processId} (${hookName}) with timeout ${timeout}ms`,
   )
@@ -81,13 +77,11 @@ export function registerPendingAsyncHook({
     stopProgressInterval,
   })
 }
-
 export function getPendingAsyncHooks(): PendingAsyncHook[] {
   return Array.from(pendingHooks.values()).filter(
     hook => !hook.responseAttachmentSent,
   )
 }
-
 async function finalizeHook(
   hook: PendingAsyncHook,
   exitCode: number,
@@ -109,7 +103,6 @@ async function finalizeHook(
     outcome,
   })
 }
-
 export async function checkForAsyncHookResponses(): Promise<
   Array<{
     processId: string
@@ -134,13 +127,9 @@ export async function checkForAsyncHookResponses(): Promise<
     stderr: string
     exitCode?: number
   }[] = []
-
   const pendingCount = pendingHooks.size
   logForDebugging(`Hooks: Found ${pendingCount} total hooks in registry`)
-
-  // Snapshot hooks before processing — we'll mutate the map after.
   const hooks = Array.from(pendingHooks.values())
-
   const settled = await Promise.allSettled(
     hooks.map(async hook => {
       const stdout = (await hook.shellCommand?.taskOutput.getStdout()) ?? ''
@@ -148,7 +137,6 @@ export async function checkForAsyncHookResponses(): Promise<
       logForDebugging(
         `Hooks: Checking hook ${hook.processId} (${hook.hookName}) - attachmentSent: ${hook.responseAttachmentSent}, stdout length: ${stdout.length}`,
       )
-
       if (!hook.shellCommand) {
         logForDebugging(
           `Hooks: Hook ${hook.processId} has no shell command, removing from registry`,
@@ -156,9 +144,7 @@ export async function checkForAsyncHookResponses(): Promise<
         hook.stopProgressInterval()
         return { type: 'remove' as const, processId: hook.processId }
       }
-
       logForDebugging(`Hooks: Hook shell status ${hook.shellCommand.status}`)
-
       if (hook.shellCommand.status === 'killed') {
         logForDebugging(
           `Hooks: Hook ${hook.processId} is ${hook.shellCommand.status}, removing from registry`,
@@ -167,11 +153,9 @@ export async function checkForAsyncHookResponses(): Promise<
         hook.shellCommand.cleanup()
         return { type: 'remove' as const, processId: hook.processId }
       }
-
       if (hook.shellCommand.status !== 'completed') {
         return { type: 'skip' as const }
       }
-
       if (hook.responseAttachmentSent || !stdout.trim()) {
         logForDebugging(
           `Hooks: Skipping hook ${hook.processId} - already delivered/sent or no stdout`,
@@ -179,15 +163,12 @@ export async function checkForAsyncHookResponses(): Promise<
         hook.stopProgressInterval()
         return { type: 'remove' as const, processId: hook.processId }
       }
-
       const lines = stdout.split('\n')
       logForDebugging(
         `Hooks: Processing ${lines.length} lines of stdout for ${hook.processId}`,
       )
-
       const execResult = await hook.shellCommand.result
       const exitCode = execResult.code
-
       let response: SyncHookJSONOutput = {}
       for (const line of lines) {
         if (line.trim().startsWith('{')) {
@@ -210,10 +191,8 @@ export async function checkForAsyncHookResponses(): Promise<
           }
         }
       }
-
       hook.responseAttachmentSent = true
       await finalizeHook(hook, exitCode, exitCode === 0 ? 'success' : 'error')
-
       return {
         type: 'response' as const,
         processId: hook.processId,
@@ -232,9 +211,6 @@ export async function checkForAsyncHookResponses(): Promise<
       }
     }),
   )
-
-  // allSettled — isolate failures so one throwing callback doesn't orphan
-  // already-applied side effects (responseAttachmentSent, finalizeHook) from others.
   let sessionStartCompleted = false
   for (const s of settled) {
     if (s.status !== 'fulfilled') {
@@ -253,20 +229,17 @@ export async function checkForAsyncHookResponses(): Promise<
       if (r.isSessionStart) sessionStartCompleted = true
     }
   }
-
   if (sessionStartCompleted) {
     logForDebugging(
       `Invalidating session env cache after SessionStart hook completed`,
     )
     invalidateSessionEnvCache()
   }
-
   logForDebugging(
     `Hooks: checkForNewResponses returning ${responses.length} responses`,
   )
   return responses
 }
-
 export function removeDeliveredAsyncHooks(processIds: string[]): void {
   for (const processId of processIds) {
     const hook = pendingHooks.get(processId)
@@ -277,7 +250,6 @@ export function removeDeliveredAsyncHooks(processIds: string[]): void {
     }
   }
 }
-
 export async function finalizePendingAsyncHooks(): Promise<void> {
   const hooks = Array.from(pendingHooks.values())
   await Promise.all(
@@ -299,8 +271,6 @@ export async function finalizePendingAsyncHooks(): Promise<void> {
   )
   pendingHooks.clear()
 }
-
-// Test utility function to clear all hooks
 export function clearAllAsyncHooks(): void {
   for (const hook of pendingHooks.values()) {
     hook.stopProgressInterval()

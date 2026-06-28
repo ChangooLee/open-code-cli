@@ -10,7 +10,6 @@ import {
   OpenAICompatibleClient,
   resolveProviderConfig,
 } from './openaiCompatible.js'
-
 export async function getProviderClient({
   apiKey,
   maxRetries,
@@ -39,18 +38,15 @@ export async function getProviderClient({
       : {}),
     ...(clientApp ? { 'x-client-app': clientApp } : {}),
   }
-
   logForDebugging(
     `[API:request] Creating OpenAI-compatible client, OPEN_CODE_CLI_CUSTOM_HEADERS present: ${!!process.env.OPEN_CODE_CLI_CUSTOM_HEADERS}, has Authorization header: ${!!customHeaders['Authorization']}, source=${source ?? 'unknown'}, model=${model ?? 'default'}, maxRetries=${maxRetries}`,
   )
-
   const additionalProtectionEnabled = isEnvTruthy(
     getOpenCodeCliEnv('ADDITIONAL_PROTECTION'),
   )
   if (additionalProtectionEnabled) {
     defaultHeaders['x-open-code-cli-additional-protection'] = 'true'
   }
-
   const resolvedFetch = buildFetch(fetchOverride, source)
   const resolvedApiKey =
     apiKey ??
@@ -65,20 +61,13 @@ export async function getProviderClient({
     }),
   )
 }
-
 function getCustomHeaders(): Record<string, string> {
   const customHeaders: Record<string, string> = {}
   const customHeadersEnv = process.env.OPEN_CODE_CLI_CUSTOM_HEADERS
-
   if (!customHeadersEnv) return customHeaders
-
-  // Split by newlines to support multiple headers
   const headerStrings = customHeadersEnv.split(/\n|\r\n/)
-
   for (const headerString of headerStrings) {
     if (!headerString.trim()) continue
-
-    // Parse header in format "Name: Value" (curl style). Split on first `:`
     const colonIdx = headerString.indexOf(':')
     if (colonIdx === -1) continue
     const name = headerString.slice(0, colonIdx).trim()
@@ -87,33 +76,26 @@ function getCustomHeaders(): Record<string, string> {
       customHeaders[name] = value
     }
   }
-
   return customHeaders
 }
-
 export const CLIENT_REQUEST_ID_HEADER = 'x-client-request-id'
-
 function buildFetch(
   fetchOverride: ClientOptions['fetch'],
   source: string | undefined,
 ): ClientOptions['fetch'] {
-  // eslint-disable-next-line eslint-plugin-n/no-unsupported-features/node-builtins
   const inner = fetchOverride ?? globalThis.fetch
   return (input, init) => {
-    // eslint-disable-next-line eslint-plugin-n/no-unsupported-features/node-builtins
     const headers = new Headers(init?.headers)
     if (!headers.has(CLIENT_REQUEST_ID_HEADER)) {
       headers.set(CLIENT_REQUEST_ID_HEADER, randomUUID())
     }
     try {
-      // eslint-disable-next-line eslint-plugin-n/no-unsupported-features/node-builtins
       const url = input instanceof Request ? input.url : String(input)
       const id = headers.get(CLIENT_REQUEST_ID_HEADER)
       logForDebugging(
         `[API REQUEST] ${new URL(url).pathname}${id ? ` ${CLIENT_REQUEST_ID_HEADER}=${id}` : ''} source=${source ?? 'unknown'} provider=${getAPIProvider()}`,
       )
     } catch {
-      // never let logging crash the fetch
     }
     return inner(input, { ...init, headers })
   }

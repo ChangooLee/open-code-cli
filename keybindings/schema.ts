@@ -1,14 +1,5 @@
-/**
- * Zod schema for keybindings.json configuration.
- * Used for validation and JSON schema generation.
- */
-
 import { z } from 'zod/v4'
 import { lazySchema } from '../utils/lazySchema.js'
-
-/**
- * Valid context names where keybindings can be applied.
- */
 export const KEYBINDING_CONTEXTS = [
   'Global',
   'Chat',
@@ -21,7 +12,6 @@ export const KEYBINDING_CONTEXTS = [
   'ThemePicker',
   'Settings',
   'Tabs',
-  // New contexts for keybindings migration
   'Attachments',
   'Footer',
   'MessageSelector',
@@ -32,10 +22,6 @@ export const KEYBINDING_CONTEXTS = [
   'Scroll',
   'MessageActions',
 ] as const
-
-/**
- * Human-readable descriptions for each keybinding context.
- */
 export const KEYBINDING_CONTEXT_DESCRIPTIONS: Record<
   (typeof KEYBINDING_CONTEXTS)[number],
   string
@@ -61,12 +47,7 @@ export const KEYBINDING_CONTEXT_DESCRIPTIONS: Record<
   Scroll: 'When scrolling the viewport (mouse/keyboard)',
   MessageActions: 'When the message actions menu is open',
 }
-
-/**
- * All valid keybinding action identifiers.
- */
 export const KEYBINDING_ACTIONS = [
-  // App-level actions (Global context)
   'app:interrupt',
   'app:exit',
   'app:toggleTodos',
@@ -77,11 +58,9 @@ export const KEYBINDING_ACTIONS = [
   'app:redraw',
   'app:globalSearch',
   'app:quickOpen',
-  // History navigation
   'history:search',
   'history:previous',
   'history:next',
-  // Chat input actions
   'chat:cancel',
   'chat:killAgents',
   'chat:cycleMode',
@@ -95,12 +74,10 @@ export const KEYBINDING_ACTIONS = [
   'chat:stash',
   'chat:imagePaste',
   'chat:messageActions',
-  // Autocomplete menu actions
   'autocomplete:accept',
   'autocomplete:dismiss',
   'autocomplete:previous',
   'autocomplete:next',
-  // Confirmation dialog actions
   'confirm:yes',
   'confirm:no',
   'confirm:previous',
@@ -110,29 +87,21 @@ export const KEYBINDING_ACTIONS = [
   'confirm:cycleMode',
   'confirm:toggle',
   'confirm:toggleExplanation',
-  // Tabs navigation actions
   'tabs:next',
   'tabs:previous',
-  // Transcript viewer actions
   'transcript:toggleShowAll',
   'transcript:exit',
-  // History search actions
   'historySearch:next',
   'historySearch:accept',
   'historySearch:cancel',
   'historySearch:execute',
-  // Task/agent actions
   'task:background',
-  // Theme picker actions
   'theme:toggleSyntaxHighlighting',
-  // Help menu actions
   'help:dismiss',
-  // Attachment navigation (select dialog image attachments)
   'attachments:next',
   'attachments:previous',
   'attachments:remove',
   'attachments:exit',
-  // Footer indicator actions
   'footer:up',
   'footer:down',
   'footer:next',
@@ -140,13 +109,11 @@ export const KEYBINDING_ACTIONS = [
   'footer:openSelected',
   'footer:clearSelection',
   'footer:close',
-  // Message selector (rewind) actions
   'messageSelector:up',
   'messageSelector:down',
   'messageSelector:top',
   'messageSelector:bottom',
   'messageSelector:select',
-  // Diff dialog actions
   'diff:dismiss',
   'diff:previousSource',
   'diff:nextSource',
@@ -154,26 +121,19 @@ export const KEYBINDING_ACTIONS = [
   'diff:viewDetails',
   'diff:previousFile',
   'diff:nextFile',
-  // Model picker actions (ant-only)
   'modelPicker:decreaseEffort',
   'modelPicker:increaseEffort',
-  // Select component actions (distinct from confirm: to avoid collisions)
   'select:next',
   'select:previous',
   'select:accept',
   'select:cancel',
-  // Plugin dialog actions
   'plugin:toggle',
   'plugin:install',
-  // Permission dialog actions
   'permission:toggleDebug',
-  // Settings config panel actions
   'settings:search',
   'settings:retry',
   'settings:close',
-  // Voice actions
   'voice:pushToTalk',
-  // Scroll actions
   'scroll:pageUp',
   'scroll:pageDown',
   'scroll:halfPageUp',
@@ -184,9 +144,7 @@ export const KEYBINDING_ACTIONS = [
   'scroll:lineDown',
   'scroll:top',
   'scroll:bottom',
-  // Selection actions
   'selection:copy',
-  // Message actions menu
   'messageActions:prev',
   'messageActions:next',
   'messageActions:prevUser',
@@ -199,10 +157,6 @@ export const KEYBINDING_ACTIONS = [
   'messageActions:c',
   'messageActions:p',
 ] as const
-
-/**
- * Schema for a single keybinding block.
- */
 export const KeybindingBlockSchema = lazySchema(() =>
   z
     .object({
@@ -235,11 +189,6 @@ export const KeybindingBlockSchema = lazySchema(() =>
     })
     .describe('A block of keybindings for a specific context'),
 )
-
-/**
- * Schema for the entire keybindings.json file.
- * Uses object wrapper format with optional $schema and $docs metadata.
- */
 export const KeybindingsSchema = lazySchema(() =>
   z
     .object({
@@ -256,10 +205,6 @@ export const KeybindingsSchema = lazySchema(() =>
       'Open Code CLI keybindings configuration. Customize keyboard shortcuts by context.',
     ),
 )
-
-/**
- * TypeScript types based on the schema.
- */
 export type KeybindingsSchemaType = z.infer<
   ReturnType<typeof KeybindingsSchema>
 >

@@ -30,30 +30,18 @@ import {
   buildEffectiveSystemPrompt,
   type SystemPrompt,
 } from '../../utils/systemPrompt.js'
-
-/* eslint-disable @typescript-eslint/no-require-imports */
 const reactiveCompact = feature('REACTIVE_COMPACT')
   ? (require('../../services/compact/reactiveCompact.js') as typeof import('../../services/compact/reactiveCompact.js'))
   : null
-/* eslint-enable @typescript-eslint/no-require-imports */
-
 export const call: LocalCommandCall = async (args, context) => {
   const { abortController } = context
   let { messages } = context
-
-  // REPL keeps snipped messages for UI scrollback — project so the compact
-  // model doesn't summarize content that was intentionally removed.
   messages = getMessagesAfterCompactBoundary(messages)
-
   if (messages.length === 0) {
     throw new Error('No messages to compact')
   }
-
   const customInstructions = args.trim()
-
   try {
-    // Try session memory compaction first if no custom instructions
-    // (session memory compaction doesn't support custom instructions)
     if (!customInstructions) {
       const sessionMemoryResult = await trySessionMemoryCompaction(
         messages,
@@ -62,8 +50,6 @@ export const call: LocalCommandCall = async (args, context) => {
       if (sessionMemoryResult) {
         getUserContext.cache.clear?.()
         runPostCompactCleanup()
-        // Reset cache read baseline so the post-compact drop isn't flagged
-        // as a break. compactConversation does this internally; SM-compact doesn't.
         if (feature('PROMPT_CACHE_BREAK_DETECTION')) {
           notifyCompaction(
             context.options.querySource ?? 'compact',
@@ -71,9 +57,7 @@ export const call: LocalCommandCall = async (args, context) => {
           )
         }
         markPostCompaction()
-        // Suppress warning immediately after successful compaction
         suppressCompactWarning()
-
         return {
           type: 'compact',
           compactionResult: sessionMemoryResult,
@@ -81,9 +65,6 @@ export const call: LocalCommandCall = async (args, context) => {
         }
       }
     }
-
-    // Reactive-only mode: route /compact through the reactive path.
-    // Checked after session-memory (that path is cheap and orthogonal).
     if (reactiveCompact?.isReactiveOnlyMode()) {
       return await compactViaReactive(
         messages,
@@ -92,12 +73,8 @@ export const call: LocalCommandCall = async (args, context) => {
         reactiveCompact,
       )
     }
-
-    // Fall back to traditional compaction
-    // Run microcompact first to reduce tokens before summarization
     const microcompactResult = await microcompactMessages(messages, context)
     const messagesForCompact = microcompactResult.messages
-
     const result = await compactConversation(
       messagesForCompact,
       context,
@@ -106,17 +83,10 @@ export const call: LocalCommandCall = async (args, context) => {
       customInstructions,
       false,
     )
-
-    // Reset lastSummarizedMessageId since legacy compaction replaces all messages
-    // and the old message UUID will no longer exist in the new messages array
     setLastSummarizedMessageId(undefined)
-
-    // Suppress the "Context left until auto-compact" warning after successful compaction
     suppressCompactWarning()
-
     getUserContext.cache.clear?.()
     runPostCompactCleanup()
-
     return {
       type: 'compact',
       compactionResult: result,
@@ -135,7 +105,6 @@ export const call: LocalCommandCall = async (args, context) => {
     }
   }
 }
-
 async function compactViaReactive(
   messages: Message[],
   context: ToolUseContext,
@@ -151,11 +120,7 @@ async function compactViaReactive(
     hookType: 'pre_compact',
   })
   context.setSDKStatus?.('compacting')
-
   try {
-    // Hooks and cache-param build are independent — run concurrently.
-    // getCacheSharingParams walks all tools to build the system prompt;
-    // pre-compact hooks spawn subprocesses. Neither depends on the other.
     const [hookResult, cacheSafeParams] = await Promise.all([
       executePreCompactHooks(
         { trigger: 'manual', customInstructions: customInstructions || null },
@@ -167,21 +132,15 @@ async function compactViaReactive(
       customInstructions,
       hookResult.newCustomInstructions,
     )
-
     context.setStreamMode?.('requesting')
     context.setResponseLength?.(() => 0)
     context.onCompactProgress?.({ type: 'compact_start' })
-
     const outcome = await reactive.reactiveCompactOnPromptTooLong(
       messages,
       cacheSafeParams,
       { customInstructions: mergedInstructions, trigger: 'manual' },
     )
-
     if (!outcome.ok) {
-      // The outer catch in `call` translates these: aborted → "Compaction
-      // canceled." (via abortController.signal.aborted check), NOT_ENOUGH →
-      // re-thrown as-is, everything else → "Error during compaction: …".
       switch (outcome.reason) {
         case 'too_few_groups':
           throw new Error(ERROR_MESSAGE_NOT_ENOUGH_MESSAGES)
@@ -193,24 +152,14 @@ async function compactViaReactive(
           throw new Error(ERROR_MESSAGE_INCOMPLETE_RESPONSE)
       }
     }
-
-    // Mirrors the post-success cleanup in tryReactiveCompact, minus
-    // resetMicrocompactState — processSlashCommand calls that for all
-    // type:'compact' results.
     setLastSummarizedMessageId(undefined)
     runPostCompactCleanup()
     suppressCompactWarning()
     getUserContext.cache.clear?.()
-
-    // reactiveCompactOnPromptTooLong runs PostCompact hooks but not PreCompact
-    // — both callers (here and tryReactiveCompact) run PreCompact outside so
-    // they can merge its userDisplayMessage with PostCompact's here. This
-    // caller additionally runs it concurrently with getCacheSharingParams.
     const combinedMessage =
       [hookResult.userDisplayMessage, outcome.result.userDisplayMessage]
         .filter(Boolean)
         .join('\n') || undefined
-
     return {
       type: 'compact',
       compactionResult: {
@@ -226,7 +175,6 @@ async function compactViaReactive(
     context.setSDKStatus?.(null)
   }
 }
-
 function buildDisplayText(
   context: ToolUseContext,
   userDisplayMessage?: string,
@@ -246,7 +194,6 @@ function buildDisplayText(
   ]
   return chalk.dim('Compacted ' + dimmed.join('\n'))
 }
-
 async function getCacheSharingParams(
   context: ToolUseContext,
   forkContextMessages: Message[],

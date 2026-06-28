@@ -10,9 +10,7 @@ import { isENOENT } from './errors.js'
 import { execFileNoThrow } from './execFileNoThrow.js'
 import { logError } from './log.js'
 import type { ThemeName } from './theme.js'
-
 const EOL = '\n'
-
 type ShellInfo = {
   name: string
   rcFile: string
@@ -20,12 +18,10 @@ type ShellInfo = {
   completionLine: string
   shellFlag: string
 }
-
 function detectShell(): ShellInfo | null {
   const shell = process.env.SHELL || ''
   const home = homedir()
   const openCodeCliDir = join(home, '.open-code-cli')
-
   if (shell.endsWith('/zsh') || shell.endsWith('/zsh.exe')) {
     const cacheFile = join(openCodeCliDir, 'completion.zsh')
     return {
@@ -59,7 +55,6 @@ function detectShell(): ShellInfo | null {
   }
   return null
 }
-
 function formatPathLink(filePath: string): string {
   if (!supportsHyperlinks()) {
     return filePath
@@ -67,28 +62,17 @@ function formatPathLink(filePath: string): string {
   const fileUrl = pathToFileURL(filePath).href
   return `\x1b]8;;${fileUrl}\x07${filePath}\x1b]8;;\x07`
 }
-
-/**
- * Generate and cache the completion script, then add a source line to the
- * shell's rc file. Returns a user-facing status message.
- */
 export async function setupShellCompletion(theme: ThemeName): Promise<string> {
   const shell = detectShell()
   if (!shell) {
     return ''
   }
-
-  // Ensure the cache directory exists
   try {
     await mkdir(dirname(shell.cacheFile), { recursive: true })
   } catch (e: unknown) {
     logError(e)
     return `${EOL}${color('warning', theme)(`Could not write ${shell.name} completion cache`)}${EOL}${chalk.dim(`Run manually: open-code-cli completion ${shell.shellFlag} > ${shell.cacheFile}`)}${EOL}`
   }
-
-  // Generate the completion script by writing directly to the cache file.
-  // Using --output avoids piping through stdout where process.exit() can
-  // truncate output before the pipe buffer drains.
   const openCodeCliBin = process.argv[1] || 'open-code-cli'
   const result = await execFileNoThrow(openCodeCliBin, [
     'completion',
@@ -99,8 +83,6 @@ export async function setupShellCompletion(theme: ThemeName): Promise<string> {
   if (result.code !== 0) {
     return `${EOL}${color('warning', theme)(`Could not generate ${shell.name} shell completions`)}${EOL}${chalk.dim(`Run manually: open-code-cli completion ${shell.shellFlag} > ${shell.cacheFile}`)}${EOL}`
   }
-
-  // Check if rc file already sources completions
   let existing = ''
   try {
     existing = await readFile(shell.rcFile, { encoding: 'utf-8' })
@@ -116,35 +98,24 @@ export async function setupShellCompletion(theme: ThemeName): Promise<string> {
       return `${EOL}${color('warning', theme)(`Could not install ${shell.name} shell completions`)}${EOL}${chalk.dim(`Add this to ${formatPathLink(shell.rcFile)}:`)}${EOL}${chalk.dim(shell.completionLine)}${EOL}`
     }
   }
-
-  // Append source line to rc file
   try {
     const configDir = dirname(shell.rcFile)
     await mkdir(configDir, { recursive: true })
-
     const separator = existing && !existing.endsWith('\n') ? '\n' : ''
     const content = `${existing}${separator}\n# Open Code CLI shell completions\n${shell.completionLine}\n`
     await writeFile(shell.rcFile, content, { encoding: 'utf-8' })
-
     return `${EOL}${color('success', theme)(`Installed ${shell.name} shell completions`)}${EOL}${chalk.dim(`Added to ${formatPathLink(shell.rcFile)}`)}${EOL}${chalk.dim(`Run: source ${shell.rcFile}`)}${EOL}`
   } catch (error) {
     logError(error)
     return `${EOL}${color('warning', theme)(`Could not install ${shell.name} shell completions`)}${EOL}${chalk.dim(`Add this to ${formatPathLink(shell.rcFile)}:`)}${EOL}${chalk.dim(shell.completionLine)}${EOL}`
   }
 }
-
-/**
- * Regenerate cached shell completion scripts in ~/.open-code-cli/.
- * Called after `open-code-cli update` so completions stay in sync with the new binary.
- */
 export async function regenerateCompletionCache(): Promise<void> {
   const shell = detectShell()
   if (!shell) {
     return
   }
-
   logForDebugging(`update: Regenerating ${shell.name} completion cache`)
-
   const openCodeCliBin = process.argv[1] || 'open-code-cli'
   const result = await execFileNoThrow(openCodeCliBin, [
     'completion',
@@ -152,14 +123,12 @@ export async function regenerateCompletionCache(): Promise<void> {
     '--output',
     shell.cacheFile,
   ])
-
   if (result.code !== 0) {
     logForDebugging(
       `update: Failed to regenerate ${shell.name} completion cache`,
     )
     return
   }
-
   logForDebugging(
     `update: Regenerated ${shell.name} completion cache at ${shell.cacheFile}`,
   )

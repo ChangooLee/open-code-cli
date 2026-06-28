@@ -55,7 +55,6 @@ import {
 } from '../api/referral.js'
 import { getSessionsSinceLastShown } from './tipHistory.js'
 import type { Tip, TipContext } from './types.js'
-
 let _isOfficialMarketplaceInstalledCache: boolean | undefined
 async function isOfficialMarketplaceInstalled(): Promise<boolean> {
   if (_isOfficialMarketplaceInstalledCache !== undefined) {
@@ -65,7 +64,6 @@ async function isOfficialMarketplaceInstalled(): Promise<boolean> {
   _isOfficialMarketplaceInstalledCache = OFFICIAL_MARKETPLACE_NAME in config
   return _isOfficialMarketplaceInstalledCache
 }
-
 async function isMarketplacePluginRelevant(
   pluginName: string,
   context: TipContext | undefined,
@@ -91,7 +89,6 @@ async function isMarketplacePluginRelevant(
   }
   return false
 }
-
 const externalTips: Tip[] = [
   {
     id: 'new-user-warmup',
@@ -111,7 +108,6 @@ const externalTips: Tip[] = [
     isRelevant: async () => {
       if (process.env.USER_TYPE === 'ant') return false
       const config = getGlobalConfig()
-      // Show to users who haven't used plan mode recently (7+ days)
       const daysSinceLastUse = config.lastPlanModeUse
         ? (Date.now() - config.lastPlanModeUse) / (1000 * 60 * 60 * 24)
         : Infinity
@@ -127,7 +123,6 @@ const externalTips: Tip[] = [
       try {
         const config = getGlobalConfig()
         const settings = getSettings_DEPRECATED()
-        // Show if they've used plan mode but haven't set a default
         const hasUsedPlanMode = Boolean(config.lastPlanModeUse)
         const hasDefaultMode = Boolean(settings?.permissions?.defaultMode)
         return hasUsedPlanMode && !hasDefaultMode
@@ -282,15 +277,12 @@ const externalTips: Tip[] = [
       `Open the Command Palette (Cmd+Shift+P) and run "Shell Command: Install '${env.terminal === 'vscode' ? 'code' : env.terminal}' command in PATH" to enable IDE integration`,
     cooldownSessions: 0,
     async isRelevant() {
-      // Only show this tip if we're in a VS Code-style terminal
       if (!isSupportedVSCodeTerminal()) {
         return false
       }
       if (getPlatform() !== 'macos') {
         return false
       }
-
-      // Check if the relevant command is available
       switch (env.terminal) {
         case 'vscode':
           return !(await isVSCodeInstalled())
@@ -311,13 +303,10 @@ const externalTips: Tip[] = [
       if (isSupportedTerminal()) {
         return false
       }
-
-      // Use lockfiles as a (quicker) signal for running IDEs
       const lockfiles = await getSortedIdeLockfiles()
       if (lockfiles.length !== 0) {
         return false
       }
-
       const runningIDEs = await detectRunningIDEsCached()
       return runningIDEs.length > 0
     },
@@ -480,7 +469,6 @@ const externalTips: Tip[] = [
       const config = getGlobalConfig()
       const modelSetting = getUserSpecifiedModelSetting()
       const hasOpusPlanMode = modelSetting === 'opusplan'
-      // Show reminder if they have Opus Plan Mode and haven't used plan mode recently (3+ days)
       const daysSinceLastUse = config.lastPlanModeUse
         ? (Date.now() - config.lastPlanModeUse) / (1000 * 60 * 60 * 24)
         : Infinity
@@ -613,7 +601,6 @@ const externalTips: Tip[] = [
       const info = getCachedOverageCreditGrant()
       const amount = info ? formatGrantAmount(info) : null
       if (!amount) return ''
-      // Copy from "OC & Bulk Overages copy" doc (#5 — CLI Rotating tip)
       return `${openCodeCli(`${amount} in extra usage, on us`)} · third-party apps · ${openCodeCli('/extra-usage')}`
     },
     cooldownSessions: 3,
@@ -651,12 +638,10 @@ const internalOnlyTips: Tip[] =
         },
       ]
     : []
-
 function getCustomTips(): Tip[] {
   const settings = getInitialSettings()
   const override = settings.spinnerTipsOverride
   if (!override?.tips?.length) return []
-
   return override.tips.map((content, i) => ({
     id: `custom-tip-${i}`,
     content: async () => content,
@@ -664,23 +649,17 @@ function getCustomTips(): Tip[] {
     isRelevant: async () => true,
   }))
 }
-
 export async function getRelevantTips(context?: TipContext): Promise<Tip[]> {
   const settings = getInitialSettings()
   const override = settings.spinnerTipsOverride
   const customTips = getCustomTips()
-
-  // If excludeDefault is true and there are custom tips, skip built-in tips entirely
   if (override?.excludeDefault && customTips.length > 0) {
     return customTips
   }
-
-  // Otherwise, filter built-in tips as before and combine with custom
   const tips = [...externalTips, ...internalOnlyTips]
   const isRelevant = await Promise.all(tips.map(_ => _.isRelevant(context)))
   const filtered = tips
     .filter((_, index) => isRelevant[index])
     .filter(_ => getSessionsSinceLastShown(_.id) >= _.cooldownSessions)
-
   return [...filtered, ...customTips]
 }

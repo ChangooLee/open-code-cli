@@ -7,97 +7,55 @@ import type {
   PluginManifest,
 } from '../utils/plugins/schemas.js'
 import type { HooksSettings } from '../utils/settings/types.js'
-
 export type { PluginAuthor, PluginManifest, CommandMetadata }
-
-/**
- * Definition for a built-in plugin that ships with the CLI.
- * Built-in plugins appear in the /plugin UI and can be enabled/disabled by
- * users (persisted to user settings).
- */
 export type BuiltinPluginDefinition = {
-  /** Plugin name (used in `{name}@builtin` identifier) */
   name: string
-  /** Description shown in the /plugin UI */
   description: string
-  /** Optional version string */
   version?: string
-  /** Skills provided by this plugin */
   skills?: BundledSkillDefinition[]
-  /** Hooks provided by this plugin */
   hooks?: HooksSettings
-  /** MCP servers provided by this plugin */
   mcpServers?: Record<string, McpServerConfig>
-  /** Whether this plugin is available (e.g. based on system capabilities). Unavailable plugins are hidden entirely. */
   isAvailable?: () => boolean
-  /** Default enabled state before the user sets a preference (defaults to true) */
   defaultEnabled?: boolean
 }
-
 export type PluginRepository = {
   url: string
   branch: string
   lastUpdated?: string
   commitSha?: string
 }
-
 export type PluginConfig = {
   repositories: Record<string, PluginRepository>
 }
-
 export type LoadedPlugin = {
   name: string
   manifest: PluginManifest
   path: string
   source: string
-  repository: string // Repository identifier, usually same as source
+  repository: string 
   enabled?: boolean
-  isBuiltin?: boolean // true for built-in plugins that ship with the CLI
-  sha?: string // Git commit SHA for version pinning (from marketplace entry source)
+  isBuiltin?: boolean 
+  sha?: string 
   commandsPath?: string
-  commandsPaths?: string[] // Additional command paths from manifest
-  commandsMetadata?: Record<string, CommandMetadata> // Metadata for named commands from object-mapping format
+  commandsPaths?: string[] 
+  commandsMetadata?: Record<string, CommandMetadata> 
   agentsPath?: string
-  agentsPaths?: string[] // Additional agent paths from manifest
+  agentsPaths?: string[] 
   skillsPath?: string
-  skillsPaths?: string[] // Additional skill paths from manifest
+  skillsPaths?: string[] 
   outputStylesPath?: string
-  outputStylesPaths?: string[] // Additional output style paths from manifest
+  outputStylesPaths?: string[] 
   hooksConfig?: HooksSettings
   mcpServers?: Record<string, McpServerConfig>
   lspServers?: Record<string, LspServerConfig>
   settings?: Record<string, unknown>
 }
-
 export type PluginComponent =
   | 'commands'
   | 'agents'
   | 'skills'
   | 'hooks'
   | 'output-styles'
-
-/**
- * Discriminated union of plugin error types.
- * Each error type has specific contextual data for better debugging and user guidance.
- *
- * This replaces the previous string-based error matching approach with type-safe
- * error handling that can't break when error messages change.
- *
- * IMPLEMENTATION STATUS:
- * Currently used in production (2 types):
- * - generic-error: Used for various plugin loading failures
- * - plugin-not-found: Used when plugin not found in marketplace
- *
- * Planned for future use (10 types - see TODOs in pluginLoader.ts):
- * - path-not-found, git-auth-failed, git-timeout, network-error
- * - manifest-parse-error, manifest-validation-error
- * - marketplace-not-found, marketplace-load-failed
- * - mcp-config-invalid, hook-load-failed, component-load-failed
- *
- * These unused types support UI formatting and provide a clear roadmap for
- * improving error specificity. They can be incrementally implemented as
- * error creation sites are refactored.
- */
 export type PluginError =
   | {
       type: 'path-not-found'
@@ -259,8 +217,8 @@ export type PluginError =
       source: string
       plugin?: string
       marketplace: string
-      blockedByBlocklist?: boolean // true if blocked by blockedMarketplaces, false if not in strictKnownMarketplaces
-      allowedSources: string[] // Formatted source strings (e.g., "github:owner/repo")
+      blockedByBlocklist?: boolean 
+      allowedSources: string[] 
     }
   | {
       type: 'dependency-unsatisfied'
@@ -281,17 +239,11 @@ export type PluginError =
       plugin?: string
       error: string
     }
-
 export type PluginLoadResult = {
   enabled: LoadedPlugin[]
   disabled: LoadedPlugin[]
   errors: PluginError[]
 }
-
-/**
- * Helper function to get a display message from any PluginError
- * Useful for logging and simple error displays
- */
 export function getPluginErrorMessage(error: PluginError): string {
   switch (error.type) {
     case 'generic-error':

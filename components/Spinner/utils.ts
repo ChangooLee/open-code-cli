@@ -1,16 +1,13 @@
 import type { RGBColor as RGBColorString } from '../../ink/styles.js'
 import type { RGBColor as RGBColorType } from './types.js'
-
 export function getDefaultCharacters(): string[] {
   if (process.env.TERM === 'xterm-ghostty') {
-    return ['·', '✢', '✳', '✶', '✻', '*'] // Use * instead of ✽ for Ghostty because the latter renders in a way that's slightly offset
+    return ['·', '✢', '✳', '✶', '✻', '*'] 
   }
   return process.platform === 'darwin'
     ? ['·', '✢', '✳', '✶', '✻', '✽']
     : ['·', '✢', '*', '✶', '✻', '✽']
 }
-
-// Interpolate between two RGB colors
 export function interpolateColor(
   color1: RGBColorType,
   color2: RGBColorType,
@@ -22,13 +19,9 @@ export function interpolateColor(
     b: Math.round(color1.b + (color2.b - color1.b) * t),
   }
 }
-
-// Convert RGB object to rgb() color string for Text component
 export function toRGBColor(color: RGBColorType): RGBColorString {
   return `rgb(${color.r},${color.g},${color.b})`
 }
-
-// HSL hue (0-360) to RGB, using voice-mode waveform parameters (s=0.7, l=0.6).
 export function hueToRgb(hue: number): RGBColorType {
   const h = ((hue % 360) + 360) % 360
   const s = 0.7
@@ -64,13 +57,10 @@ export function hueToRgb(hue: number): RGBColorType {
     b: Math.round((b + m) * 255),
   }
 }
-
 const RGB_CACHE = new Map<string, RGBColorType | null>()
-
 export function parseRGB(colorStr: string): RGBColorType | null {
   const cached = RGB_CACHE.get(colorStr)
   if (cached !== undefined) return cached
-
   const match = colorStr.match(/rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/)
   const result = match
     ? {

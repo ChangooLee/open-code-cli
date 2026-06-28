@@ -7,12 +7,9 @@ import { logError } from 'src/utils/log.js'
 export async function getOauthProfileFromApiKey(): Promise<
   OAuthProfileResponse | undefined
 > {
-  // Assumes interactive session
   const config = getGlobalConfig()
   const accountUuid = config.oauthAccount?.accountUuid
   const apiKey = getOpenAICompatibleApiKey()
-
-  // Need both account UUID and API key to check
   if (!accountUuid || !apiKey) {
     return
   }
@@ -33,7 +30,6 @@ export async function getOauthProfileFromApiKey(): Promise<
     logError(error as Error)
   }
 }
-
 export async function getOauthProfileFromOauthToken(
   accessToken: string,
 ): Promise<OAuthProfileResponse | undefined> {

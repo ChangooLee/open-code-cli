@@ -33,72 +33,47 @@ import {
 } from './pluginOptionsStorage.js'
 import type { CommandMetadata, PluginManifest } from './schemas.js'
 import { walkPluginMarkdown } from './walkPluginMarkdown.js'
-
-// Similar to MarkdownFile but for plugin sources
 type PluginMarkdownFile = {
   filePath: string
   baseDir: string
   frontmatter: FrontmatterData
   content: string
 }
-
-// Configuration for loading commands or skills
 type LoadConfig = {
-  isSkillMode: boolean // true when loading from skills/ directory
+  isSkillMode: boolean 
 }
-
-/**
- * Check if a file path is a skill file (SKILL.md)
- */
 function isSkillFile(filePath: string): boolean {
   return /^skill\.md$/i.test(basename(filePath))
 }
-
-/**
- * Get command name from file path, handling both regular files and skills
- */
 function getCommandNameFromFile(
   filePath: string,
   baseDir: string,
   pluginName: string,
 ): string {
   const isSkill = isSkillFile(filePath)
-
   if (isSkill) {
-    // For skills, use the parent directory name
     const skillDirectory = dirname(filePath)
     const parentOfSkillDir = dirname(skillDirectory)
     const commandBaseName = basename(skillDirectory)
-
-    // Build namespace from parent of skill directory
     const relativePath = parentOfSkillDir.startsWith(baseDir)
       ? parentOfSkillDir.slice(baseDir.length).replace(/^\//, '')
       : ''
     const namespace = relativePath ? relativePath.split('/').join(':') : ''
-
     return namespace
       ? `${pluginName}:${namespace}:${commandBaseName}`
       : `${pluginName}:${commandBaseName}`
   } else {
-    // For regular files, use filename without .md
     const fileDirectory = dirname(filePath)
     const commandBaseName = basename(filePath).replace(/\.md$/, '')
-
-    // Build namespace from file directory
     const relativePath = fileDirectory.startsWith(baseDir)
       ? fileDirectory.slice(baseDir.length).replace(/^\//, '')
       : ''
     const namespace = relativePath ? relativePath.split('/').join(':') : ''
-
     return namespace
       ? `${pluginName}:${namespace}:${commandBaseName}`
       : `${pluginName}:${commandBaseName}`
   }
 }
-
-/**
- * Recursively collects all markdown files from a directory
- */
 async function collectMarkdownFiles(
   dirPath: string,
   baseDir: string,
@@ -106,7 +81,6 @@ async function collectMarkdownFiles(
 ): Promise<PluginMarkdownFile[]> {
   const files: PluginMarkdownFile[] = []
   const fs = getFsImplementation()
-
   await walkPluginMarkdown(
     dirPath,
     async fullPath => {
@@ -125,47 +99,35 @@ async function collectMarkdownFiles(
     },
     { stopAtSkillDir: true, logLabel: 'commands' },
   )
-
   return files
 }
-
-/**
- * Transforms plugin markdown files to handle skill directories
- */
 function transformPluginSkillFiles(
   files: PluginMarkdownFile[],
 ): PluginMarkdownFile[] {
   const filesByDir = new Map<string, PluginMarkdownFile[]>()
-
   for (const file of files) {
     const dir = dirname(file.filePath)
     const dirFiles = filesByDir.get(dir) ?? []
     dirFiles.push(file)
     filesByDir.set(dir, dirFiles)
   }
-
   const result: PluginMarkdownFile[] = []
-
   for (const [dir, dirFiles] of filesByDir) {
     const skillFiles = dirFiles.filter(f => isSkillFile(f.filePath))
     if (skillFiles.length > 0) {
-      // Use the first skill file if multiple exist
       const skillFile = skillFiles[0]!
       if (skillFiles.length > 1) {
         logForDebugging(
           `Multiple skill files found in ${dir}, using ${basename(skillFile.filePath)}`,
         )
       }
-      // Directory has a skill - only include the skill file
       result.push(skillFile)
     } else {
       result.push(...dirFiles)
     }
   }
-
   return result
 }
-
 async function loadCommandsFromDirectory(
   commandsPath: string,
   pluginName: string,
@@ -175,17 +137,12 @@ async function loadCommandsFromDirectory(
   config: LoadConfig = { isSkillMode: false },
   loadedPaths: Set<string> = new Set(),
 ): Promise<Command[]> {
-  // Collect all markdown files
   const markdownFiles = await collectMarkdownFiles(
     commandsPath,
     commandsPath,
     loadedPaths,
   )
-
-  // Apply skill transformation
   const processedFiles = transformPluginSkillFiles(markdownFiles)
-
-  // Convert to commands
   const commands: Command[] = []
   for (const file of processedFiles) {
     const commandName = getCommandNameFromFile(
@@ -193,7 +150,6 @@ async function loadCommandsFromDirectory(
       file.baseDir,
       pluginName,
     )
-
     const command = createPluginCommand(
       commandName,
       file,
@@ -203,18 +159,12 @@ async function loadCommandsFromDirectory(
       isSkillFile(file.filePath),
       config,
     )
-
     if (command) {
       commands.push(command)
     }
   }
-
   return commands
 }
-
-/**
- * Create a Command from a plugin markdown file
- */
 function createPluginCommand(
   commandName: string,
   file: PluginMarkdownFile,
@@ -226,7 +176,6 @@ function createPluginCommand(
 ): Command | null {
   try {
     const { frontmatter, content } = file
-
     const validatedDescription = coerceDescriptionToString(
       frontmatter.description,
       commandName,
@@ -237,8 +186,6 @@ function createPluginCommand(
         content,
         isSkill ? 'Plugin skill' : 'Plugin command',
       )
-
-    // Substitute ${OPEN_CODE_CLI_PLUGIN_ROOT} in allowed-tools before parsing
     const rawAllowedTools = frontmatter['allowed-tools']
     const substitutedAllowedTools =
       typeof rawAllowedTools === 'string'
@@ -259,7 +206,6 @@ function createPluginCommand(
     const allowedTools = parseSlashCommandToolsFromFrontmatter(
       substitutedAllowedTools,
     )
-
     const argumentHint = frontmatter['argument-hint'] as string | undefined
     const argumentNames = parseArgumentNames(
       frontmatter.arguments as string | string[] | undefined,
@@ -267,15 +213,12 @@ function createPluginCommand(
     const whenToUse = frontmatter.when_to_use as string | undefined
     const version = frontmatter.version as string | undefined
     const displayName = frontmatter.name as string | undefined
-
-    // Handle model configuration, resolving aliases like 'haiku', 'sonnet', 'opus'
     const model =
       frontmatter.model === 'inherit'
         ? undefined
         : frontmatter.model
           ? parseUserSpecifiedModel(frontmatter.model as string)
           : undefined
-
     const effortRaw = frontmatter['effort']
     const effort =
       effortRaw !== undefined ? parseEffortValue(effortRaw) : undefined
@@ -284,19 +227,15 @@ function createPluginCommand(
         `Plugin command ${commandName} has invalid effort '${effortRaw}'. Valid options: ${EFFORT_LEVELS.join(', ')} or an integer`,
       )
     }
-
     const disableModelInvocation = parseBooleanFrontmatter(
       frontmatter['disable-model-invocation'],
     )
-
     const userInvocableValue = frontmatter['user-invocable']
     const userInvocable =
       userInvocableValue === undefined
         ? true
         : parseBooleanFrontmatter(userInvocableValue)
-
     const shell = parseShellFrontmatter(frontmatter.shell, commandName)
-
     return {
       type: 'prompt',
       name: commandName,
@@ -324,27 +263,19 @@ function createPluginCommand(
         return displayName || commandName
       },
       async getPromptForCommand(args, context) {
-        // For skills from skills/ directory, include base directory
         let finalContent = config.isSkillMode
           ? `Base directory for this skill: ${dirname(file.filePath)}\n\n${content}`
           : content
-
         finalContent = substituteArguments(
           finalContent,
           args,
           true,
           argumentNames,
         )
-
-        // Replace ${OPEN_CODE_CLI_PLUGIN_ROOT} and ${OPEN_CODE_PLUGIN_DATA} with their paths
         finalContent = substitutePluginVariables(finalContent, {
           path: pluginPath,
           source: sourceName,
         })
-
-        // Replace ${user_config.X} with saved option values. Sensitive keys
-        // resolve to a descriptive placeholder instead — skill content goes to
-        // the model prompt and we don't put secrets there.
         if (pluginManifest.userConfig) {
           finalContent = substituteUserConfigInContent(
             finalContent,
@@ -352,11 +283,6 @@ function createPluginCommand(
             pluginManifest.userConfig,
           )
         }
-
-        // Replace ${OPEN_CODE_CLI_SKILL_DIR} with this specific skill's directory.
-        // Distinct from ${OPEN_CODE_CLI_PLUGIN_ROOT}: a plugin can contain multiple
-        // skills, so OPEN_CODE_CLI_PLUGIN_ROOT points to the plugin root while
-        // OPEN_CODE_CLI_SKILL_DIR points to the individual skill's subdirectory.
         if (config.isSkillMode) {
           const rawSkillDir = dirname(file.filePath)
           const skillDir =
@@ -368,13 +294,10 @@ function createPluginCommand(
             skillDir,
           )
         }
-
-        // Replace ${OPEN_CODE_CLI_SESSION_ID} with the current session ID
         finalContent = finalContent.replace(
           /\$\{OPEN_CODE_CLI_SESSION_ID\}/g,
           getSessionId(),
         )
-
         finalContent = await executeShellCommandsInPrompt(
           finalContent,
           {
@@ -396,7 +319,6 @@ function createPluginCommand(
           `/${commandName}`,
           shell,
         )
-
         return [{ type: 'text', text: finalContent }]
       },
     } satisfies Command
@@ -410,32 +332,20 @@ function createPluginCommand(
     return null
   }
 }
-
 export const getPluginCommands = memoize(async (): Promise<Command[]> => {
-  // --bare: skip marketplace plugin auto-load. Explicit --plugin-dir still
-  // works — getInlinePlugins() is set by main.tsx from --plugin-dir.
-  // loadAllPluginsCacheOnly already short-circuits to inline-only when
-  // inlinePlugins.length > 0.
   if (isBareMode() && getInlinePlugins().length === 0) {
     return []
   }
-  // Only load commands from enabled plugins
   const { enabled, errors } = await loadAllPluginsCacheOnly()
-
   if (errors.length > 0) {
     logForDebugging(
       `Plugin loading errors: ${errors.map(e => getPluginErrorMessage(e)).join(', ')}`,
     )
   }
-
-  // Process plugins in parallel; each plugin has its own loadedPaths scope
   const perPluginCommands = await Promise.all(
     enabled.map(async (plugin): Promise<Command[]> => {
-      // Track loaded file paths to prevent duplicates within this plugin
       const loadedPaths = new Set<string>()
       const pluginCommands: Command[] = []
-
-      // Load commands from default commands directory
       if (plugin.commandsPath) {
         try {
           const commands = await loadCommandsFromDirectory(
@@ -448,7 +358,6 @@ export const getPluginCommands = memoize(async (): Promise<Command[]> => {
             loadedPaths,
           )
           pluginCommands.push(...commands)
-
           if (commands.length > 0) {
             logForDebugging(
               `Loaded ${commands.length} commands from plugin ${plugin.name} default directory`,
@@ -461,14 +370,10 @@ export const getPluginCommands = memoize(async (): Promise<Command[]> => {
           )
         }
       }
-
-      // Load commands from additional paths specified in manifest
       if (plugin.commandsPaths) {
         logForDebugging(
           `Plugin ${plugin.name} has commandsPaths: ${plugin.commandsPaths.join(', ')}`,
         )
-        // Process all commandsPaths in parallel. isDuplicatePath is synchronous
-        // (check-and-add), so concurrent access to loadedPaths is safe.
         const pathResults = await Promise.all(
           plugin.commandsPaths.map(async (commandPath): Promise<Command[]> => {
             try {
@@ -477,9 +382,7 @@ export const getPluginCommands = memoize(async (): Promise<Command[]> => {
               logForDebugging(
                 `Checking commandPath ${commandPath} - isDirectory: ${stats.isDirectory()}, isFile: ${stats.isFile()}`,
               )
-
               if (stats.isDirectory()) {
-                // Load all .md files and skill directories from directory
                 const commands = await loadCommandsFromDirectory(
                   commandPath,
                   plugin.name,
@@ -489,7 +392,6 @@ export const getPluginCommands = memoize(async (): Promise<Command[]> => {
                   { isSkillMode: false },
                   loadedPaths,
                 )
-
                 if (commands.length > 0) {
                   logForDebugging(
                     `Loaded ${commands.length} commands from plugin ${plugin.name} custom path: ${commandPath}`,
@@ -505,21 +407,14 @@ export const getPluginCommands = memoize(async (): Promise<Command[]> => {
                 if (isDuplicatePath(fs, commandPath, loadedPaths)) {
                   return []
                 }
-
-                // Load single command file
                 const content = await fs.readFile(commandPath, {
                   encoding: 'utf-8',
                 })
                 const { frontmatter, content: markdownContent } =
                   parseFrontmatter(content, commandPath)
-
-                // Check if there's metadata for this command (object-mapping format)
                 let commandName: string | undefined
                 let metadataOverride: CommandMetadata | undefined
-
                 if (plugin.commandsMetadata) {
-                  // Find metadata by matching the command's absolute path to the metadata source
-                  // Convert metadata.source (relative to plugin root) to absolute path for comparison
                   for (const [name, metadata] of Object.entries(
                     plugin.commandsMetadata,
                   )) {
@@ -536,13 +431,9 @@ export const getPluginCommands = memoize(async (): Promise<Command[]> => {
                     }
                   }
                 }
-
-                // Fall back to filename-based naming if no metadata
                 if (!commandName) {
                   commandName = `${plugin.name}:${basename(commandPath).replace(/\.md$/, '')}`
                 }
-
-                // Apply metadata overrides to frontmatter
                 const finalFrontmatter = metadataOverride
                   ? {
                       ...frontmatter,
@@ -561,14 +452,12 @@ export const getPluginCommands = memoize(async (): Promise<Command[]> => {
                       }),
                     }
                   : frontmatter
-
                 const file: PluginMarkdownFile = {
                   filePath: commandPath,
                   baseDir: dirname(commandPath),
                   frontmatter: finalFrontmatter,
                   content: markdownContent,
                 }
-
                 const command = createPluginCommand(
                   commandName,
                   file,
@@ -577,7 +466,6 @@ export const getPluginCommands = memoize(async (): Promise<Command[]> => {
                   plugin.path,
                   false,
                 )
-
                 if (command) {
                   logForDebugging(
                     `Loaded command from plugin ${plugin.name} custom file: ${commandPath}${metadataOverride ? ' (with metadata override)' : ''}`,
@@ -599,26 +487,17 @@ export const getPluginCommands = memoize(async (): Promise<Command[]> => {
           pluginCommands.push(...commands)
         }
       }
-
-      // Load commands with inline content (no source file)
-      // Note: Commands with source files were already loaded in the previous loop
-      // when iterating through commandsPaths. This loop handles metadata entries
-      // that specify inline content instead of file references.
       if (plugin.commandsMetadata) {
         for (const [name, metadata] of Object.entries(
           plugin.commandsMetadata,
         )) {
-          // Only process entries with inline content (no source)
           if (metadata.content && !metadata.source) {
             try {
-              // Parse inline content for frontmatter
               const { frontmatter, content: markdownContent } =
                 parseFrontmatter(
                   metadata.content,
                   `<inline:${plugin.name}:${name}>`,
                 )
-
-              // Apply metadata overrides to frontmatter
               const finalFrontmatter: FrontmatterData = {
                 ...frontmatter,
                 ...(metadata.description && {
@@ -634,7 +513,6 @@ export const getPluginCommands = memoize(async (): Promise<Command[]> => {
                   'allowed-tools': metadata.allowedTools.join(','),
                 }),
               }
-
               const commandName = `${plugin.name}:${name}`
               const file: PluginMarkdownFile = {
                 filePath: `<inline:${commandName}>`, // Virtual path for inline content
@@ -642,7 +520,6 @@ export const getPluginCommands = memoize(async (): Promise<Command[]> => {
                 frontmatter: finalFrontmatter,
                 content: markdownContent,
               }
-
               const command = createPluginCommand(
                 commandName,
                 file,
@@ -651,7 +528,6 @@ export const getPluginCommands = memoize(async (): Promise<Command[]> => {
                 plugin.path,
                 false,
               )
-
               if (command) {
                 pluginCommands.push(command)
                 logForDebugging(
@@ -670,20 +546,13 @@ export const getPluginCommands = memoize(async (): Promise<Command[]> => {
       return pluginCommands
     }),
   )
-
   const allCommands = perPluginCommands.flat()
   logForDebugging(`Total plugin commands loaded: ${allCommands.length}`)
   return allCommands
 })
-
 export function clearPluginCommandCache(): void {
   getPluginCommands.cache?.clear?.()
 }
-
-/**
- * Loads skills from plugin skills directories
- * Skills are directories containing SKILL.md files
- */
 async function loadSkillsFromDirectory(
   skillsPath: string,
   pluginName: string,
@@ -694,8 +563,6 @@ async function loadSkillsFromDirectory(
 ): Promise<Command[]> {
   const fs = getFsImplementation()
   const skills: Command[] = []
-
-  // First, check if skillsPath itself contains SKILL.md (direct skill directory)
   const directSkillPath = join(skillsPath, 'SKILL.md')
   let directSkillContent: string | null = null
   try {
@@ -709,11 +576,8 @@ async function loadSkillsFromDirectory(
       })
       return skills
     }
-    // ENOENT: no direct SKILL.md, fall through to scan subdirectories
   }
-
   if (directSkillContent !== null) {
-    // This is a direct skill directory, load the skill from here
     if (isDuplicatePath(fs, directSkillPath, loadedPaths)) {
       return skills
     }
@@ -722,16 +586,13 @@ async function loadSkillsFromDirectory(
         directSkillContent,
         directSkillPath,
       )
-
       const skillName = `${pluginName}:${basename(skillsPath)}`
-
       const file: PluginMarkdownFile = {
         filePath: directSkillPath,
         baseDir: dirname(directSkillPath),
         frontmatter,
         content: markdownContent,
       }
-
       const skill = createPluginCommand(
         skillName,
         file,
@@ -741,7 +602,6 @@ async function loadSkillsFromDirectory(
         true, // isSkill
         { isSkillMode: true }, // config
       )
-
       if (skill) {
         skills.push(skill)
       }
@@ -755,8 +615,6 @@ async function loadSkillsFromDirectory(
     }
     return skills
   }
-
-  // Otherwise, scan for subdirectories containing SKILL.md files
   let entries
   try {
     entries = await fs.readdir(skillsPath)
@@ -769,18 +627,13 @@ async function loadSkillsFromDirectory(
     }
     return skills
   }
-
   await Promise.all(
     entries.map(async entry => {
-      // Accept both directories and symlinks (symlinks may point to skill directories)
       if (!entry.isDirectory() && !entry.isSymbolicLink()) {
         return
       }
-
       const skillDirPath = join(skillsPath, entry.name)
       const skillFilePath = join(skillDirPath, 'SKILL.md')
-
-      // Try to read SKILL.md directly; skip if it doesn't exist
       let content: string
       try {
         content = await fs.readFile(skillFilePath, { encoding: 'utf-8' })
@@ -792,26 +645,21 @@ async function loadSkillsFromDirectory(
         }
         return
       }
-
       if (isDuplicatePath(fs, skillFilePath, loadedPaths)) {
         return
       }
-
       try {
         const { frontmatter, content: markdownContent } = parseFrontmatter(
           content,
           skillFilePath,
         )
-
         const skillName = `${pluginName}:${entry.name}`
-
         const file: PluginMarkdownFile = {
           filePath: skillFilePath,
           baseDir: dirname(skillFilePath),
           frontmatter,
           content: markdownContent,
         }
-
         const skill = createPluginCommand(
           skillName,
           file,
@@ -821,7 +669,6 @@ async function loadSkillsFromDirectory(
           true, // isSkill
           { isSkillMode: true }, // config
         )
-
         if (skill) {
           skills.push(skill)
         }
@@ -833,40 +680,28 @@ async function loadSkillsFromDirectory(
       }
     }),
   )
-
   return skills
 }
-
 export const getPluginSkills = memoize(async (): Promise<Command[]> => {
-  // --bare: same gate as getPluginCommands above — honor explicit
-  // --plugin-dir, skip marketplace auto-load.
   if (isBareMode() && getInlinePlugins().length === 0) {
     return []
   }
-  // Only load skills from enabled plugins
   const { enabled, errors } = await loadAllPluginsCacheOnly()
-
   if (errors.length > 0) {
     logForDebugging(
       `Plugin loading errors: ${errors.map(e => getPluginErrorMessage(e)).join(', ')}`,
     )
   }
-
   logForDebugging(
     `getPluginSkills: Processing ${enabled.length} enabled plugins`,
   )
-
-  // Process plugins in parallel; each plugin has its own loadedPaths scope
   const perPluginSkills = await Promise.all(
     enabled.map(async (plugin): Promise<Command[]> => {
-      // Track loaded file paths to prevent duplicates within this plugin
       const loadedPaths = new Set<string>()
       const pluginSkills: Command[] = []
-
       logForDebugging(
         `Checking plugin ${plugin.name}: skillsPath=${plugin.skillsPath ? 'exists' : 'none'}, skillsPaths=${plugin.skillsPaths ? plugin.skillsPaths.length : 0} paths`,
       )
-      // Load skills from default skills directory
       if (plugin.skillsPath) {
         logForDebugging(
           `Attempting to load skills from plugin ${plugin.name} default skillsPath: ${plugin.skillsPath}`,
@@ -881,7 +716,6 @@ export const getPluginSkills = memoize(async (): Promise<Command[]> => {
             loadedPaths,
           )
           pluginSkills.push(...skills)
-
           logForDebugging(
             `Loaded ${skills.length} skills from plugin ${plugin.name} default directory`,
           )
@@ -892,14 +726,10 @@ export const getPluginSkills = memoize(async (): Promise<Command[]> => {
           )
         }
       }
-
-      // Load skills from additional paths specified in manifest
       if (plugin.skillsPaths) {
         logForDebugging(
           `Attempting to load skills from plugin ${plugin.name} skillsPaths: ${plugin.skillsPaths.join(', ')}`,
         )
-        // Process all skillsPaths in parallel. isDuplicatePath is synchronous
-        // (check-and-add), so concurrent access to loadedPaths is safe.
         const pathResults = await Promise.all(
           plugin.skillsPaths.map(async (skillPath): Promise<Command[]> => {
             try {
@@ -914,7 +744,6 @@ export const getPluginSkills = memoize(async (): Promise<Command[]> => {
                 plugin.path,
                 loadedPaths,
               )
-
               logForDebugging(
                 `Loaded ${skills.length} skills from plugin ${plugin.name} custom path: ${skillPath}`,
               )
@@ -935,12 +764,10 @@ export const getPluginSkills = memoize(async (): Promise<Command[]> => {
       return pluginSkills
     }),
   )
-
   const allSkills = perPluginSkills.flat()
   logForDebugging(`Total plugin skills loaded: ${allSkills.length}`)
   return allSkills
 })
-
 export function clearPluginSkillsCache(): void {
   getPluginSkills.cache?.clear?.()
 }

@@ -1,5 +1,3 @@
-/* eslint-disable eslint-plugin-n/no-unsupported-features/node-builtins */
-
 import type { SDKMessage } from '../entrypoints/agentSdkTypes.js'
 import type {
   SDKControlPermissionRequest,
@@ -9,14 +7,12 @@ import type { RemotePermissionResponse } from '../remote/RemoteSessionManager.js
 import { logForDebugging } from '../utils/debug.js'
 import { jsonParse, jsonStringify } from '../utils/slowOperations.js'
 import type { RemoteMessageContent } from '../utils/teleport/api.js'
-
 export type DirectConnectConfig = {
   serverUrl: string
   sessionId: string
   wsUrl: string
   authToken?: string
 }
-
 export type DirectConnectCallbacks = {
   onMessage: (message: SDKMessage) => void
   onPermissionRequest: (
@@ -27,7 +23,6 @@ export type DirectConnectCallbacks = {
   onDisconnected?: () => void
   onError?: (error: Error) => void
 }
-
 function isStdoutMessage(value: unknown): value is StdoutMessage {
   return (
     typeof value === 'object' &&
@@ -36,35 +31,28 @@ function isStdoutMessage(value: unknown): value is StdoutMessage {
     typeof value.type === 'string'
   )
 }
-
 export class DirectConnectSessionManager {
   private ws: WebSocket | null = null
   private config: DirectConnectConfig
   private callbacks: DirectConnectCallbacks
-
   constructor(config: DirectConnectConfig, callbacks: DirectConnectCallbacks) {
     this.config = config
     this.callbacks = callbacks
   }
-
   connect(): void {
     const headers: Record<string, string> = {}
     if (this.config.authToken) {
       headers['authorization'] = `Bearer ${this.config.authToken}`
     }
-    // Bun's WebSocket supports headers option but the DOM typings don't
     this.ws = new WebSocket(this.config.wsUrl, {
       headers,
     } as unknown as string[])
-
     this.ws.addEventListener('open', () => {
       this.callbacks.onConnected?.()
     })
-
     this.ws.addEventListener('message', event => {
       const data = typeof event.data === 'string' ? event.data : ''
       const lines = data.split('\n').filter((l: string) => l.trim())
-
       for (const line of lines) {
         let raw: unknown
         try {
@@ -72,13 +60,10 @@ export class DirectConnectSessionManager {
         } catch {
           continue
         }
-
         if (!isStdoutMessage(raw)) {
           continue
         }
         const parsed = raw
-
-        // Handle control requests (permission requests)
         if (parsed.type === 'control_request') {
           if (parsed.request.subtype === 'can_use_tool') {
             this.callbacks.onPermissionRequest(
@@ -86,8 +71,6 @@ export class DirectConnectSessionManager {
               parsed.request_id,
             )
           } else {
-            // Send an error response for unrecognized subtypes so the
-            // server doesn't hang waiting for a reply that never comes.
             logForDebugging(
               `[DirectConnect] Unsupported control request subtype: ${parsed.request.subtype}`,
             )
@@ -98,8 +81,6 @@ export class DirectConnectSessionManager {
           }
           continue
         }
-
-        // Forward SDK messages (assistant, result, system, etc.)
         if (
           parsed.type !== 'control_response' &&
           parsed.type !== 'keep_alive' &&
@@ -112,22 +93,17 @@ export class DirectConnectSessionManager {
         }
       }
     })
-
     this.ws.addEventListener('close', () => {
       this.callbacks.onDisconnected?.()
     })
-
     this.ws.addEventListener('error', () => {
       this.callbacks.onError?.(new Error('WebSocket connection error'))
     })
   }
-
   sendMessage(content: RemoteMessageContent): boolean {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       return false
     }
-
-    // Must match SDKUserMessage format expected by `--input-format stream-json`
     const message = jsonStringify({
       type: 'user',
       message: {
@@ -140,7 +116,6 @@ export class DirectConnectSessionManager {
     this.ws.send(message)
     return true
   }
-
   respondToPermissionRequest(
     requestId: string,
     result: RemotePermissionResponse,
@@ -148,8 +123,6 @@ export class DirectConnectSessionManager {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       return
     }
-
-    // Must match SDKControlResponse format expected by StructuredIO
     const response = jsonStringify({
       type: 'control_response',
       response: {
@@ -165,16 +138,10 @@ export class DirectConnectSessionManager {
     })
     this.ws.send(response)
   }
-
-  /**
-   * Send an interrupt signal to cancel the current request
-   */
   sendInterrupt(): void {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       return
     }
-
-    // Must match SDKControlRequest format expected by StructuredIO
     const request = jsonStringify({
       type: 'control_request',
       request_id: crypto.randomUUID(),
@@ -184,7 +151,6 @@ export class DirectConnectSessionManager {
     })
     this.ws.send(request)
   }
-
   private sendErrorResponse(requestId: string, error: string): void {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       return
@@ -199,14 +165,12 @@ export class DirectConnectSessionManager {
     })
     this.ws.send(response)
   }
-
   disconnect(): void {
     if (this.ws) {
       this.ws.close()
       this.ws = null
     }
   }
-
   isConnected(): boolean {
     return this.ws?.readyState === WebSocket.OPEN
   }

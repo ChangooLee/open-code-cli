@@ -1,9 +1,5 @@
 import { registerBundledSkill } from '../bundledSkills.js'
-
-// Verified 1-token words (tested via API token counting)
-// All common English words confirmed to tokenize as single tokens
 const ONE_TOKEN_WORDS = [
-  // Articles & pronouns
   'the',
   'a',
   'an',
@@ -28,7 +24,6 @@ const ONE_TOKEN_WORDS = [
   'that',
   'what',
   'who',
-  // Common verbs
   'is',
   'are',
   'was',
@@ -78,7 +73,6 @@ const ONE_TOKEN_WORDS = [
   'seem',
   'leave',
   'put',
-  // Common nouns & adjectives
   'time',
   'year',
   'day',
@@ -115,7 +109,6 @@ const ONE_TOKEN_WORDS = [
   'bad',
   'same',
   'able',
-  // Prepositions & conjunctions
   'in',
   'on',
   'at',
@@ -151,7 +144,6 @@ const ONE_TOKEN_WORDS = [
   'where',
   'why',
   'how',
-  // Common adverbs
   'not',
   'now',
   'just',
@@ -178,7 +170,6 @@ const ONE_TOKEN_WORDS = [
   'down',
   'out',
   'up',
-  // Tech/common words
   'test',
   'code',
   'data',
@@ -198,44 +189,34 @@ const ONE_TOKEN_WORDS = [
   'end',
   'start',
 ]
-
 function generateLoremIpsum(targetTokens: number): string {
   let tokens = 0
   let result = ''
-
   while (tokens < targetTokens) {
-    // Sentence: 10-20 words
     const sentenceLength = 10 + Math.floor(Math.random() * 11)
     let wordsInSentence = 0
-
     for (let i = 0; i < sentenceLength && tokens < targetTokens; i++) {
       const word =
         ONE_TOKEN_WORDS[Math.floor(Math.random() * ONE_TOKEN_WORDS.length)]
       result += word
       tokens++
       wordsInSentence++
-
       if (i === sentenceLength - 1 || tokens >= targetTokens) {
         result += '. '
       } else {
         result += ' '
       }
     }
-
-    // Paragraph break every 5-8 sentences (roughly 20% chance per sentence)
     if (wordsInSentence > 0 && Math.random() < 0.2 && tokens < targetTokens) {
       result += '\n\n'
     }
   }
-
   return result.trim()
 }
-
 export function registerLoremIpsumSkill(): void {
   if (process.env.USER_TYPE !== 'ant') {
     return
   }
-
   registerBundledSkill({
     name: 'lorem-ipsum',
     description:
@@ -244,7 +225,6 @@ export function registerLoremIpsumSkill(): void {
     userInvocable: true,
     async getPromptForCommand(args) {
       const parsed = parseInt(args)
-
       if (args && (isNaN(parsed) || parsed <= 0)) {
         return [
           {
@@ -253,12 +233,8 @@ export function registerLoremIpsumSkill(): void {
           },
         ]
       }
-
       const targetTokens = parsed || 10000
-
-      // Cap at 500k tokens for safety
       const cappedTokens = Math.min(targetTokens, 500_000)
-
       if (cappedTokens < targetTokens) {
         return [
           {
@@ -267,10 +243,7 @@ export function registerLoremIpsumSkill(): void {
           },
         ]
       }
-
       const loremText = generateLoremIpsum(cappedTokens)
-
-      // Just dump the lorem ipsum text into the conversation
       return [
         {
           type: 'text',

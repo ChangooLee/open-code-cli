@@ -3,9 +3,7 @@ import type { PermissionResult } from 'src/utils/permissions/PermissionResult.js
 import { z } from 'zod/v4'
 import { buildTool, type ToolDef } from '../../Tool.js'
 import { lazySchema } from '../../utils/lazySchema.js'
-
 export const TUNGSTEN_TOOL_NAME = 'Tungsten'
-
 const inputSchema = lazySchema(() =>
   z.strictObject({
     prompt: z.string().describe('The instruction to run.'),
@@ -13,26 +11,17 @@ const inputSchema = lazySchema(() =>
 )
 type InputSchema = ReturnType<typeof inputSchema>
 type Input = z.infer<InputSchema>
-
 export type TungstenOutput = {
   result: string
 }
-
-/**
- * Tracks which sessions have used the Tungsten tool so that per-session usage
- * state can be cleared on /clear and session resume.
- */
 const sessionsWithTungstenUsage = new Set<string>()
 let initialized = false
-
 export function clearSessionsWithTungstenUsage(): void {
   sessionsWithTungstenUsage.clear()
 }
-
 export function resetInitializationState(): void {
   initialized = false
 }
-
 export const TungstenTool = buildTool({
   name: TUNGSTEN_TOOL_NAME,
   maxResultSizeChars: 100_000,

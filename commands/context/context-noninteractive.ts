@@ -12,13 +12,6 @@ import { formatTokens } from '../../utils/format.js'
 import { getMessagesAfterCompactBoundary } from '../../utils/messages.js'
 import { getSourceDisplayName } from '../../utils/settings/constants.js'
 import { plural } from '../../utils/stringUtils.js'
-
-/**
- * Shared data-collection path for `/context` (slash command) and the SDK
- * `get_context_usage` control request. Mirrors query.ts's pre-API transforms
- * (compact boundary, projectView, microcompact) so the token count reflects
- * what the model actually sees.
- */
 type CollectContextDataInput = {
   messages: Message[]
   getAppState: () => AppState
@@ -30,7 +23,6 @@ type CollectContextDataInput = {
     appendSystemPrompt?: string
   }
 }
-
 export async function collectContextData(
   context: CollectContextDataInput,
 ): Promise<ContextData> {
@@ -45,19 +37,14 @@ export async function collectContextData(
       appendSystemPrompt,
     },
   } = context
-
   let apiView = getMessagesAfterCompactBoundary(messages)
   if (feature('CONTEXT_COLLAPSE')) {
-    /* eslint-disable @typescript-eslint/no-require-imports */
     const { projectView } =
       require('../../services/contextCollapse/operations.js') as typeof import('../../services/contextCollapse/operations.js')
-    /* eslint-enable @typescript-eslint/no-require-imports */
     apiView = projectView(apiView)
   }
-
   const { messages: compactedMessages } = await microcompactMessages(apiView)
   const appState = getAppState()
-
   return analyzeContextUsage(
     compactedMessages,
     mainLoopModel,
@@ -65,8 +52,6 @@ export async function collectContextData(
     tools,
     agentDefinitions,
     undefined, // terminalWidth
-    // analyzeContextUsage only reads options.{customSystemPrompt,appendSystemPrompt}
-    // but its signature declares the full Pick<ToolUseContext, 'options'>.
     { options: { customSystemPrompt, appendSystemPrompt } } as Pick<
       ToolUseContext,
       'options'
@@ -75,7 +60,6 @@ export async function collectContextData(
     apiView, // original messages for API usage extraction
   )
 }
-
 export async function call(
   _args: string,
   context: ToolUseContext,
@@ -86,7 +70,6 @@ export async function call(
     value: formatContextAsMarkdownTable(data),
   }
 }
-
 function formatContextAsMarkdownTable(data: ContextData): string {
   const {
     categories,
@@ -102,23 +85,15 @@ function formatContextAsMarkdownTable(data: ContextData): string {
     systemTools,
     systemPromptSections,
   } = data
-
   let output = `## Context Usage\n\n`
   output += `**Model:** ${model}  \n`
   output += `**Tokens:** ${formatTokens(totalTokens)} / ${formatTokens(rawMaxTokens)} (${percentage}%)\n`
-
-  // Context-collapse status. Always show when the runtime gate is on —
-  // the user needs to know which strategy is managing their context
-  // even before anything has fired.
   if (feature('CONTEXT_COLLAPSE')) {
-    /* eslint-disable @typescript-eslint/no-require-imports */
     const { getStats, isContextCollapseEnabled } =
       require('../../services/contextCollapse/index.js') as typeof import('../../services/contextCollapse/index.js')
-    /* eslint-enable @typescript-eslint/no-require-imports */
     if (isContextCollapseEnabled()) {
       const s = getStats()
       const { health: h } = s
-
       const parts = []
       if (s.collapsedSpans > 0) {
         parts.push(
@@ -133,7 +108,6 @@ function formatContextAsMarkdownTable(data: ContextData): string {
             ? `${h.totalSpawns} ${plural(h.totalSpawns, 'spawn')}, nothing staged yet`
             : 'waiting for first trigger'
       output += `**Context strategy:** collapse (${summary})\n`
-
       if (h.totalErrors > 0) {
         output += `**Collapse errors:** ${h.totalErrors}/${h.totalSpawns} spawns failed`
         if (h.lastError) {
@@ -146,25 +120,20 @@ function formatContextAsMarkdownTable(data: ContextData): string {
     }
   }
   output += '\n'
-
-  // Main categories table
   const visibleCategories = categories.filter(
     cat =>
       cat.tokens > 0 &&
       cat.name !== 'Free space' &&
       cat.name !== 'Autocompact buffer',
   )
-
   if (visibleCategories.length > 0) {
     output += `### Estimated usage by category\n\n`
     output += `| Category | Tokens | Percentage |\n`
     output += `|----------|--------|------------|\n`
-
     for (const cat of visibleCategories) {
       const percentDisplay = ((cat.tokens / rawMaxTokens) * 100).toFixed(1)
       output += `| ${cat.name} | ${formatTokens(cat.tokens)} | ${percentDisplay}% |\n`
     }
-
     const freeSpaceCategory = categories.find(c => c.name === 'Free space')
     if (freeSpaceCategory && freeSpaceCategory.tokens > 0) {
       const percentDisplay = (
@@ -173,7 +142,6 @@ function formatContextAsMarkdownTable(data: ContextData): string {
       ).toFixed(1)
       output += `| Free space | ${formatTokens(freeSpaceCategory.tokens)} | ${percentDisplay}% |\n`
     }
-
     const autocompactCategory = categories.find(
       c => c.name === 'Autocompact buffer',
     )
@@ -184,11 +152,8 @@ function formatContextAsMarkdownTable(data: ContextData): string {
       ).toFixed(1)
       output += `| Autocompact buffer | ${formatTokens(autocompactCategory.tokens)} | ${percentDisplay}% |\n`
     }
-
     output += `\n`
   }
-
-  // MCP tools
   if (mcpTools.length > 0) {
     output += `### MCP Tools\n\n`
     output += `| Tool | Server | Tokens |\n`
@@ -198,8 +163,6 @@ function formatContextAsMarkdownTable(data: ContextData): string {
     }
     output += `\n`
   }
-
-  // System tools (ant-only)
   if (
     systemTools &&
     systemTools.length > 0 &&
@@ -213,8 +176,6 @@ function formatContextAsMarkdownTable(data: ContextData): string {
     }
     output += `\n`
   }
-
-  // System prompt sections (ant-only)
   if (
     systemPromptSections &&
     systemPromptSections.length > 0 &&
@@ -228,8 +189,6 @@ function formatContextAsMarkdownTable(data: ContextData): string {
     }
     output += `\n`
   }
-
-  // Custom agents
   if (agents.length > 0) {
     output += `### Custom Agents\n\n`
     output += `| Agent Type | Source | Tokens |\n`
@@ -265,8 +224,6 @@ function formatContextAsMarkdownTable(data: ContextData): string {
     }
     output += `\n`
   }
-
-  // Memory files
   if (memoryFiles.length > 0) {
     output += `### Memory Files\n\n`
     output += `| Type | Path | Tokens |\n`
@@ -276,8 +233,6 @@ function formatContextAsMarkdownTable(data: ContextData): string {
     }
     output += `\n`
   }
-
-  // Skills
   if (skills && skills.tokens > 0 && skills.skillFrontmatter.length > 0) {
     output += `### Skills\n\n`
     output += `| Skill | Source | Tokens |\n`
@@ -287,8 +242,6 @@ function formatContextAsMarkdownTable(data: ContextData): string {
     }
     output += `\n`
   }
-
-  // Message breakdown (ant-only)
   if (messageBreakdown && process.env.USER_TYPE === 'ant') {
     output += `### [ANT-ONLY] Message Breakdown\n\n`
     output += `| Category | Tokens |\n`
@@ -299,7 +252,6 @@ function formatContextAsMarkdownTable(data: ContextData): string {
     output += `| Assistant messages (non-tool) | ${formatTokens(messageBreakdown.assistantMessageTokens)} |\n`
     output += `| User messages (non-tool-result) | ${formatTokens(messageBreakdown.userMessageTokens)} |\n`
     output += `\n`
-
     if (messageBreakdown.toolCallsByType.length > 0) {
       output += `#### Top Tools\n\n`
       output += `| Tool | Call Tokens | Result Tokens |\n`
@@ -309,7 +261,6 @@ function formatContextAsMarkdownTable(data: ContextData): string {
       }
       output += `\n`
     }
-
     if (messageBreakdown.attachmentsByType.length > 0) {
       output += `#### Top Attachments\n\n`
       output += `| Attachment | Tokens |\n`
@@ -320,6 +271,5 @@ function formatContextAsMarkdownTable(data: ContextData): string {
       output += `\n`
     }
   }
-
   return output
 }

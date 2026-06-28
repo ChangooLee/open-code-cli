@@ -1,15 +1,8 @@
 export const PRODUCT_URL = 'https://open-code-cli.dev'
-
-// Open Code CLI Remote session URLs
 export const OPEN_CODE_CLI_REMOTE_BASE_URL = 'https://open-code-cli.dev'
 export const OPEN_CODE_CLI_REMOTE_STAGING_BASE_URL =
   'https://staging.open-code-cli.dev'
 export const OPEN_CODE_CLI_REMOTE_LOCAL_BASE_URL = 'http://localhost:4000'
-
-/**
- * Determine if we're in a staging environment for remote sessions.
- * Checks session ID format and ingress URL.
- */
 export function isRemoteSessionStaging(
   sessionId?: string,
   ingressUrl?: string,
@@ -19,11 +12,6 @@ export function isRemoteSessionStaging(
     ingressUrl?.includes('staging') === true
   )
 }
-
-/**
- * Determine if we're in a local-dev environment for remote sessions.
- * Checks session ID format (e.g. `session_local_...`) and ingress URL.
- */
 export function isRemoteSessionLocal(
   sessionId?: string,
   ingressUrl?: string,
@@ -33,10 +21,6 @@ export function isRemoteSessionLocal(
     ingressUrl?.includes('localhost') === true
   )
 }
-
-/**
- * Get the base URL for Open Code CLI remote sessions based on environment.
- */
 export function getOpenCodeCliRemoteBaseUrl(
   sessionId?: string,
   ingressUrl?: string,
@@ -49,28 +33,12 @@ export function getOpenCodeCliRemoteBaseUrl(
   }
   return OPEN_CODE_CLI_REMOTE_BASE_URL
 }
-
-/**
- * Get the full session URL for a remote session.
- *
- * The cse_→session_ translation is a temporary shim gated by
- * open_code_cli_bridge_repl_v2_cse_shim_enabled (see isCseShimEnabled). Worker
- * endpoints (/v1/code/sessions/{id}/worker/*) want `cse_*` but the Open Code CLI
- * frontend currently routes on `session_*` (compat/convert.go:27 validates
- * TagSession). Same UUID body, different tag prefix. Once the server tags by
- * environment_kind and the frontend accepts `cse_*` directly, flip the gate
- * off. No-op for IDs already in `session_*` form. See toCompatSessionId in
- * src/bridge/sessionIdCompat.ts for the canonical helper (lazy-required here
- * to keep constants/ leaf-of-DAG at module-load time).
- */
 export function getRemoteSessionUrl(
   sessionId: string,
   ingressUrl?: string,
 ): string {
-  /* eslint-disable @typescript-eslint/no-require-imports */
   const { toCompatSessionId } =
     require('../bridge/sessionIdCompat.js') as typeof import('../bridge/sessionIdCompat.js')
-  /* eslint-enable @typescript-eslint/no-require-imports */
   const compatId = toCompatSessionId(sessionId)
   const baseUrl = getOpenCodeCliRemoteBaseUrl(compatId, ingressUrl)
   return `${baseUrl}/code/${compatId}`

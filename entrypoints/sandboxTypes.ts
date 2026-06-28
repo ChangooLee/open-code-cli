@@ -1,16 +1,5 @@
-/**
- * Sandbox types for the Open Code CLI Agent SDK
- *
- * This file is the single source of truth for sandbox configuration types.
- * Both the SDK and the settings validation import from here.
- */
-
 import { z } from 'zod/v4'
 import { lazySchema } from '../utils/lazySchema.js'
-
-/**
- * Network configuration schema for sandbox.
- */
 export const SandboxNetworkConfigSchema = lazySchema(() =>
   z
     .object({
@@ -40,10 +29,6 @@ export const SandboxNetworkConfigSchema = lazySchema(() =>
     })
     .optional(),
 )
-
-/**
- * Filesystem configuration schema for sandbox.
- */
 export const SandboxFilesystemConfigSchema = lazySchema(() =>
   z
     .object({
@@ -84,10 +69,6 @@ export const SandboxFilesystemConfigSchema = lazySchema(() =>
     })
     .optional(),
 )
-
-/**
- * Sandbox settings schema.
- */
 export const SandboxSettingsSchema = lazySchema(() =>
   z
     .object({
@@ -101,14 +82,6 @@ export const SandboxSettingsSchema = lazySchema(() =>
             'When false (default), a warning is shown and commands run unsandboxed. ' +
             'Intended for managed-settings deployments that require sandboxing as a hard gate.',
         ),
-      // Note: enabledPlatforms is an undocumented setting read via .passthrough()
-      // It restricts sandboxing to specific platforms (e.g., ["macos"]).
-      //
-      // Added to unblock NVIDIA enterprise rollout: they want to enable
-      // autoAllowBashIfSandboxed but only on macOS initially, since Linux/WSL
-      // sandbox support is newer and less battle-tested. This allows them to
-      // set enabledPlatforms: ["macos"] to disable sandbox (and auto-allow)
-      // on other platforms until they're ready to expand.
       autoAllowBashIfSandboxed: z.boolean().optional(),
       allowUnsandboxedCommands: z
         .boolean()
@@ -142,8 +115,6 @@ export const SandboxSettingsSchema = lazySchema(() =>
     })
     .passthrough(),
 )
-
-// Inferred types from schemas
 export type SandboxSettings = z.infer<ReturnType<typeof SandboxSettingsSchema>>
 export type SandboxNetworkConfig = NonNullable<
   z.infer<ReturnType<typeof SandboxNetworkConfigSchema>>

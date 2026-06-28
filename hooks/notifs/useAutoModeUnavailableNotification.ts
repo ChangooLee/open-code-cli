@@ -9,13 +9,6 @@ import {
   getAutoModeUnavailableReason,
 } from '../../utils/permissions/permissionSetup.js'
 import { hasAutoModeOptIn } from '../../utils/settings/settings.js'
-
-/**
- * Shows a one-shot notification when the shift-tab carousel wraps past where
- * auto mode would have been. Covers all reasons (settings, circuit-breaker,
- * org-allowlist). The startup case (defaultMode: auto silently downgraded) is
- * handled by verifyAutoModeGateAccess → checkAndDisableAutoModeIfNeeded.
- */
 export function useAutoModeUnavailableNotification(): void {
   const { addNotification } = useNotifications()
   const mode = useAppState(s => s.toolPermissionContext.mode)
@@ -24,27 +17,21 @@ export function useAutoModeUnavailableNotification(): void {
   )
   const shownRef = useRef(false)
   const prevModeRef = useRef<PermissionMode>(mode)
-
   useEffect(() => {
     const prevMode = prevModeRef.current
     prevModeRef.current = mode
-
     if (!feature('TRANSCRIPT_CLASSIFIER')) return
     if (getIsRemoteMode()) return
     if (shownRef.current) return
-
     const wrappedPastAutoSlot =
       mode === 'default' &&
       prevMode !== 'default' &&
       prevMode !== 'auto' &&
       !isAutoModeAvailable &&
       hasAutoModeOptIn()
-
     if (!wrappedPastAutoSlot) return
-
     const reason = getAutoModeUnavailableReason()
     if (!reason) return
-
     shownRef.current = true
     addNotification({
       key: 'auto-mode-unavailable',

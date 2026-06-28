@@ -1,14 +1,9 @@
 import type { ContentBlockParam } from 'src/services/api/openaiCompatible.js'
 import type { Command } from '../commands.js'
 import { isUltrareviewEnabled } from './review/ultrareviewEnabled.js'
-
-// Legal wants the explicit surface name plus a docs link visible before the
-// user triggers, so the description carries "Open Code CLI on the web" + URL.
 const CCR_TERMS_URL = 'https://open-code-cli.dev/docs/open-code-cli-on-the-web'
-
 const LOCAL_REVIEW_PROMPT = (args: string) => `
       You are an expert code reviewer. Follow these steps:
-
       1. If no PR number is provided in the args, run \`gh pr list\` to show open PRs
       2. If a PR number is provided, run \`gh pr view <number>\` to get PR details
       3. Run \`gh pr diff <number>\` to get the diff
@@ -17,19 +12,15 @@ const LOCAL_REVIEW_PROMPT = (args: string) => `
          - Analysis of code quality and style
          - Specific suggestions for improvements
          - Any potential issues or risks
-
       Keep your review concise but thorough. Focus on:
       - Code correctness
       - Following project conventions
       - Performance implications
       - Test coverage
       - Security considerations
-
       Format your review with clear sections and bullet points.
-
       PR number: ${args}
     `
-
 const review: Command = {
   type: 'prompt',
   name: 'review',
@@ -41,10 +32,6 @@ const review: Command = {
     return [{ type: 'text', text: LOCAL_REVIEW_PROMPT(args) }]
   },
 }
-
-// /ultrareview is the ONLY entry point to the remote bughunter path —
-// /review stays purely local. local-jsx type renders the overage permission
-// dialog when free reviews are exhausted.
 const ultrareview: Command = {
   type: 'local-jsx',
   name: 'ultrareview',
@@ -52,6 +39,5 @@ const ultrareview: Command = {
   isEnabled: () => isUltrareviewEnabled(),
   load: () => import('./review/ultrareviewCommand.js'),
 }
-
 export default review
 export { ultrareview }

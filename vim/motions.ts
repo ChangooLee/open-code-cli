@@ -1,15 +1,4 @@
-/**
- * Vim Motion Functions
- *
- * Pure functions for resolving vim motions to cursor positions.
- */
-
 import type { Cursor } from '../utils/Cursor.js'
-
-/**
- * Resolve a motion to a target cursor position.
- * Does not modify anything - pure calculation.
- */
 export function resolveMotion(
   key: string,
   cursor: Cursor,
@@ -23,10 +12,6 @@ export function resolveMotion(
   }
   return result
 }
-
-/**
- * Apply a single motion step.
- */
 function applySingleMotion(key: string, cursor: Cursor): Cursor {
   switch (key) {
     case 'h':
@@ -65,18 +50,9 @@ function applySingleMotion(key: string, cursor: Cursor): Cursor {
       return cursor
   }
 }
-
-/**
- * Check if a motion is inclusive (includes character at destination).
- */
 export function isInclusiveMotion(key: string): boolean {
   return 'eE$'.includes(key)
 }
-
-/**
- * Check if a motion is linewise (operates on full lines when used with operators).
- * Note: gj/gk are characterwise exclusive per `:help gj`, not linewise.
- */
 export function isLinewiseMotion(key: string): boolean {
   return 'jkG'.includes(key) || key === 'gg'
 }

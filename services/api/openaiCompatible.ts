@@ -551,7 +551,6 @@ async function responseToAPIError(response: Response): Promise<APIError> {
     try {
       message = await response.text()
     } catch {
-      // keep status text
     }
   }
   if (response.status === 408) {

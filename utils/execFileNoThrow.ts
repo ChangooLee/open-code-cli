@@ -1,28 +1,18 @@
-// This file represents useful wrappers over node:child_process
-// These wrappers ease error handling and cross-platform compatbility
-// By using execa, Windows automatically gets shell escaping + BAT / CMD handling
-
 import { type ExecaError, execa } from 'execa'
 import { getCwd } from '../utils/cwd.js'
 import { logError } from './log.js'
-
 export { execSyncWithDefaults_DEPRECATED } from './execFileNoThrowPortable.js'
-
 const MS_IN_SECOND = 1000
 const SECONDS_IN_MINUTE = 60
-
 type ExecFileOptions = {
   abortSignal?: AbortSignal
   timeout?: number
   preserveOutputOnError?: boolean
-  // Setting useCwd=false avoids circular dependencies during initialization
-  // getCwd() -> PersistentShell -> logEvent() -> execFileNoThrow
   useCwd?: boolean
   env?: NodeJS.ProcessEnv
   stdin?: 'ignore' | 'inherit' | 'pipe'
   input?: string
 }
-
 export function execFileNoThrow(
   file: string,
   args: string[],
@@ -42,7 +32,6 @@ export function execFileNoThrow(
     input: options.input,
   })
 }
-
 type ExecFileWithCwdOptions = {
   abortSignal?: AbortSignal
   timeout?: number
@@ -54,22 +43,10 @@ type ExecFileWithCwdOptions = {
   stdin?: 'ignore' | 'inherit' | 'pipe'
   input?: string
 }
-
 type ExecaResultWithError = {
   shortMessage?: string
   signal?: string
 }
-
-/**
- * Extracts a human-readable error message from an execa result.
- *
- * Priority order:
- * 1. shortMessage - execa's human-readable error (e.g., "Command failed with exit code 1: ...")
- *    This is preferred because it already includes signal info when a process is killed,
- *    making it more informative than just the signal name.
- * 2. signal - the signal that killed the process (e.g., "SIGTERM")
- * 3. errorCode - fallback to just the numeric exit code
- */
 function getErrorMessage(
   result: ExecaResultWithError,
   errorCode: number,
@@ -82,10 +59,6 @@ function getErrorMessage(
   }
   return String(errorCode)
 }
-
-/**
- * execFile, but always resolves (never throws)
- */
 export function execFileNoThrowWithCwd(
   file: string,
   args: string[],
@@ -106,7 +79,6 @@ export function execFileNoThrowWithCwd(
   },
 ): Promise<{ stdout: string; stderr: string; code: number; error?: string }> {
   return new Promise(resolve => {
-    // Use execa for cross-platform .bat/.cmd compatibility on Windows
     execa(file, args, {
       maxBuffer,
       signal: abortSignal,

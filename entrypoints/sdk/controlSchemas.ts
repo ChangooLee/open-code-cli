@@ -1,12 +1,3 @@
-/**
- * SDK Control Schemas - Zod schemas for the control protocol.
- *
- * These schemas define the control protocol between SDK implementations and the CLI.
- * Used by SDK builders (e.g., Python SDK) to communicate with the CLI process.
- *
- * SDK consumers should use coreSchemas.ts instead.
- */
-
 import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js'
 import { z } from 'zod/v4'
 import { lazySchema } from '../../utils/lazySchema.js'
@@ -29,20 +20,9 @@ import {
   SDKUserMessageSchema,
   SlashCommandSchema,
 } from './coreSchemas.js'
-
-// ============================================================================
-// External Type Placeholders
-// ============================================================================
-
-// JSONRPCMessage from @modelcontextprotocol/sdk
 export const JSONRPCMessagePlaceholder = lazySchema(
   () => z.unknown() as unknown as z.ZodType<JSONRPCMessage>,
 )
-
-// ============================================================================
-// Hook Callback Types
-// ============================================================================
-
 export const SDKHookCallbackMatcherSchema = lazySchema(() =>
   z
     .object({
@@ -52,11 +32,6 @@ export const SDKHookCallbackMatcherSchema = lazySchema(() =>
     })
     .describe('Configuration for matching and routing hook callbacks.'),
 )
-
-// ============================================================================
-// Control Request Types
-// ============================================================================
-
 export const SDKControlInitializeRequestSchema = lazySchema(() =>
   z
     .object({
@@ -76,7 +51,6 @@ export const SDKControlInitializeRequestSchema = lazySchema(() =>
       'Initializes the SDK session with hooks, MCP servers, and agent configuration.',
     ),
 )
-
 export const SDKControlInitializeResponseSchema = lazySchema(() =>
   z
     .object({
@@ -96,7 +70,6 @@ export const SDKControlInitializeResponseSchema = lazySchema(() =>
       'Response from session initialization with available commands, models, and account info.',
     ),
 )
-
 export const SDKControlInterruptRequestSchema = lazySchema(() =>
   z
     .object({
@@ -104,8 +77,6 @@ export const SDKControlInterruptRequestSchema = lazySchema(() =>
     })
     .describe('Interrupts the currently running conversation turn.'),
 )
-
-
 export const SDKControlPermissionRequestSchema = lazySchema(() =>
   z
     .object({
@@ -123,7 +94,6 @@ export const SDKControlPermissionRequestSchema = lazySchema(() =>
     })
     .describe('Requests permission to use a tool with the given input.'),
 )
-
 export const SDKControlSetPermissionModeRequestSchema = lazySchema(() =>
   z
     .object({
@@ -136,7 +106,6 @@ export const SDKControlSetPermissionModeRequestSchema = lazySchema(() =>
     })
     .describe('Sets the permission mode for tool execution handling.'),
 )
-
 export const SDKControlSetModelRequestSchema = lazySchema(() =>
   z
     .object({
@@ -145,7 +114,6 @@ export const SDKControlSetModelRequestSchema = lazySchema(() =>
     })
     .describe('Sets the model to use for subsequent conversation turns.'),
 )
-
 export const SDKControlSetMaxThinkingTokensRequestSchema = lazySchema(() =>
   z
     .object({
@@ -156,7 +124,6 @@ export const SDKControlSetMaxThinkingTokensRequestSchema = lazySchema(() =>
       'Sets the maximum number of thinking tokens for extended thinking.',
     ),
 )
-
 export const SDKControlMcpStatusRequestSchema = lazySchema(() =>
   z
     .object({
@@ -164,7 +131,6 @@ export const SDKControlMcpStatusRequestSchema = lazySchema(() =>
     })
     .describe('Requests the current status of all MCP server connections.'),
 )
-
 export const SDKControlMcpStatusResponseSchema = lazySchema(() =>
   z
     .object({
@@ -174,7 +140,6 @@ export const SDKControlMcpStatusResponseSchema = lazySchema(() =>
       'Response containing the current status of all MCP server connections.',
     ),
 )
-
 export const SDKControlGetContextUsageRequestSchema = lazySchema(() =>
   z
     .object({
@@ -184,7 +149,6 @@ export const SDKControlGetContextUsageRequestSchema = lazySchema(() =>
       'Requests a breakdown of current context window usage by category.',
     ),
 )
-
 const ContextCategorySchema = lazySchema(() =>
   z.object({
     name: z.string(),
@@ -193,7 +157,6 @@ const ContextCategorySchema = lazySchema(() =>
     isDeferred: z.boolean().optional(),
   }),
 )
-
 const ContextGridSquareSchema = lazySchema(() =>
   z.object({
     color: z.string(),
@@ -204,7 +167,6 @@ const ContextGridSquareSchema = lazySchema(() =>
     squareFullness: z.number(),
   }),
 )
-
 export const SDKControlGetContextUsageResponseSchema = lazySchema(() =>
   z
     .object({
@@ -307,7 +269,6 @@ export const SDKControlGetContextUsageResponseSchema = lazySchema(() =>
       'Breakdown of current context window usage by category (system prompt, tools, messages, etc.).',
     ),
 )
-
 export const SDKControlRewindFilesRequestSchema = lazySchema(() =>
   z
     .object({
@@ -317,7 +278,6 @@ export const SDKControlRewindFilesRequestSchema = lazySchema(() =>
     })
     .describe('Rewinds file changes made since a specific user message.'),
 )
-
 export const SDKControlRewindFilesResponseSchema = lazySchema(() =>
   z
     .object({
@@ -329,7 +289,6 @@ export const SDKControlRewindFilesResponseSchema = lazySchema(() =>
     })
     .describe('Result of a rewindFiles operation.'),
 )
-
 export const SDKControlCancelAsyncMessageRequestSchema = lazySchema(() =>
   z
     .object({
@@ -340,7 +299,6 @@ export const SDKControlCancelAsyncMessageRequestSchema = lazySchema(() =>
       'Drops a pending async user message from the command queue by uuid. No-op if already dequeued for execution.',
     ),
 )
-
 export const SDKControlCancelAsyncMessageResponseSchema = lazySchema(() =>
   z
     .object({
@@ -350,7 +308,6 @@ export const SDKControlCancelAsyncMessageResponseSchema = lazySchema(() =>
       'Result of a cancel_async_message operation. cancelled=false means the message was not in the queue (already dequeued or never enqueued).',
     ),
 )
-
 export const SDKControlSeedReadStateRequestSchema = lazySchema(() =>
   z
     .object({
@@ -362,7 +319,6 @@ export const SDKControlSeedReadStateRequestSchema = lazySchema(() =>
       'Seeds the readFileState cache with a path+mtime entry. Use when a prior Read was removed from context (e.g. by snip) so Edit validation would fail despite the client having observed the Read. The mtime lets the CLI detect if the file changed since the seeded Read — same staleness check as the normal path.',
     ),
 )
-
 export const SDKHookCallbackRequestSchema = lazySchema(() =>
   z
     .object({
@@ -373,7 +329,6 @@ export const SDKHookCallbackRequestSchema = lazySchema(() =>
     })
     .describe('Delivers a hook callback with its input data.'),
 )
-
 export const SDKControlMcpMessageRequestSchema = lazySchema(() =>
   z
     .object({
@@ -383,7 +338,6 @@ export const SDKControlMcpMessageRequestSchema = lazySchema(() =>
     })
     .describe('Sends a JSON-RPC message to a specific MCP server.'),
 )
-
 export const SDKControlMcpSetServersRequestSchema = lazySchema(() =>
   z
     .object({
@@ -392,7 +346,6 @@ export const SDKControlMcpSetServersRequestSchema = lazySchema(() =>
     })
     .describe('Replaces the set of dynamically managed MCP servers.'),
 )
-
 export const SDKControlMcpSetServersResponseSchema = lazySchema(() =>
   z
     .object({
@@ -404,7 +357,6 @@ export const SDKControlMcpSetServersResponseSchema = lazySchema(() =>
       'Result of replacing the set of dynamically managed MCP servers.',
     ),
 )
-
 export const SDKControlReloadPluginsRequestSchema = lazySchema(() =>
   z
     .object({
@@ -414,7 +366,6 @@ export const SDKControlReloadPluginsRequestSchema = lazySchema(() =>
       'Reloads plugins from disk and returns the refreshed session components.',
     ),
 )
-
 export const SDKControlReloadPluginsResponseSchema = lazySchema(() =>
   z
     .object({
@@ -434,7 +385,6 @@ export const SDKControlReloadPluginsResponseSchema = lazySchema(() =>
       'Refreshed commands, agents, plugins, and MCP server status after reload.',
     ),
 )
-
 export const SDKControlMcpReconnectRequestSchema = lazySchema(() =>
   z
     .object({
@@ -443,7 +393,6 @@ export const SDKControlMcpReconnectRequestSchema = lazySchema(() =>
     })
     .describe('Reconnects a disconnected or failed MCP server.'),
 )
-
 export const SDKControlMcpToggleRequestSchema = lazySchema(() =>
   z
     .object({
@@ -453,8 +402,6 @@ export const SDKControlMcpToggleRequestSchema = lazySchema(() =>
     })
     .describe('Enables or disables an MCP server.'),
 )
-
-
 export const SDKControlStopTaskRequestSchema = lazySchema(() =>
   z
     .object({
@@ -463,7 +410,6 @@ export const SDKControlStopTaskRequestSchema = lazySchema(() =>
     })
     .describe('Stops a running task.'),
 )
-
 export const SDKControlApplyFlagSettingsRequestSchema = lazySchema(() =>
   z
     .object({
@@ -474,7 +420,6 @@ export const SDKControlApplyFlagSettingsRequestSchema = lazySchema(() =>
       'Merges the provided settings into the flag settings layer, updating the active configuration.',
     ),
 )
-
 export const SDKControlGetSettingsRequestSchema = lazySchema(() =>
   z
     .object({
@@ -484,7 +429,6 @@ export const SDKControlGetSettingsRequestSchema = lazySchema(() =>
       'Returns the effective merged settings and the raw per-source settings.',
     ),
 )
-
 export const SDKControlGetSettingsResponseSchema = lazySchema(() =>
   z
     .object({
@@ -508,8 +452,6 @@ export const SDKControlGetSettingsResponseSchema = lazySchema(() =>
       applied: z
         .object({
           model: z.string(),
-          // String levels only — numeric effort is ant-only and the
-          // Zod→proto generator can't emit enum∪number unions.
           effort: z.enum(['low', 'medium', 'high', 'max']).nullable(),
         })
         .optional()
@@ -521,7 +463,6 @@ export const SDKControlGetSettingsResponseSchema = lazySchema(() =>
       'Effective merged settings plus raw per-source settings in merge order.',
     ),
 )
-
 export const SDKControlElicitationRequestSchema = lazySchema(() =>
   z
     .object({
@@ -537,7 +478,6 @@ export const SDKControlElicitationRequestSchema = lazySchema(() =>
       'Requests the SDK consumer to handle an MCP elicitation (user input request).',
     ),
 )
-
 export const SDKControlElicitationResponseSchema = lazySchema(() =>
   z
     .object({
@@ -546,8 +486,6 @@ export const SDKControlElicitationResponseSchema = lazySchema(() =>
     })
     .describe('Response from the SDK consumer for an elicitation request.'),
 )
-
-
 export const SDKControlEndSessionRequestSchema = lazySchema(() =>
   z
     .object({
@@ -556,7 +494,6 @@ export const SDKControlEndSessionRequestSchema = lazySchema(() =>
     })
     .describe('Signals the print-mode session should be torn down.'),
 )
-
 export const SDKControlChannelEnableRequestSchema = lazySchema(() =>
   z
     .object({
@@ -565,7 +502,6 @@ export const SDKControlChannelEnableRequestSchema = lazySchema(() =>
     })
     .describe('Enables a notification/elicitation channel for an MCP server.'),
 )
-
 export const SDKControlMcpAuthenticateRequestSchema = lazySchema(() =>
   z
     .object({
@@ -574,7 +510,6 @@ export const SDKControlMcpAuthenticateRequestSchema = lazySchema(() =>
     })
     .describe('Starts an OAuth authentication flow for an MCP server.'),
 )
-
 export const SDKControlMcpOauthCallbackUrlRequestSchema = lazySchema(() =>
   z
     .object({
@@ -584,7 +519,6 @@ export const SDKControlMcpOauthCallbackUrlRequestSchema = lazySchema(() =>
     })
     .describe('Submits a manual OAuth callback URL for an MCP server.'),
 )
-
 export const SDKControlMcpClearAuthRequestSchema = lazySchema(() =>
   z
     .object({
@@ -593,7 +527,6 @@ export const SDKControlMcpClearAuthRequestSchema = lazySchema(() =>
     })
     .describe('Revokes stored OAuth tokens for an MCP server.'),
 )
-
 export const SDKControlOpenCodeCliAuthenticateRequestSchema = lazySchema(() =>
   z
     .object({
@@ -602,7 +535,6 @@ export const SDKControlOpenCodeCliAuthenticateRequestSchema = lazySchema(() =>
     })
     .describe('Starts the Open Code CLI OAuth flow over the control channel.'),
 )
-
 export const SDKControlOpenCodeCliOauthCallbackRequestSchema = lazySchema(() =>
   z
     .object({
@@ -612,7 +544,6 @@ export const SDKControlOpenCodeCliOauthCallbackRequestSchema = lazySchema(() =>
     })
     .describe('Submits a manual Open Code CLI OAuth authorization code.'),
 )
-
 export const SDKControlOpenCodeCliOauthWaitForCompletionRequestSchema =
   lazySchema(() =>
     z
@@ -621,7 +552,6 @@ export const SDKControlOpenCodeCliOauthWaitForCompletionRequestSchema =
       })
       .describe('Waits for the active Open Code CLI OAuth flow to complete.'),
   )
-
 export const SDKControlGenerateSessionTitleRequestSchema = lazySchema(() =>
   z
     .object({
@@ -631,7 +561,6 @@ export const SDKControlGenerateSessionTitleRequestSchema = lazySchema(() =>
     })
     .describe('Requests generation of a session title from a description.'),
 )
-
 export const SDKControlSideQuestionRequestSchema = lazySchema(() =>
   z
     .object({
@@ -640,7 +569,6 @@ export const SDKControlSideQuestionRequestSchema = lazySchema(() =>
     })
     .describe('Asks a forked-agent side question without blocking the loop.'),
 )
-
 export const SDKControlRemoteControlRequestSchema = lazySchema(() =>
   z
     .object({
@@ -649,11 +577,6 @@ export const SDKControlRemoteControlRequestSchema = lazySchema(() =>
     })
     .describe('Enables or disables the remote-control bridge for the session.'),
 )
-
-// ============================================================================
-// Control Request/Response Wrappers
-// ============================================================================
-
 export const SDKControlRequestInnerSchema = lazySchema(() =>
   z.union([
     SDKControlInterruptRequestSchema(),
@@ -690,7 +613,6 @@ export const SDKControlRequestInnerSchema = lazySchema(() =>
     SDKControlRemoteControlRequestSchema(),
   ]),
 )
-
 export const SDKControlRequestSchema = lazySchema(() =>
   z.object({
     type: z.literal('control_request'),
@@ -698,7 +620,6 @@ export const SDKControlRequestSchema = lazySchema(() =>
     request: SDKControlRequestInnerSchema(),
   }),
 )
-
 export const ControlResponseSchema = lazySchema(() =>
   z.object({
     subtype: z.literal('success'),
@@ -706,7 +627,6 @@ export const ControlResponseSchema = lazySchema(() =>
     response: z.record(z.string(), z.unknown()).optional(),
   }),
 )
-
 export const ControlErrorResponseSchema = lazySchema(() =>
   z.object({
     subtype: z.literal('error'),
@@ -717,14 +637,12 @@ export const ControlErrorResponseSchema = lazySchema(() =>
       .optional(),
   }),
 )
-
 export const SDKControlResponseSchema = lazySchema(() =>
   z.object({
     type: z.literal('control_response'),
     response: z.union([ControlResponseSchema(), ControlErrorResponseSchema()]),
   }),
 )
-
 export const SDKControlCancelRequestSchema = lazySchema(() =>
   z
     .object({
@@ -733,7 +651,6 @@ export const SDKControlCancelRequestSchema = lazySchema(() =>
     })
     .describe('Cancels a currently open control request.'),
 )
-
 export const SDKKeepAliveMessageSchema = lazySchema(() =>
   z
     .object({
@@ -741,7 +658,6 @@ export const SDKKeepAliveMessageSchema = lazySchema(() =>
     })
     .describe('Keep-alive message to maintain WebSocket connection.'),
 )
-
 export const SDKUpdateEnvironmentVariablesMessageSchema = lazySchema(() =>
   z
     .object({
@@ -750,11 +666,6 @@ export const SDKUpdateEnvironmentVariablesMessageSchema = lazySchema(() =>
     })
     .describe('Updates environment variables at runtime.'),
 )
-
-// ============================================================================
-// Aggregate Message Types
-// ============================================================================
-
 export const StdoutMessageSchema = lazySchema(() =>
   z.union([
     SDKMessageSchema(),
@@ -767,7 +678,6 @@ export const StdoutMessageSchema = lazySchema(() =>
     SDKKeepAliveMessageSchema(),
   ]),
 )
-
 export const StdinMessageSchema = lazySchema(() =>
   z.union([
     SDKUserMessageSchema(),

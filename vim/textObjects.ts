@@ -1,21 +1,10 @@
-/**
- * Vim Text Object Finding
- *
- * Functions for finding text object boundaries (iw, aw, i", a(, etc.)
- */
-
 import {
   isVimPunctuation,
   isVimWhitespace,
   isVimWordChar,
 } from '../utils/Cursor.js'
 import { getGraphemeSegmenter } from '../utils/intl.js'
-
 export type TextObjectRange = { start: number; end: number } | null
-
-/**
- * Delimiter pairs for text objects.
- */
 const PAIRS: Record<string, [string, string]> = {
   '(': ['(', ')'],
   ')': ['(', ')'],
@@ -31,10 +20,6 @@ const PAIRS: Record<string, [string, string]> = {
   "'": ["'", "'"],
   '`': ['`', '`'],
 }
-
-/**
- * Find a text object at the given position.
- */
 export function findTextObject(
   text: string,
   offset: number,
@@ -45,7 +30,6 @@ export function findTextObject(
     return findWordObject(text, offset, isInner, isVimWordChar)
   if (objectType === 'W')
     return findWordObject(text, offset, isInner, ch => !isVimWhitespace(ch))
-
   const pair = PAIRS[objectType]
   if (pair) {
     const [open, close] = pair
@@ -53,23 +37,18 @@ export function findTextObject(
       ? findQuoteObject(text, offset, open, isInner)
       : findBracketObject(text, offset, open, close, isInner)
   }
-
   return null
 }
-
 function findWordObject(
   text: string,
   offset: number,
   isInner: boolean,
   isWordChar: (ch: string) => boolean,
 ): TextObjectRange {
-  // Pre-segment into graphemes for grapheme-safe iteration
   const graphemes: Array<{ segment: string; index: number }> = []
   for (const { segment, index } of getGraphemeSegmenter().segment(text)) {
     graphemes.push({ segment, index })
   }
-
-  // Find which grapheme index the offset falls in
   let graphemeIdx = graphemes.length - 1
   for (let i = 0; i < graphemes.length; i++) {
     const g = graphemes[i]!
@@ -80,17 +59,14 @@ function findWordObject(
       break
     }
   }
-
   const graphemeAt = (idx: number): string => graphemes[idx]?.segment ?? ''
   const offsetAt = (idx: number): number =>
     idx < graphemes.length ? graphemes[idx]!.index : text.length
   const isWs = (idx: number): boolean => isVimWhitespace(graphemeAt(idx))
   const isWord = (idx: number): boolean => isWordChar(graphemeAt(idx))
   const isPunct = (idx: number): boolean => isVimPunctuation(graphemeAt(idx))
-
   let startIdx = graphemeIdx
   let endIdx = graphemeIdx
-
   if (isWord(graphemeIdx)) {
     while (startIdx > 0 && isWord(startIdx - 1)) startIdx--
     while (endIdx < graphemes.length && isWord(endIdx)) endIdx++
@@ -102,19 +78,15 @@ function findWordObject(
     while (startIdx > 0 && isPunct(startIdx - 1)) startIdx--
     while (endIdx < graphemes.length && isPunct(endIdx)) endIdx++
   }
-
   if (!isInner) {
-    // Include surrounding whitespace
     if (endIdx < graphemes.length && isWs(endIdx)) {
       while (endIdx < graphemes.length && isWs(endIdx)) endIdx++
     } else if (startIdx > 0 && isWs(startIdx - 1)) {
       while (startIdx > 0 && isWs(startIdx - 1)) startIdx--
     }
   }
-
   return { start: offsetAt(startIdx), end: offsetAt(endIdx) }
 }
-
 function findQuoteObject(
   text: string,
   offset: number,
@@ -126,13 +98,10 @@ function findQuoteObject(
   const effectiveEnd = lineEnd === -1 ? text.length : lineEnd
   const line = text.slice(lineStart, effectiveEnd)
   const posInLine = offset - lineStart
-
   const positions: number[] = []
   for (let i = 0; i < line.length; i++) {
     if (line[i] === quote) positions.push(i)
   }
-
-  // Pair quotes correctly: 0-1, 2-3, 4-5, etc.
   for (let i = 0; i < positions.length - 1; i += 2) {
     const qs = positions[i]!
     const qe = positions[i + 1]!
@@ -142,10 +111,8 @@ function findQuoteObject(
         : { start: lineStart + qs, end: lineStart + qe + 1 }
     }
   }
-
   return null
 }
-
 function findBracketObject(
   text: string,
   offset: number,
@@ -155,7 +122,6 @@ function findBracketObject(
 ): TextObjectRange {
   let depth = 0
   let start = -1
-
   for (let i = offset; i >= 0; i--) {
     if (text[i] === close && i !== offset) depth++
     else if (text[i] === open) {
@@ -167,7 +133,6 @@ function findBracketObject(
     }
   }
   if (start === -1) return null
-
   depth = 0
   let end = -1
   for (let i = start + 1; i < text.length; i++) {
@@ -181,6 +146,5 @@ function findBracketObject(
     }
   }
   if (end === -1) return null
-
   return isInner ? { start: start + 1, end } : { start, end: end + 1 }
 }

@@ -19,7 +19,6 @@ import {
 import { ENTER_WORKTREE_TOOL_NAME } from './constants.js'
 import { getEnterWorktreeToolPrompt } from './prompt.js'
 import { renderToolResultMessage, renderToolUseMessage } from './UI.js'
-
 const inputSchema = lazySchema(() =>
   z.strictObject({
     name: z
@@ -38,7 +37,6 @@ const inputSchema = lazySchema(() =>
   }),
 )
 type InputSchema = ReturnType<typeof inputSchema>
-
 const outputSchema = lazySchema(() =>
   z.object({
     worktreePath: z.string(),
@@ -48,7 +46,6 @@ const outputSchema = lazySchema(() =>
 )
 type OutputSchema = ReturnType<typeof outputSchema>
 export type Output = z.infer<OutputSchema>
-
 export const EnterWorktreeTool: Tool<InputSchema, Output> = buildTool({
   name: ENTER_WORKTREE_TOOL_NAME,
   searchHint: 'create an isolated git worktree and switch into it',
@@ -75,40 +72,29 @@ export const EnterWorktreeTool: Tool<InputSchema, Output> = buildTool({
   renderToolUseMessage,
   renderToolResultMessage,
   async call(input) {
-    // Validate not already in a worktree created by this session
     if (getCurrentWorktreeSession()) {
       throw new Error('Already in a worktree session')
     }
-
-    // Resolve to main repo root so worktree creation works from within a worktree
     const mainRepoRoot = findCanonicalGitRoot(getCwd())
     if (mainRepoRoot && mainRepoRoot !== getCwd()) {
       process.chdir(mainRepoRoot)
       setCwd(mainRepoRoot)
     }
-
     const slug = input.name ?? getPlanSlug()
-
     const worktreeSession = await createWorktreeForSession(getSessionId(), slug)
-
     process.chdir(worktreeSession.worktreePath)
     setCwd(worktreeSession.worktreePath)
     setOriginalCwd(getCwd())
     saveWorktreeState(worktreeSession)
-    // Clear cached system prompt sections so env_info_simple recomputes with worktree context
     clearSystemPromptSections()
-    // Clear memoized caches that depend on CWD
     clearMemoryFileCaches()
     getPlansDirectory.cache.clear?.()
-
     logEvent('open_code_cli_worktree_created', {
       mid_session: true,
     })
-
     const branchInfo = worktreeSession.worktreeBranch
       ? ` on branch ${worktreeSession.worktreeBranch}`
       : ''
-
     return {
       data: {
         worktreePath: worktreeSession.worktreePath,

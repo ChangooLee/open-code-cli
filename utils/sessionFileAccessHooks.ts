@@ -1,8 +1,3 @@
-/**
- * Session file access analytics hooks.
- * Tracks access to session memory and transcript files via Read, Grep, Glob tools.
- * Also tracks memdir file access via Read, Grep, Glob, Edit, and Write tools.
- */
 import { feature } from 'bun:bundle'
 import { registerHookCallbacks } from '../bootstrap/state.js'
 import type { HookInput, HookJSONOutput } from '../entrypoints/agentSdkTypes.js'
@@ -27,8 +22,6 @@ import {
   isAutoMemFile,
   memoryScopeForPath,
 } from './memoryFileDetection.js'
-
-/* eslint-disable @typescript-eslint/no-require-imports */
 const teamMemPaths = feature('TEAMMEM')
   ? (require('../memdir/teamMemPaths.js') as typeof import('../memdir/teamMemPaths.js'))
   : null
@@ -38,14 +31,7 @@ const teamMemWatcher = feature('TEAMMEM')
 const memoryShapeTelemetry = feature('MEMORY_SHAPE_TELEMETRY')
   ? (require('../memdir/memoryShapeTelemetry.js') as typeof import('../memdir/memoryShapeTelemetry.js'))
   : null
-
-/* eslint-enable @typescript-eslint/no-require-imports */
 import { getSubagentLogName } from './agentContext.js'
-
-/**
- * Extract the file path from a tool input for memdir detection.
- * Covers Read (file_path), Edit (file_path), and Write (file_path).
- */
 function getFilePathFromInput(
   toolName: string,
   toolInput: unknown,
@@ -67,11 +53,6 @@ function getFilePathFromInput(
       return null
   }
 }
-
-/**
- * Extract file type from tool input.
- * Returns the detected session file type or null.
- */
 function getSessionFileTypeFromInput(
   toolName: string,
   toolInput: unknown,
@@ -85,12 +66,10 @@ function getSessionFileTypeFromInput(
     case GREP_TOOL_NAME: {
       const parsed = GrepTool.inputSchema.safeParse(toolInput)
       if (!parsed.success) return null
-      // Check path if provided
       if (parsed.data.path) {
         const pathType = detectSessionFileType(parsed.data.path)
         if (pathType) return pathType
       }
-      // Check glob pattern
       if (parsed.data.glob) {
         const globType = detectSessionPatternType(parsed.data.glob)
         if (globType) return globType
@@ -100,12 +79,10 @@ function getSessionFileTypeFromInput(
     case GLOB_TOOL_NAME: {
       const parsed = GlobTool.inputSchema.safeParse(toolInput)
       if (!parsed.success) return null
-      // Check path if provided
       if (parsed.data.path) {
         const pathType = detectSessionFileType(parsed.data.path)
         if (pathType) return pathType
       }
-      // Check pattern
       const patternType = detectSessionPatternType(parsed.data.pattern)
       if (patternType) return patternType
       return null
@@ -114,12 +91,6 @@ function getSessionFileTypeFromInput(
       return null
   }
 }
-
-/**
- * Check if a tool use constitutes a memory file access.
- * Detects session memory (via Read/Grep/Glob) and memdir access (via Read/Edit/Write).
- * Uses the same conditions as the PostToolUse session file access hooks.
- */
 export function isMemoryFileAccess(
   toolName: string,
   toolInput: unknown,
@@ -127,7 +98,6 @@ export function isMemoryFileAccess(
   if (getSessionFileTypeFromInput(toolName, toolInput) === 'session_memory') {
     return true
   }
-
   const filePath = getFilePathFromInput(toolName, toolInput)
   if (
     filePath &&
@@ -136,42 +106,31 @@ export function isMemoryFileAccess(
   ) {
     return true
   }
-
   return false
 }
-
-/**
- * PostToolUse callback to log session file access events.
- */
 async function handleSessionFileAccess(
   input: HookInput,
   _toolUseID: string | null,
   _signal: AbortSignal | undefined,
 ): Promise<HookJSONOutput> {
   if (input.hook_event_name !== 'PostToolUse') return {}
-
   const fileType = getSessionFileTypeFromInput(
     input.tool_name,
     input.tool_input,
   )
-
   const subagentName = getSubagentLogName()
   const subagentProps = subagentName ? { subagent_name: subagentName } : {}
-
   if (fileType === 'session_memory') {
     logEvent('open_code_cli_session_memory_accessed', { ...subagentProps })
   } else if (fileType === 'session_transcript') {
     logEvent('open_code_cli_transcript_accessed', { ...subagentProps })
   }
-
-  // Memdir access tracking
   const filePath = getFilePathFromInput(input.tool_name, input.tool_input)
   if (filePath && isAutoMemFile(filePath)) {
     logEvent('open_code_cli_memdir_accessed', {
       tool: input.tool_name as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
       ...subagentProps,
     })
-
     switch (input.tool_name) {
       case FILE_READ_TOOL_NAME:
         logEvent('open_code_cli_memdir_file_read', { ...subagentProps })
@@ -184,14 +143,11 @@ async function handleSessionFileAccess(
         break
     }
   }
-
-  // Team memory access tracking
   if (feature('TEAMMEM') && filePath && teamMemPaths!.isTeamMemFile(filePath)) {
     logEvent('open_code_cli_team_mem_accessed', {
       tool: input.tool_name as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
       ...subagentProps,
     })
-
     switch (input.tool_name) {
       case FILE_READ_TOOL_NAME:
         logEvent('open_code_cli_team_mem_file_read', { ...subagentProps })
@@ -206,7 +162,6 @@ async function handleSessionFileAccess(
         break
     }
   }
-
   if (feature('MEMORY_SHAPE_TELEMETRY') && filePath) {
     const scope = memoryScopeForPath(filePath)
     if (
@@ -222,14 +177,8 @@ async function handleSessionFileAccess(
       )
     }
   }
-
   return {}
 }
-
-/**
- * Register session file access tracking hooks.
- * Called during CLI initialization.
- */
 export function registerSessionFileAccessHooks(): void {
   const hook: HookCallback = {
     type: 'callback',
@@ -237,7 +186,6 @@ export function registerSessionFileAccessHooks(): void {
     timeout: 1, // Very short timeout - just logging
     internal: true,
   }
-
   registerHookCallbacks({
     PostToolUse: [
       { matcher: FILE_READ_TOOL_NAME, hooks: [hook] },

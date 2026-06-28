@@ -1,18 +1,6 @@
-/**
- * Tool validation configuration
- *
- * Most tools need NO configuration - basic validation works automatically.
- * Only add your tool here if it has special pattern requirements.
- */
-
 export type ToolValidationConfig = {
-  /** Tools that accept file glob patterns (e.g., *.ts, src/**) */
   filePatternTools: string[]
-
-  /** Tools that accept bash wildcard patterns (* anywhere) and legacy :* prefix syntax */
   bashPrefixTools: string[]
-
-  /** Custom validation rules for specific tools */
   customValidation: {
     [toolName: string]: (content: string) => {
       valid: boolean
@@ -22,9 +10,7 @@ export type ToolValidationConfig = {
     }
   }
 }
-
 export const TOOL_VALIDATION_CONFIG: ToolValidationConfig = {
-  // File pattern tools (accept *.ts, src/**, etc.)
   filePatternTools: [
     'Read',
     'Write',
@@ -33,13 +19,8 @@ export const TOOL_VALIDATION_CONFIG: ToolValidationConfig = {
     'NotebookRead',
     'NotebookEdit',
   ],
-
-  // Bash wildcard tools (accept * anywhere, and legacy command:* syntax)
   bashPrefixTools: ['Bash'],
-
-  // Custom validation (only if needed)
   customValidation: {
-    // WebSearch doesn't support wildcards or complex patterns
     WebSearch: content => {
       if (content.includes('*') || content.includes('?')) {
         return {
@@ -51,10 +32,7 @@ export const TOOL_VALIDATION_CONFIG: ToolValidationConfig = {
       }
       return { valid: true }
     },
-
-    // WebFetch uses domain: prefix for hostname-based permissions
     WebFetch: content => {
-      // Check if it's trying to use a URL format
       if (content.includes('://') || content.startsWith('http')) {
         return {
           valid: false,
@@ -66,8 +44,6 @@ export const TOOL_VALIDATION_CONFIG: ToolValidationConfig = {
           ],
         }
       }
-
-      // Must start with domain: prefix
       if (!content.startsWith('domain:')) {
         return {
           valid: false,
@@ -79,25 +55,16 @@ export const TOOL_VALIDATION_CONFIG: ToolValidationConfig = {
           ],
         }
       }
-
-      // Allow wildcards in domain patterns
-      // Valid: domain:*.example.com, domain:example.*, etc.
       return { valid: true }
     },
   },
 }
-
-// Helper to check if a tool uses file patterns
 export function isFilePatternTool(toolName: string): boolean {
   return TOOL_VALIDATION_CONFIG.filePatternTools.includes(toolName)
 }
-
-// Helper to check if a tool uses bash prefix patterns
 export function isBashPrefixTool(toolName: string): boolean {
   return TOOL_VALIDATION_CONFIG.bashPrefixTools.includes(toolName)
 }
-
-// Helper to get custom validation for a tool
 export function getCustomValidation(toolName: string) {
   return TOOL_VALIDATION_CONFIG.customValidation[toolName]
 }

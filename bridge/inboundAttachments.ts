@@ -1,15 +1,3 @@
-/**
- * Resolve file_uuid attachments on inbound bridge user messages.
- *
- * Web composer uploads via cookie-authed /api/{org}/upload, sends file_uuid
- * alongside the message. Here we fetch each via GET /api/oauth/files/{uuid}/content
- * (oauth-authed, same store), write to ~/.open-code-cli/uploads/{sessionId}/, and
- * return @path refs to prepend. Open Code CLI's Read tool takes it from there.
- *
- * Optional: any failure (no token, network, non-2xx, disk) logs debug and
- * skips that attachment. The message still reaches Open Code CLI, just without @path.
- */
-
 import type { ContentBlockParam } from 'src/services/api/openaiCompatible.js'
 import axios from 'axios'
 import { randomUUID } from 'crypto'
@@ -21,13 +9,10 @@ import { logForDebugging } from '../utils/debug.js'
 import { getOpenCodeCliConfigHomeDir } from '../utils/envUtils.js'
 import { lazySchema } from '../utils/lazySchema.js'
 import { getBridgeAccessToken, getBridgeBaseUrl } from './bridgeConfig.js'
-
 const DOWNLOAD_TIMEOUT_MS = 30_000
-
 function debug(msg: string): void {
   logForDebugging(`[bridge:inbound-attach] ${msg}`)
 }
-
 const attachmentSchema = lazySchema(() =>
   z.object({
     file_uuid: z.string(),
@@ -35,10 +20,7 @@ const attachmentSchema = lazySchema(() =>
   }),
 )
 const attachmentsArraySchema = lazySchema(() => z.array(attachmentSchema()))
-
 export type InboundAttachment = z.infer<ReturnType<typeof attachmentSchema>>
-
-/** Pull file_attachments off a loosely-typed inbound message. */
 export function extractInboundAttachments(msg: unknown): InboundAttachment[] {
   if (typeof msg !== 'object' || msg === null || !('file_attachments' in msg)) {
     return []
@@ -46,38 +28,21 @@ export function extractInboundAttachments(msg: unknown): InboundAttachment[] {
   const parsed = attachmentsArraySchema().safeParse(msg.file_attachments)
   return parsed.success ? parsed.data : []
 }
-
-/**
- * Strip path components and keep only filename-safe chars. file_name comes
- * from the network (web composer), so treat it as untrusted even though the
- * composer controls it.
- */
 function sanitizeFileName(name: string): string {
   const base = basename(name).replace(/[^a-zA-Z0-9._-]/g, '_')
   return base || 'attachment'
 }
-
 function uploadsDir(): string {
   return join(getOpenCodeCliConfigHomeDir(), 'uploads', getSessionId())
 }
-
-/**
- * Fetch + write one attachment. Returns the absolute path on success,
- * undefined on any failure.
- */
 async function resolveOne(att: InboundAttachment): Promise<string | undefined> {
   const token = getBridgeAccessToken()
   if (!token) {
     debug('skip: no oauth token')
     return undefined
   }
-
   let data: Buffer
   try {
-    // getOauthConfig() (via getBridgeBaseUrl) throws on a non-allowlisted
-    // OPEN_CODE_CLI_CUSTOM_OAUTH_URL — keep it inside the try so a bad
-    // FedStart URL degrades to "no @path" instead of crashing print.ts's
-    // reader loop (which has no catch around the await).
     const url = `${getBridgeBaseUrl()}/api/oauth/files/${encodeURIComponent(att.file_uuid)}/content`
     const response = await axios.get(url, {
       headers: { Authorization: `Bearer ${token}` },
@@ -94,16 +59,12 @@ async function resolveOne(att: InboundAttachment): Promise<string | undefined> {
     debug(`fetch ${att.file_uuid} threw: ${e}`)
     return undefined
   }
-
-  // uuid-prefix makes collisions impossible across messages and within one
-  // (same filename, different files). 8 chars is enough — this isn't security.
   const safeName = sanitizeFileName(att.file_name)
   const prefix = (
     att.file_uuid.slice(0, 8) || randomUUID().slice(0, 8)
   ).replace(/[^a-zA-Z0-9_-]/g, '_')
   const dir = uploadsDir()
   const outPath = join(dir, `${prefix}-${safeName}`)
-
   try {
     await mkdir(dir, { recursive: true })
     await writeFile(outPath, data)
@@ -111,15 +72,9 @@ async function resolveOne(att: InboundAttachment): Promise<string | undefined> {
     debug(`write ${outPath} failed: ${e}`)
     return undefined
   }
-
   debug(`resolved ${att.file_uuid} → ${outPath} (${data.length} bytes)`)
   return outPath
 }
-
-/**
- * Resolve all attachments on an inbound message to a prefix string of
- * @path refs. Empty string if none resolved.
- */
 export async function resolveInboundAttachments(
   attachments: InboundAttachment[],
 ): Promise<string> {
@@ -128,17 +83,8 @@ export async function resolveInboundAttachments(
   const paths = await Promise.all(attachments.map(resolveOne))
   const ok = paths.filter((p): p is string => p !== undefined)
   if (ok.length === 0) return ''
-  // Quoted form — extractAtMentionedFiles truncates unquoted @refs at the
-  // first space, which breaks any home dir with spaces (/Users/John Smith/).
   return ok.map(p => `@"${p}"`).join(' ') + ' '
 }
-
-/**
- * Prepend @path refs to content, whichever form it's in.
- * Targets the LAST text block — processUserInputBase reads inputString
- * from processedBlocks[processedBlocks.length - 1], so putting refs in
- * block[0] means they're silently ignored for [text, image] content.
- */
 export function prependPathRefs(
   content: string | Array<ContentBlockParam>,
   prefix: string,
@@ -156,14 +102,8 @@ export function prependPathRefs(
       ]
     }
   }
-  // No text block — append one at the end so it's last.
   return [...content, { type: 'text', text: prefix.trimEnd() }]
 }
-
-/**
- * Convenience: extract + resolve + prepend. No-op when the message has no
- * file_attachments field (fast path — no network, returns same reference).
- */
 export async function resolveAndPrepend(
   msg: unknown,
   content: string | Array<ContentBlockParam>,

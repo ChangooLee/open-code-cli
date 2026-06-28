@@ -26,19 +26,14 @@ import { setCwd } from '../utils/Shell.js'
 import { jsonStringify } from '../utils/slowOperations.js'
 import { getErrorParts } from '../utils/toolErrors.js'
 import { zodToJsonSchema } from '../utils/zodToJsonSchema.js'
-
 type ToolInput = Tool['inputSchema']
 type ToolOutput = Tool['outputSchema']
-
 const MCP_COMMANDS: Command[] = [review]
-
 export async function startMCPServer(
   cwd: string,
   debug: boolean,
   verbose: boolean,
 ): Promise<void> {
-  // Use size-limited LRU cache for readFileState to prevent unbounded memory growth
-  // 100 files and 25MB limit should be sufficient for MCP server operations
   const READ_FILE_STATE_CACHE_SIZE = 100
   const readFileStateCache = createFileStateCacheWithSizeLimit(
     READ_FILE_STATE_CACHE_SIZE,
@@ -55,11 +50,9 @@ export async function startMCPServer(
       },
     },
   )
-
   server.setRequestHandler(
     ListToolsRequestSchema,
     async (): Promise<ListToolsResult> => {
-      // TODO: Also re-expose any MCP tools
       const toolPermissionContext = getEmptyToolPermissionContext()
       const tools = getTools(toolPermissionContext)
       return {
@@ -68,9 +61,6 @@ export async function startMCPServer(
             let outputSchema: ToolOutput | undefined
             if (tool.outputSchema) {
               const convertedSchema = zodToJsonSchema(tool.outputSchema)
-              // MCP SDK requires outputSchema to have type: "object" at root level
-              // Skip schemas with anyOf/oneOf at root (from z.union, z.discriminatedUnion, etc.)
-              // See: https://github.com/open-code-cli/open-code-cli/issues/8014
               if (
                 typeof convertedSchema === 'object' &&
                 convertedSchema !== null &&
@@ -95,20 +85,15 @@ export async function startMCPServer(
       }
     },
   )
-
   server.setRequestHandler(
     CallToolRequestSchema,
     async ({ params: { name, arguments: args } }): Promise<CallToolResult> => {
       const toolPermissionContext = getEmptyToolPermissionContext()
-      // TODO: Also re-expose any MCP tools
       const tools = getTools(toolPermissionContext)
       const tool = findToolByName(tools, name)
       if (!tool) {
         throw new Error(`Tool ${name} not found`)
       }
-
-      // Assume MCP servers do not read messages separately from the tool
-      // call arguments.
       const toolUseContext: ToolUseContext = {
         abortController: createAbortController(),
         options: {
@@ -132,8 +117,6 @@ export async function startMCPServer(
         updateFileHistoryState: () => {},
         updateAttributionState: () => {},
       }
-
-      // TODO: validate input types with zod
       try {
         if (!tool.isEnabled()) {
           throw new Error(`Tool ${name} is not enabled`)
@@ -155,7 +138,6 @@ export async function startMCPServer(
             content: [],
           }),
         )
-
         return {
           content: [
             {
@@ -169,11 +151,9 @@ export async function startMCPServer(
         }
       } catch (error) {
         logError(error)
-
         const parts =
           error instanceof Error ? getErrorParts(error) : [String(error)]
         const errorText = parts.filter(Boolean).join('\n').trim() || 'Error'
-
         return {
           isError: true,
           content: [
@@ -186,11 +166,9 @@ export async function startMCPServer(
       }
     },
   )
-
   async function runServer() {
     const transport = new StdioServerTransport()
     await server.connect(transport)
   }
-
   return await runServer()
 }

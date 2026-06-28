@@ -9,35 +9,24 @@ import {
   renderToolUseMessage,
   renderToolUseProgressMessage,
 } from './UI.js'
-
-// Allow any input object since MCP tools define their own schemas
 export const inputSchema = lazySchema(() => z.object({}).passthrough())
 type InputSchema = ReturnType<typeof inputSchema>
-
 export const outputSchema = lazySchema(() =>
   z.string().describe('MCP tool execution result'),
 )
 type OutputSchema = ReturnType<typeof outputSchema>
-
 export type Output = z.infer<OutputSchema>
-
-// Re-export MCPProgress from centralized types to break import cycles
 export type { MCPProgress } from '../../types/tools.js'
-
 export const MCPTool = buildTool({
   isMcp: true,
-  // Overridden in mcpClient.ts with the real MCP tool name + args
   isOpenWorld() {
     return false
   },
-  // Overridden in mcpClient.ts
   name: 'mcp',
   maxResultSizeChars: 100_000,
-  // Overridden in mcpClient.ts
   async description() {
     return DESCRIPTION
   },
-  // Overridden in mcpClient.ts
   async prompt() {
     return PROMPT
   },
@@ -47,7 +36,6 @@ export const MCPTool = buildTool({
   get outputSchema(): OutputSchema {
     return outputSchema()
   },
-  // Overridden in mcpClient.ts
   async call() {
     return {
       data: '',
@@ -60,7 +48,6 @@ export const MCPTool = buildTool({
     }
   },
   renderToolUseMessage,
-  // Overridden in mcpClient.ts
   userFacingName: () => 'mcp',
   renderToolUseProgressMessage,
   renderToolResultMessage,

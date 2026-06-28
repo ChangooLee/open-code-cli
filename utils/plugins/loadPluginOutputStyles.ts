@@ -11,7 +11,6 @@ import { getFsImplementation, isDuplicatePath } from '../fsOperations.js'
 import { extractDescriptionFromMarkdown } from '../markdownConfigLoader.js'
 import { loadAllPluginsCacheOnly } from './pluginLoader.js'
 import { walkPluginMarkdown } from './walkPluginMarkdown.js'
-
 async function loadOutputStylesFromDirectory(
   outputStylesPath: string,
   pluginName: string,
@@ -32,7 +31,6 @@ async function loadOutputStylesFromDirectory(
   )
   return styles
 }
-
 async function loadOutputStyleFromFile(
   filePath: string,
   pluginName: string,
@@ -48,10 +46,8 @@ async function loadOutputStyleFromFile(
       content,
       filePath,
     )
-
     const fileName = basename(filePath, '.md')
     const baseStyleName = (frontmatter.name as string) || fileName
-    // Namespace output styles with plugin name, consistent with commands and agents
     const name = `${pluginName}:${baseStyleName}`
     const description =
       coerceDescriptionToString(frontmatter.description, name) ??
@@ -59,8 +55,6 @@ async function loadOutputStyleFromFile(
         markdownContent,
         `Output style from ${pluginName} plugin`,
       )
-
-    // Parse forceForPlugin flag (supports both boolean and string values)
     const forceRaw = frontmatter['force-for-plugin']
     const forceForPlugin =
       forceRaw === true || forceRaw === 'true'
@@ -68,7 +62,6 @@ async function loadOutputStyleFromFile(
         : forceRaw === false || forceRaw === 'false'
           ? false
           : undefined
-
     return {
       name,
       description,
@@ -83,24 +76,17 @@ async function loadOutputStyleFromFile(
     return null
   }
 }
-
 export const loadPluginOutputStyles = memoize(
   async (): Promise<OutputStyleConfig[]> => {
-    // Only load output styles from enabled plugins
     const { enabled, errors } = await loadAllPluginsCacheOnly()
     const allStyles: OutputStyleConfig[] = []
-
     if (errors.length > 0) {
       logForDebugging(
         `Plugin loading errors: ${errors.map(e => getPluginErrorMessage(e)).join(', ')}`,
       )
     }
-
     for (const plugin of enabled) {
-      // Track loaded file paths to prevent duplicates within this plugin
       const loadedPaths = new Set<string>()
-
-      // Load output styles from default output-styles directory
       if (plugin.outputStylesPath) {
         try {
           const styles = await loadOutputStylesFromDirectory(
@@ -109,7 +95,6 @@ export const loadPluginOutputStyles = memoize(
             loadedPaths,
           )
           allStyles.push(...styles)
-
           if (styles.length > 0) {
             logForDebugging(
               `Loaded ${styles.length} output styles from plugin ${plugin.name} default directory`,
@@ -122,30 +107,24 @@ export const loadPluginOutputStyles = memoize(
           )
         }
       }
-
-      // Load output styles from additional paths specified in manifest
       if (plugin.outputStylesPaths) {
         for (const stylePath of plugin.outputStylesPaths) {
           try {
             const fs = getFsImplementation()
             const stats = await fs.stat(stylePath)
-
             if (stats.isDirectory()) {
-              // Load all .md files from directory
               const styles = await loadOutputStylesFromDirectory(
                 stylePath,
                 plugin.name,
                 loadedPaths,
               )
               allStyles.push(...styles)
-
               if (styles.length > 0) {
                 logForDebugging(
                   `Loaded ${styles.length} output styles from plugin ${plugin.name} custom path: ${stylePath}`,
                 )
               }
             } else if (stats.isFile() && stylePath.endsWith('.md')) {
-              // Load single output style file
               const style = await loadOutputStyleFromFile(
                 stylePath,
                 plugin.name,
@@ -167,12 +146,10 @@ export const loadPluginOutputStyles = memoize(
         }
       }
     }
-
     logForDebugging(`Total plugin output styles loaded: ${allStyles.length}`)
     return allStyles
   },
 )
-
 export function clearPluginOutputStyleCache(): void {
   loadPluginOutputStyles.cache?.clear?.()
 }

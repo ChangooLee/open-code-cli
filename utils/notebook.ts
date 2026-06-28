@@ -16,9 +16,7 @@ import type {
 import { getFsImplementation } from './fsOperations.js'
 import { expandPath } from './path.js'
 import { jsonParse } from './slowOperations.js'
-
 const LARGE_OUTPUT_THRESHOLD = 10000
-
 function isLargeOutputs(
   outputs: (NotebookCellSourceOutput | undefined)[],
 ): boolean {
@@ -30,14 +28,12 @@ function isLargeOutputs(
   }
   return false
 }
-
 function processOutputText(text: string | string[] | undefined): string {
   if (!text) return ''
   const rawText = Array.isArray(text) ? text.join('') : text
   const { truncatedContent } = formatOutput(rawText)
   return truncatedContent
 }
-
 function extractImage(
   data: Record<string, unknown>,
 ): NotebookOutputImage | undefined {
@@ -55,7 +51,6 @@ function extractImage(
   }
   return undefined
 }
-
 function processOutput(output: NotebookCellOutput) {
   switch (output.output_type) {
     case 'stream':
@@ -79,7 +74,6 @@ function processOutput(output: NotebookCellOutput) {
       }
   }
 }
-
 function processCell(
   cell: NotebookCell,
   index: number,
@@ -94,11 +88,9 @@ function processCell(
       cell.cell_type === 'code' ? cell.execution_count || undefined : undefined,
     cell_id: cellId,
   }
-  // Avoid giving text cells the code language.
   if (cell.cell_type === 'code') {
     cellData.language = codeLanguage
   }
-
   if (cell.cell_type === 'code' && cell.outputs?.length) {
     const outputs = cell.outputs.map(processOutput)
     if (!includeLargeOutputs && isLargeOutputs(outputs)) {
@@ -112,10 +104,8 @@ function processCell(
       cellData.outputs = outputs
     }
   }
-
   return cellData
 }
-
 function cellContentToToolResult(cell: NotebookCellSource): TextBlockParam {
   const metadata = []
   if (cell.cellType !== 'code') {
@@ -130,7 +120,6 @@ function cellContentToToolResult(cell: NotebookCellSource): TextBlockParam {
     type: 'text',
   }
 }
-
 function cellOutputToToolResult(output: NotebookCellSourceOutput) {
   const outputs: (TextBlockParam | ImageBlockParam)[] = []
   if (output.text) {
@@ -151,16 +140,11 @@ function cellOutputToToolResult(output: NotebookCellSourceOutput) {
   }
   return outputs
 }
-
 function getToolResultFromCell(cell: NotebookCellSource) {
   const contentResult = cellContentToToolResult(cell)
   const outputResults = cell.outputs?.flatMap(cellOutputToToolResult)
   return [contentResult, ...(outputResults ?? [])]
 }
-
-/**
- * Reads and parses a Jupyter notebook file into processed cell data
- */
 export async function readNotebook(
   notebookPath: string,
   cellId?: string,
@@ -181,31 +165,22 @@ export async function readNotebook(
     processCell(cell, index, language, false),
   )
 }
-
-/**
- * Maps notebook cell data to tool result block parameters with sophisticated text block merging
- */
 export function mapNotebookCellsToToolResult(
   data: NotebookCellSource[],
   toolUseID: string,
 ): ToolResultBlockParam {
   const allResults = data.flatMap(getToolResultFromCell)
-
-  // Merge adjacent text blocks
   return {
     tool_use_id: toolUseID,
     type: 'tool_result' as const,
     content: allResults.reduce<(TextBlockParam | ImageBlockParam)[]>(
       (acc, curr) => {
         if (acc.length === 0) return [curr]
-
         const prev = acc[acc.length - 1]
         if (prev && prev.type === 'text' && curr.type === 'text') {
-          // Merge the text blocks
           prev.text += '\n' + curr.text
           return acc
         }
-
         acc.push(curr)
         return acc
       },
@@ -213,7 +188,6 @@ export function mapNotebookCellsToToolResult(
     ),
   }
 }
-
 export function parseCellId(cellId: string): number | undefined {
   const match = cellId.match(/^cell-(\d+)$/)
   if (match && match[1]) {

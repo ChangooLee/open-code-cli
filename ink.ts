@@ -6,22 +6,16 @@ import inkRender, {
   type RenderOptions,
   type Root,
 } from './ink/root.js'
-
 export type { RenderOptions, Instance, Root }
-
-// Wrap all CC render calls with ThemeProvider so ThemedBox/ThemedText work
-// without every call site having to mount it. Ink itself is theme-agnostic.
 function withTheme(node: ReactNode): ReactNode {
   return createElement(ThemeProvider, null, node)
 }
-
 export async function render(
   node: ReactNode,
   options?: NodeJS.WriteStream | RenderOptions,
 ): Promise<Instance> {
   return inkRender(withTheme(node), options)
 }
-
 export async function createRoot(options?: RenderOptions): Promise<Root> {
   const root = await inkCreateRoot(options)
   return {
@@ -29,7 +23,6 @@ export async function createRoot(options?: RenderOptions): Promise<Root> {
     render: node => root.render(withTheme(node)),
   }
 }
-
 export { color } from './components/design-system/color.js'
 export type { Props as BoxProps } from './components/design-system/ThemedBox.js'
 export { default as Box } from './components/design-system/ThemedBox.js'

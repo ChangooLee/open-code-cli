@@ -1,28 +1,12 @@
-/**
- * Environment variables that control inference routing: which provider to use,
- * which endpoint to hit, and which model IDs to send.
- *
- * When OPEN_CODE_CLI_PROVIDER_MANAGED_BY_HOST is truthy in the spawn env, these
- * are stripped from settings-sourced env so the host's routing config isn't
- * overridden by a user's ~/.open-code-cli/settings.json.
- *
- * @[MODEL LAUNCH]: New models usually don't need changes here —
- * New providers or new routing config vars (endpoint, project, auth) do.
- */
 const PROVIDER_MANAGED_ENV_VARS = new Set([
-  // The flag itself — settings can't unset it once the host set it
   'OPEN_CODE_CLI_PROVIDER_MANAGED_BY_HOST',
-  // Provider selection
-  // Endpoint config (base URLs, project/resource identifiers)
   'OPEN_CODE_CLI_PROVIDER_BASE_URL',
   'OPEN_CODE_CLI_BASE_URL',
   'OPEN_CODE_CLI_REMOTE_BASE_URL',
   'OPEN_CODE_CLI_PROVIDER_RESOURCE',
   'OPEN_CODE_CLI_PROVIDER_PROJECT_ID',
-  // Auth
   'OPEN_CODE_CLI_API_KEY',
   'OPEN_CODE_CLI_AUTH_TOKEN',
-  // Model defaults — often set to provider-specific ID formats
   'OPEN_CODE_CLI_MODEL',
   'OPEN_CODE_CLI_DEFAULT_SMALL_FAST_MODEL',
   'OPEN_CODE_CLI_DEFAULT_SMALL_FAST_MODEL_DESCRIPTION',
@@ -40,9 +24,7 @@ const PROVIDER_MANAGED_ENV_VARS = new Set([
   'OPEN_CODE_CLI_SMALL_FAST_MODEL_AWS_REGION',
   'OPEN_CODE_CLI_SUBAGENT_MODEL',
 ])
-
 const PROVIDER_MANAGED_ENV_PREFIXES: string[] = []
-
 export function isProviderManagedEnvVar(key: string): boolean {
   const upper = key.toUpperCase()
   return (
@@ -50,10 +32,6 @@ export function isProviderManagedEnvVar(key: string): boolean {
     PROVIDER_MANAGED_ENV_PREFIXES.some(p => upper.startsWith(p))
   )
 }
-
-/**
- * Dangerous shell settings that can execute arbitrary shell code
- */
 export const DANGEROUS_SHELL_SETTINGS = [
   'apiKeyHelper',
   'awsAuthRefresh',
@@ -62,30 +40,6 @@ export const DANGEROUS_SHELL_SETTINGS = [
   'otelHeadersHelper',
   'statusLine',
 ] as const
-
-/**
- * Safe environment variables that can be applied before trust dialog.
- * These are Open Code CLI specific settings that don't pose security risks.
- *
- * IMPORTANT: This is the source of truth for which env vars are safe.
- * Any env var NOT in this list is considered dangerous and will trigger
- * a security dialog when set via remote managed settings.
- *
- * Dangerous env vars (NOT in this list):
- *
- * === REDIRECT TO ATTACKER-CONTROLLED SERVER ===
- * - OPEN_CODE_CLI_PROVIDER_BASE_URL, OPEN_CODE_CLI_BASE_URL, OPEN_CODE_CLI_REMOTE_BASE_URL
- * - HTTP_PROXY, HTTPS_PROXY, NO_PROXY, http_proxy, https_proxy, no_proxy
- * - OTEL_EXPORTER_OTLP_ENDPOINT, OTEL_EXPORTER_OTLP_LOGS_ENDPOINT, OTEL_EXPORTER_OTLP_METRICS_ENDPOINT
- *
- * === TRUST ATTACKER-CONTROLLED SERVER ===
- * - NODE_TLS_REJECT_UNAUTHORIZED
- * - NODE_EXTRA_CA_CERTS
- *
- * === SWITCH TO ATTACKER-CONTROLLED PROJECT ===
- * - OPEN_CODE_CLI_PROVIDER_RESOURCE
- * - OPEN_CODE_CLI_API_KEY, OPEN_CODE_CLI_AUTH_TOKEN
- */
 export const SAFE_ENV_VARS = new Set([
   'OPEN_CODE_CLI_CUSTOM_HEADERS',
   'OPEN_CODE_CLI_CUSTOM_MODEL_OPTION',

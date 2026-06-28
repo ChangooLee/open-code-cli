@@ -1,23 +1,16 @@
-// Background task entry for locally-executed workflow scripts.
-// Surfaces a running workflow (and its constituent agents) in the footer pill
-// and the Shift+Down background tasks dialog.
-
 import type { SetAppState, Task, TaskStateBase } from '../../Task.js'
 import { updateTaskState } from '../../utils/task/framework.js'
-
 export type WorkflowAgentStatus =
   | 'pending'
   | 'running'
   | 'completed'
   | 'failed'
   | 'skipped'
-
 export type WorkflowAgentState = {
   agentId: string
   name: string
   status: WorkflowAgentStatus
 }
-
 export type LocalWorkflowTaskState = TaskStateBase & {
   type: 'local_workflow'
   workflowName: string
@@ -25,7 +18,6 @@ export type LocalWorkflowTaskState = TaskStateBase & {
   isBackgrounded: boolean
   abortController?: AbortController
 }
-
 export function isLocalWorkflowTask(
   task: unknown,
 ): task is LocalWorkflowTaskState {
@@ -36,7 +28,6 @@ export function isLocalWorkflowTask(
     task.type === 'local_workflow'
   )
 }
-
 export function killWorkflowTask(
   taskId: string,
   setAppState: SetAppState,
@@ -53,7 +44,6 @@ export function killWorkflowTask(
     }
   })
 }
-
 export function skipWorkflowAgent(
   taskId: string,
   agentId: string,
@@ -66,7 +56,6 @@ export function skipWorkflowAgent(
     ),
   }))
 }
-
 export function retryWorkflowAgent(
   taskId: string,
   agentId: string,
@@ -79,14 +68,11 @@ export function retryWorkflowAgent(
     ),
   }))
 }
-
 export const LocalWorkflowTask: Task = {
   name: 'LocalWorkflowTask',
   type: 'local_workflow',
-
   async kill(taskId, setAppState) {
     killWorkflowTask(taskId, setAppState)
   },
 }
-
 export default LocalWorkflowTask

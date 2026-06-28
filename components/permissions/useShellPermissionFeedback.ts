@@ -7,12 +7,6 @@ import { sanitizeToolNameForAnalytics } from '../../services/analytics/metadata.
 import { useSetAppState } from '../../state/AppState.js'
 import type { ToolUseConfirm } from './PermissionRequest.js'
 import { logUnaryPermissionEvent } from './utils.js'
-
-/**
- * Shared feedback-mode state + handlers for shell permission dialogs (Bash,
- * PowerShell). Encapsulates the yes/no input-mode toggle, feedback text state,
- * focus tracking, and reject handling.
- */
 export function useShellPermissionFeedback({
   toolUseConfirm,
   onDone,
@@ -43,13 +37,9 @@ export function useShellPermissionFeedback({
   const [yesInputMode, setYesInputMode] = useState(false)
   const [noInputMode, setNoInputMode] = useState(false)
   const [focusedOption, setFocusedOption] = useState('yes')
-  // Track whether user ever entered feedback mode (persists after collapse)
   const [yesFeedbackModeEntered, setYesFeedbackModeEntered] = useState(false)
   const [noFeedbackModeEntered, setNoFeedbackModeEntered] = useState(false)
-
-  // Handle Tab key toggling input mode for Yes/No options
   function handleInputModeToggle(option: string) {
-    // Notify that user is interacting with the dialog
     toolUseConfirm.onUserInteraction()
     const analyticsProps = {
       toolName: sanitizeToolNameForAnalytics(
@@ -57,7 +47,6 @@ export function useShellPermissionFeedback({
       ) as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
       isMcp: toolUseConfirm.tool.isMcp ?? false,
     }
-
     if (option === 'yes') {
       if (yesInputMode) {
         setYesInputMode(false)
@@ -78,17 +67,13 @@ export function useShellPermissionFeedback({
       }
     }
   }
-
   function handleReject(feedback?: string) {
     const trimmedFeedback = feedback?.trim()
     const hasFeedback = !!trimmedFeedback
-
-    // Log escape if no feedback was provided (user pressed ESC)
     if (!hasFeedback) {
       logEvent('open_code_cli_permission_request_escape', {
         explainer_visible: explainerVisible,
       })
-      // Increment escape count for attribution tracking
       setAppState(prev => ({
         ...prev,
         attribution: {
@@ -97,31 +82,24 @@ export function useShellPermissionFeedback({
         },
       }))
     }
-
     logUnaryPermissionEvent(
       'tool_use_single',
       toolUseConfirm,
       'reject',
       hasFeedback,
     )
-
     if (trimmedFeedback) {
       toolUseConfirm.onReject(trimmedFeedback)
     } else {
       toolUseConfirm.onReject()
     }
-
     onReject()
     onDone()
   }
-
   function handleFocus(value: string) {
-    // Notify that user is interacting with the dialog (only if focus changed)
-    // This prevents triggering on the initial mount/render
     if (value !== focusedOption) {
       toolUseConfirm.onUserInteraction()
     }
-    // Reset input mode when navigating away, but only if no text typed
     if (value !== 'yes' && yesInputMode && !acceptFeedback.trim()) {
       setYesInputMode(false)
     }
@@ -130,7 +108,6 @@ export function useShellPermissionFeedback({
     }
     setFocusedOption(value)
   }
-
   return {
     yesInputMode,
     noInputMode,

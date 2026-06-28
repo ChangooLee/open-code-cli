@@ -1,32 +1,15 @@
-/**
- * Classify an MCP tool as a search/read operation for UI collapsing.
- * Returns { isSearch: false, isRead: false } for tools that should not
- * collapse (e.g., send_message, create_*, update_*).
- *
- * Uses explicit per-tool allowlists for the most common MCP servers.
- * Tool names are stable across installs (even when the server name varies,
- * e.g., "slack" vs "open_code_cli_ai_Slack"), so matching is keyed on the tool
- * name alone after normalizing camelCase/kebab-case to snake_case.
- * Unknown tool names don't collapse (conservative).
- */
-
-// prettier-ignore
 const SEARCH_TOOLS = new Set([
-  // Slack (hosted + @modelcontextprotocol/server-slack)
   'slack_search_public',
   'slack_search_public_and_private',
   'slack_search_channels',
   'slack_search_users',
-  // GitHub (github/github-mcp-server)
   'search_code',
   'search_repositories',
   'search_issues',
   'search_pull_requests',
   'search_orgs',
   'search_users',
-  // Linear (mcp.linear.app)
   'search_documentation',
-  // Datadog (mcp.datadoghq.com)
   'search_logs',
   'search_spans',
   'search_rum_events',
@@ -35,7 +18,6 @@ const SEARCH_TOOLS = new Set([
   'search_monitor_groups',
   'find_slow_spans',
   'find_monitors_matching_pattern',
-  // Sentry (getsentry/sentry-mcp)
   'search_docs',
   'search_events',
   'search_issue_events',
@@ -44,47 +26,29 @@ const SEARCH_TOOLS = new Set([
   'find_projects',
   'find_releases',
   'find_dsns',
-  // Notion (mcp.notion.com — kebab-case, normalized)
   'search',
-  // Gmail (Open Code CLI hosted)
   'gmail_search_messages',
-  // Google Drive (Open Code CLI hosted + @modelcontextprotocol/server-gdrive)
   'google_drive_search',
-  // Google Calendar (Open Code CLI hosted)
   'gcal_find_my_free_time',
   'gcal_find_meeting_times',
   'gcal_find_user_emails',
-  // Atlassian/Jira (mcp.atlassian.com — camelCase, normalized)
   'search_jira_issues_using_jql',
   'search_confluence_using_cql',
   'lookup_jira_account_id',
-  // Community Atlassian (sooperset/mcp-atlassian)
   'confluence_search',
   'jira_search',
   'jira_search_fields',
-  // Asana (mcp.asana.com)
   'asana_search_tasks',
   'asana_typeahead_search',
-  // Filesystem (@modelcontextprotocol/server-filesystem)
   'search_files',
-  // Memory (@modelcontextprotocol/server-memory)
   'search_nodes',
-  // Brave Search
   'brave_web_search',
   'brave_local_search',
-  // Git (mcp-server-git)
-  // (git has no search verbs)
-  // Grafana (grafana/mcp-grafana)
   'search_dashboards',
   'search_folders',
-  // PagerDuty
-  // (pagerduty reads all use get_/list_, no search verbs)
-  // Supabase
   'search_docs',
-  // Stripe
   'search_stripe_resources',
   'search_stripe_documentation',
-  // PubMed (Open Code CLI hosted + community)
   'search_articles',
   'find_related_articles',
   'lookup_article_by_citation',
@@ -94,31 +58,22 @@ const SEARCH_TOOLS = new Set([
   'search_pubmed_advanced',
   'pubmed_search',
   'pubmed_mesh_lookup',
-  // Firecrawl
   'firecrawl_search',
-  // Exa
   'web_search_exa',
   'web_search_advanced_exa',
   'people_search_exa',
   'linkedin_search_exa',
   'deep_search_exa',
-  // Perplexity
   'perplexity_search',
   'perplexity_search_web',
-  // Tavily
   'tavily_search',
-  // Obsidian (MarkusPfundstein)
   'obsidian_simple_search',
   'obsidian_complex_search',
-  // MongoDB
   'find',
   'search_knowledge',
-  // Neo4j
   'search_memories',
   'find_memories_by_name',
-  // Airtable
   'search_records',
-  // Todoist (Doist — kebab-case, normalized)
   'find_tasks',
   'find_tasks_by_date',
   'find_completed_tasks',
@@ -129,18 +84,13 @@ const SEARCH_TOOLS = new Set([
   'find_activity',
   'find_labels',
   'find_filters',
-  // AWS
   'search_documentation',
   'search_catalog',
-  // Terraform
   'search_modules',
   'search_providers',
   'search_policies',
 ])
-
-// prettier-ignore
 const READ_TOOLS = new Set([
-  // Slack (hosted + @modelcontextprotocol/server-slack)
   'slack_read_channel',
   'slack_read_thread',
   'slack_read_canvas',
@@ -150,7 +100,6 @@ const READ_TOOLS = new Set([
   'slack_get_thread_replies',
   'slack_get_users',
   'slack_get_user_profile',
-  // GitHub (github/github-mcp-server)
   'get_me',
   'get_team_members',
   'get_teams',
@@ -201,7 +150,6 @@ const READ_TOOLS = new Set([
   'get_pull_request_status',
   'get_pull_request_comments',
   'get_pull_request_reviews',
-  // Linear (mcp.linear.app)
   'list_comments',
   'list_cycles',
   'get_document',
@@ -217,7 +165,6 @@ const READ_TOOLS = new Set([
   'get_team',
   'list_users',
   'get_user',
-  // Datadog (mcp.datadoghq.com)
   'aggregate_logs',
   'list_spans',
   'aggregate_spans',
@@ -240,7 +187,6 @@ const READ_TOOLS = new Set([
   'query_notebook_cell',
   'get_profiling_metrics',
   'compare_profiling_metrics',
-  // Sentry (getsentry/sentry-mcp)
   'whoami',
   'get_issue_details',
   'get_issue_tag_values',
@@ -251,25 +197,20 @@ const READ_TOOLS = new Set([
   'list_events',
   'list_issue_events',
   'get_sentry_issue',
-  // Notion (mcp.notion.com — kebab-case, normalized)
   'fetch',
   'get_comments',
   'get_users',
   'get_self',
-  // Gmail (Open Code CLI hosted)
   'gmail_get_profile',
   'gmail_read_message',
   'gmail_read_thread',
   'gmail_list_drafts',
   'gmail_list_labels',
-  // Google Drive (Open Code CLI hosted + @modelcontextprotocol/server-gdrive)
   'google_drive_fetch',
   'google_drive_export',
-  // Google Calendar (Open Code CLI hosted)
   'gcal_list_calendars',
   'gcal_list_events',
   'gcal_get_event',
-  // Atlassian/Jira (mcp.atlassian.com — camelCase, normalized)
   'atlassian_user_info',
   'get_accessible_atlassian_resources',
   'get_visible_jira_projects',
@@ -284,7 +225,6 @@ const READ_TOOLS = new Set([
   'get_confluence_page_descendants',
   'get_confluence_page_footer_comments',
   'get_confluence_page_inline_comments',
-  // Community Atlassian (sooperset/mcp-atlassian)
   'confluence_get_page',
   'confluence_get_page_children',
   'confluence_get_comments',
@@ -302,7 +242,6 @@ const READ_TOOLS = new Set([
   'jira_get_user_profile',
   'jira_get_project_issues',
   'jira_get_project_versions',
-  // Asana (mcp.asana.com)
   'asana_get_attachment',
   'asana_get_attachments_for_object',
   'asana_get_goal',
@@ -330,7 +269,6 @@ const READ_TOOLS = new Set([
   'asana_get_user',
   'asana_get_workspace_users',
   'asana_list_workspaces',
-  // Filesystem (@modelcontextprotocol/server-filesystem)
   'read_file',
   'read_text_file',
   'read_media_file',
@@ -340,16 +278,12 @@ const READ_TOOLS = new Set([
   'directory_tree',
   'get_file_info',
   'list_allowed_directories',
-  // Memory (@modelcontextprotocol/server-memory)
   'read_graph',
   'open_nodes',
-  // Postgres (@modelcontextprotocol/server-postgres)
   'query',
-  // SQLite (@modelcontextprotocol/server-sqlite)
   'read_query',
   'list_tables',
   'describe_table',
-  // Git (mcp-server-git)
   'git_status',
   'git_diff',
   'git_diff_unstaged',
@@ -357,7 +291,6 @@ const READ_TOOLS = new Set([
   'git_log',
   'git_show',
   'git_branch',
-  // Grafana (grafana/mcp-grafana)
   'list_teams',
   'list_users_by_org',
   'get_dashboard_by_uid',
@@ -394,7 +327,6 @@ const READ_TOOLS = new Set([
   'get_annotations',
   'get_annotation_tags',
   'get_panel_image',
-  // PagerDuty (PagerDuty/pagerduty-mcp-server)
   'list_incidents',
   'get_incident',
   'get_outlier_incident',
@@ -423,7 +355,6 @@ const READ_TOOLS = new Set([
   'get_alert_from_incident',
   'list_change_events',
   'get_change_event',
-  // Supabase (supabase-community/supabase-mcp)
   'list_organizations',
   'get_organization',
   'get_cost',
@@ -438,7 +369,6 @@ const READ_TOOLS = new Set([
   'get_edge_function',
   'list_storage_buckets',
   'get_storage_config',
-  // Stripe (stripe/agent-toolkit)
   'get_stripe_account_info',
   'retrieve_balance',
   'list_customers',
@@ -450,7 +380,6 @@ const READ_TOOLS = new Set([
   'list_coupons',
   'list_disputes',
   'fetch_stripe_resources',
-  // PubMed (Open Code CLI hosted + community)
   'get_article_metadata',
   'get_full_text_article',
   'convert_article_ids',
@@ -466,34 +395,28 @@ const READ_TOOLS = new Set([
   'pubmed_spell',
   'pubmed_cite',
   'pubmed_related',
-  // BigQuery (Open Code CLI hosted + community)
   'bigquery_query',
   'bigquery_schema',
   'list_dataset_ids',
   'list_table_ids',
   'get_dataset_info',
   'get_table_info',
-  // Firecrawl
   'firecrawl_scrape',
   'firecrawl_map',
   'firecrawl_crawl',
   'firecrawl_check_crawl_status',
   'firecrawl_extract',
-  // Exa
   'get_code_context_exa',
   'company_research_exa',
   'crawling_exa',
   'deep_researcher_check',
-  // Perplexity
   'perplexity_ask',
   'perplexity_research',
   'perplexity_reason',
-  // Tavily
   'tavily_extract',
   'tavily_crawl',
   'tavily_map',
   'tavily_research',
-  // Obsidian (MarkusPfundstein)
   'obsidian_list_files_in_vault',
   'obsidian_list_files_in_dir',
   'obsidian_get_file_contents',
@@ -501,10 +424,8 @@ const READ_TOOLS = new Set([
   'obsidian_get_periodic_note',
   'obsidian_get_recent_periodic_notes',
   'obsidian_get_recent_changes',
-  // Figma (GLips/Figma-Context-MCP)
   'get_figma_data',
   'download_figma_images',
-  // Playwright (microsoft/playwright-mcp)
   'browser_console_messages',
   'browser_network_requests',
   'browser_take_screenshot',
@@ -518,9 +439,7 @@ const READ_TOOLS = new Set([
   'browser_sessionstorage_list',
   'browser_sessionstorage_get',
   'browser_storage_state',
-  // Puppeteer (@modelcontextprotocol/server-puppeteer)
   'puppeteer_screenshot',
-  // MongoDB
   'list_databases',
   'list_collections',
   'collection_indexes',
@@ -532,29 +451,24 @@ const READ_TOOLS = new Set([
   'aggregate',
   'count',
   'export',
-  // Neo4j
   'get_neo4j_schema',
   'read_neo4j_cypher',
   'list_instances',
   'get_instance_details',
   'get_instance_by_name',
-  // Elasticsearch (elastic)
   'list_indices',
   'get_mappings',
   'esql',
   'get_shards',
-  // Airtable
   'list_records',
   'list_bases',
   'get_record',
-  // Todoist (Doist — kebab-case, normalized)
   'get_productivity_stats',
   'get_overview',
   'fetch_object',
   'user_info',
   'list_workspaces',
   'view_attachment',
-  // AWS (awslabs/mcp)
   'get_available_services',
   'read_documentation',
   'read_sections',
@@ -566,7 +480,6 @@ const READ_TOOLS = new Set([
   'get_alarm_history',
   'get_metric_data',
   'get_metric_metadata',
-  // Kubernetes
   'kubectl_get',
   'kubectl_describe',
   'kubectl_logs',
@@ -584,14 +497,12 @@ const READ_TOOLS = new Set([
   'resources_get',
   'resources_list',
 ])
-
 function normalize(name: string): string {
   return name
     .replace(/([a-z])([A-Z])/g, '$1_$2')
     .replace(/-/g, '_')
     .toLowerCase()
 }
-
 export function classifyMcpToolForCollapse(
   _serverName: string,
   toolName: string,

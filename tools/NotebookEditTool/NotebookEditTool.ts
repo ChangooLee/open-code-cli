@@ -26,7 +26,6 @@ import {
   renderToolUseMessage,
   renderToolUseRejectedMessage,
 } from './UI.js'
-
 export const inputSchema = lazySchema(() =>
   z.strictObject({
     notebook_path: z
@@ -56,7 +55,6 @@ export const inputSchema = lazySchema(() =>
   }),
 )
 type InputSchema = ReturnType<typeof inputSchema>
-
 export const outputSchema = lazySchema(() =>
   z.object({
     new_source: z
@@ -73,7 +71,6 @@ export const outputSchema = lazySchema(() =>
       .string()
       .optional()
       .describe('Error message if the operation failed'),
-    // Fields for attribution tracking
     notebook_path: z.string().describe('The path to the notebook file'),
     original_file: z
       .string()
@@ -84,9 +81,7 @@ export const outputSchema = lazySchema(() =>
   }),
 )
 type OutputSchema = ReturnType<typeof outputSchema>
-
 export type Output = z.infer<OutputSchema>
-
 export const NotebookEditTool = buildTool({
   name: NOTEBOOK_EDIT_TOOL_NAME,
   searchHint: 'edit Jupyter notebook cells (.ipynb)',
@@ -180,12 +175,9 @@ export const NotebookEditTool = buildTool({
     const fullPath = isAbsolute(notebook_path)
       ? notebook_path
       : resolve(getCwd(), notebook_path)
-
-    // SECURITY: Skip filesystem operations for UNC paths to prevent NTLM credential leaks.
     if (fullPath.startsWith('\\\\') || fullPath.startsWith('//')) {
       return { result: true }
     }
-
     if (extname(fullPath) !== '.ipynb') {
       return {
         result: false,
@@ -194,7 +186,6 @@ export const NotebookEditTool = buildTool({
         errorCode: 2,
       }
     }
-
     if (
       edit_mode !== 'replace' &&
       edit_mode !== 'insert' &&
@@ -206,7 +197,6 @@ export const NotebookEditTool = buildTool({
         errorCode: 4,
       }
     }
-
     if (edit_mode === 'insert' && !cell_type) {
       return {
         result: false,
@@ -214,10 +204,6 @@ export const NotebookEditTool = buildTool({
         errorCode: 5,
       }
     }
-
-    // Require Read-before-Edit (matches FileEditTool/FileWriteTool). Without
-    // this, the model could edit a notebook it never saw, or edit against a
-    // stale view after an external change — silent data loss.
     const readTimestamp = toolUseContext.readFileState.get(fullPath)
     if (!readTimestamp) {
       return {
@@ -235,7 +221,6 @@ export const NotebookEditTool = buildTool({
         errorCode: 10,
       }
     }
-
     let content: string
     try {
       content = readFileSyncWithMetadata(fullPath).content
@@ -266,11 +251,8 @@ export const NotebookEditTool = buildTool({
         }
       }
     } else {
-      // First try to find the cell by its actual ID
       const cellIndex = notebook.cells.findIndex(cell => cell.id === cell_id)
-
       if (cellIndex === -1) {
-        // If not found, try to parse as a numeric index (cell-N format)
         const parsedCellIndex = parseCellId(cell_id)
         if (parsedCellIndex !== undefined) {
           if (!notebook.cells[parsedCellIndex]) {
@@ -289,7 +271,6 @@ export const NotebookEditTool = buildTool({
         }
       }
     }
-
     return { result: true }
   },
   async call(
@@ -307,7 +288,6 @@ export const NotebookEditTool = buildTool({
     const fullPath = isAbsolute(notebook_path)
       ? notebook_path
       : resolve(getCwd(), notebook_path)
-
     if (fileHistoryEnabled()) {
       await fileHistoryTrackEdit(
         updateFileHistoryState,
@@ -315,19 +295,9 @@ export const NotebookEditTool = buildTool({
         parentMessage.uuid,
       )
     }
-
     try {
-      // readFileSyncWithMetadata gives content + encoding + line endings in
-      // one safeResolvePath + readFileSync pass, replacing the previous
-      // detectFileEncoding + readFile + detectLineEndings chain (each of
-      // which redid safeResolvePath and/or a 4KB readSync).
       const { content, encoding, lineEndings } =
         readFileSyncWithMetadata(fullPath)
-      // Must use non-memoized jsonParse here: safeParseJSON caches by content
-      // string and returns a shared object reference, but we mutate the
-      // notebook in place below (cells.splice, targetCell.source = ...).
-      // Using the memoized version poisons the cache for validateInput() and
-      // any subsequent call() with the same file content.
       let notebook: NotebookContent
       try {
         notebook = jsonParse(content) as NotebookContent
@@ -346,36 +316,28 @@ export const NotebookEditTool = buildTool({
           },
         }
       }
-
       let cellIndex
       if (!cell_id) {
-        cellIndex = 0 // Default to inserting at the beginning if no cell_id is provided
+        cellIndex = 0 
       } else {
-        // First try to find the cell by its actual ID
         cellIndex = notebook.cells.findIndex(cell => cell.id === cell_id)
-
-        // If not found, try to parse as a numeric index (cell-N format)
         if (cellIndex === -1) {
           const parsedCellIndex = parseCellId(cell_id)
           if (parsedCellIndex !== undefined) {
             cellIndex = parsedCellIndex
           }
         }
-
         if (originalEditMode === 'insert') {
-          cellIndex += 1 // Insert after the cell with this ID
+          cellIndex += 1 
         }
       }
-
-      // Convert replace to insert if trying to replace one past the end
       let edit_mode = originalEditMode
       if (edit_mode === 'replace' && cellIndex === notebook.cells.length) {
         edit_mode = 'insert'
         if (!cell_type) {
-          cell_type = 'code' // Default to code if no cell_type specified
+          cell_type = 'code' 
         }
       }
-
       const language = notebook.metadata.language_info?.name ?? 'python'
       let new_cell_id = undefined
       if (
@@ -388,9 +350,7 @@ export const NotebookEditTool = buildTool({
           new_cell_id = cell_id
         }
       }
-
       if (edit_mode === 'delete') {
-        // Delete the specified cell
         notebook.cells.splice(cellIndex, 1)
       } else if (edit_mode === 'insert') {
         let new_cell: NotebookCell
@@ -411,14 +371,11 @@ export const NotebookEditTool = buildTool({
             outputs: [],
           }
         }
-        // Insert the new cell
         notebook.cells.splice(cellIndex, 0, new_cell)
       } else {
-        // Find the specified cell
-        const targetCell = notebook.cells[cellIndex]! // validateInput ensures cell_number is in bounds
+        const targetCell = notebook.cells[cellIndex]! 
         targetCell.source = new_source
         if (targetCell.cell_type === 'code') {
-          // Reset execution count and clear outputs since cell was modified
           targetCell.execution_count = null
           targetCell.outputs = []
         }
@@ -426,14 +383,9 @@ export const NotebookEditTool = buildTool({
           targetCell.cell_type = cell_type
         }
       }
-      // Write back to file
       const IPYNB_INDENT = 1
       const updatedContent = jsonStringify(notebook, null, IPYNB_INDENT)
       writeTextContent(fullPath, updatedContent, encoding, lineEndings)
-      // Update readFileState with post-write mtime (matches FileEditTool/
-      // FileWriteTool). offset:undefined breaks FileReadTool's dedup match —
-      // without this, Read→NotebookEdit→Read in the same millisecond would
-      // return the file_unchanged marker against stale in-context content.
       readFileState.set(fullPath, {
         content: updatedContent,
         timestamp: getFileModificationTime(fullPath),

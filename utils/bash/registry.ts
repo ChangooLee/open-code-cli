@@ -1,6 +1,5 @@
 import { memoizeWithLRU } from '../memoize.js'
 import specs from './specs/index.js'
-
 export type CommandSpec = {
   name: string
   description?: string
@@ -8,32 +7,28 @@ export type CommandSpec = {
   args?: Argument | Argument[]
   options?: Option[]
 }
-
 export type Argument = {
   name?: string
   description?: string
   isDangerous?: boolean
-  isVariadic?: boolean // repeats infinitely e.g. echo hello world
+  isVariadic?: boolean 
   isOptional?: boolean
-  isCommand?: boolean // wrapper commands e.g. timeout, sudo
-  isModule?: string | boolean // for python -m and similar module args
-  isScript?: boolean // script files e.g. node script.js
+  isCommand?: boolean 
+  isModule?: string | boolean 
+  isScript?: boolean 
 }
-
 export type Option = {
   name: string | string[]
   description?: string
   args?: Argument | Argument[]
   isRequired?: boolean
 }
-
 export async function loadFigSpec(
   command: string,
 ): Promise<CommandSpec | null> {
   if (!command || command.includes('/') || command.includes('\\')) return null
   if (command.includes('..')) return null
   if (command.startsWith('-') && command !== '-') return null
-
   try {
     const module = await import(`@withfig/autocomplete/build/${command}.js`)
     return module.default || module

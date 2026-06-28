@@ -7,7 +7,6 @@ import {
 import { generateKeybindingsTemplate } from '../../keybindings/template.js'
 import { getErrnoCode } from '../../utils/errors.js'
 import { editFileInEditor } from '../../utils/promptEditor.js'
-
 export async function call(): Promise<{ type: 'text'; value: string }> {
   if (!isKeybindingCustomizationEnabled()) {
     return {
@@ -16,11 +15,7 @@ export async function call(): Promise<{ type: 'text'; value: string }> {
         'Keybinding customization is not enabled. This feature is currently in preview.',
     }
   }
-
   const keybindingsPath = getKeybindingsPath()
-
-  // Write template with 'wx' flag (exclusive create) — fails with EEXIST if
-  // the file already exists. Avoids a stat pre-check (TOCTOU race + extra syscall).
   let fileExists = false
   await mkdir(dirname(keybindingsPath), { recursive: true })
   try {
@@ -35,8 +30,6 @@ export async function call(): Promise<{ type: 'text'; value: string }> {
       throw e
     }
   }
-
-  // Open in editor
   const result = await editFileInEditor(keybindingsPath)
   if (result.error) {
     return {

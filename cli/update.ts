@@ -26,25 +26,18 @@ import { getPackageManager } from 'src/utils/nativeInstaller/packageManagers.js'
 import { writeToStdout } from 'src/utils/process.js'
 import { gte } from 'src/utils/semver.js'
 import { getInitialSettings } from 'src/utils/settings/settings.js'
-
 export async function update() {
   logEvent('open_code_cli_update_check', {})
   writeToStdout(`Current version: ${MACRO.VERSION}\n`)
-
   const channel = getInitialSettings()?.autoUpdatesChannel ?? 'latest'
   writeToStdout(`Checking for updates to ${channel} version...\n`)
-
   logForDebugging('update: Starting update check')
-
-  // Run diagnostic to detect potential issues
   logForDebugging('update: Running diagnostic')
   const diagnostic = await getDoctorDiagnostic()
   logForDebugging(`update: Installation type: ${diagnostic.installationType}`)
   logForDebugging(
     `update: Config install method: ${diagnostic.configInstallMethod}`,
   )
-
-  // Check for multiple installations
   if (diagnostic.multipleInstallations.length > 1) {
     writeToStdout('\n')
     writeToStdout(chalk.yellow('Warning: Multiple installations found') + '\n')
@@ -56,24 +49,15 @@ export async function update() {
       writeToStdout(`- ${install.type} at ${install.path}${current}\n`)
     }
   }
-
-  // Display warnings if any exist
   if (diagnostic.warnings.length > 0) {
     writeToStdout('\n')
     for (const warning of diagnostic.warnings) {
       logForDebugging(`update: Warning detected: ${warning.issue}`)
-
-      // Don't skip PATH warnings - they're always relevant
-      // The user needs to know that 'which open-code-cli' points elsewhere
       logForDebugging(`update: Showing warning: ${warning.issue}`)
-
       writeToStdout(chalk.yellow(`Warning: ${warning.issue}\n`))
-
       writeToStdout(chalk.bold(`Fix: ${warning.fix}\n`))
     }
   }
-
-  // Update config if installMethod is not set (but skip for package managers)
   const config = getGlobalConfig()
   if (
     !config.installMethod &&
@@ -82,8 +66,6 @@ export async function update() {
     writeToStdout('\n')
     writeToStdout('Updating configuration to track installation method...\n')
     let detectedMethod: 'local' | 'native' | 'global' | 'unknown' = 'unknown'
-
-    // Map diagnostic installation type to config install method
     switch (diagnostic.installationType) {
       case 'npm-local':
         detectedMethod = 'local'
@@ -97,15 +79,12 @@ export async function update() {
       default:
         detectedMethod = 'unknown'
     }
-
     saveGlobalConfig(current => ({
       ...current,
       installMethod: detectedMethod,
     }))
     writeToStdout(`Installation method set to: ${detectedMethod}\n`)
   }
-
-  // Check if running from development build
   if (diagnostic.installationType === 'development') {
     writeToStdout('\n')
     writeToStdout(
@@ -113,12 +92,9 @@ export async function update() {
     )
     await gracefulShutdown(1)
   }
-
-  // Check if running from a package manager
   if (diagnostic.installationType === 'package-manager') {
     const packageManager = await getPackageManager()
     writeToStdout('\n')
-
     if (packageManager === 'homebrew') {
       writeToStdout('Open Code CLI is managed by Homebrew.\n')
       const latest = await getLatestVersion(channel)
@@ -155,17 +131,11 @@ export async function update() {
         writeToStdout('Open Code CLI is up to date!\n')
       }
     } else {
-      // pacman, deb, and rpm don't get specific commands because they each have
-      // multiple frontends (pacman: yay/paru/makepkg, deb: apt/apt-get/aptitude/nala,
-      // rpm: dnf/yum/zypper)
       writeToStdout('Open Code CLI is managed by a package manager.\n')
       writeToStdout('Please use your package manager to update.\n')
     }
-
     await gracefulShutdown(0)
   }
-
-  // Check for config/reality mismatch (skip for package-manager installs)
   if (
     config.installMethod &&
     diagnostic.configInstallMethod !== 'not set' &&
@@ -173,8 +143,6 @@ export async function update() {
   ) {
     const runningType = diagnostic.installationType
     const configExpects = diagnostic.configInstallMethod
-
-    // Map installation types for comparison
     const typeMapping: Record<string, string> = {
       'npm-local': 'local',
       'npm-global': 'global',
@@ -182,9 +150,7 @@ export async function update() {
       development: 'development',
       unknown: 'unknown',
     }
-
     const normalizedRunningType = typeMapping[runningType] || runningType
-
     if (
       normalizedRunningType !== configExpects &&
       configExpects !== 'unknown'
@@ -198,8 +164,6 @@ export async function update() {
           `Updating the ${runningType} installation you are currently using`,
         ) + '\n',
       )
-
-      // Update config to match reality
       saveGlobalConfig(current => ({
         ...current,
         installMethod: normalizedRunningType as InstallMethod,
@@ -209,16 +173,12 @@ export async function update() {
       )
     }
   }
-
-  // Handle native installation updates first
   if (diagnostic.installationType === 'native') {
     logForDebugging(
       'update: Detected native installation, using native updater',
     )
     try {
       const result = await installLatestNative(channel, true)
-
-      // Handle lock contention gracefully
       if (result.lockFailed) {
         const pidInfo = result.lockHolderPid
           ? ` (PID ${result.lockHolderPid})`
@@ -230,12 +190,10 @@ export async function update() {
         )
         await gracefulShutdown(0)
       }
-
       if (!result.latestVersion) {
         process.stderr.write('Failed to check for updates\n')
         await gracefulShutdown(1)
       }
-
       if (result.latestVersion === MACRO.VERSION) {
         writeToStdout(
           chalk.green(`Open Code CLI is up to date (${MACRO.VERSION})`) + '\n',
@@ -256,14 +214,9 @@ export async function update() {
       await gracefulShutdown(1)
     }
   }
-
-  // Fallback to existing JS/npm-based update logic
-  // Remove native installer symlink since we're not using native installation
-  // But only if user hasn't migrated to native installation
   if (config.installMethod !== 'native') {
     await removeInstalledSymlink()
   }
-
   logForDebugging('update: Checking npm registry for latest version')
   logForDebugging(`update: Package URL: ${MACRO.PACKAGE_URL}`)
   const npmTag = channel === 'stable' ? 'stable' : 'latest'
@@ -273,7 +226,6 @@ export async function update() {
   logForDebugging(
     `update: Latest version from npm: ${latestVersion || 'FAILED'}`,
   )
-
   if (!latestVersion) {
     logForDebugging('update: Failed to get latest version from npm registry')
     process.stderr.write(chalk.red('Failed to check for updates') + '\n')
@@ -300,28 +252,21 @@ export async function update() {
     process.stderr.write(
       `  • Manually check: npm view ${packageName} version\n`,
     )
-
     process.stderr.write('  • Check if you need to login: npm whoami\n')
     await gracefulShutdown(1)
   }
-
-  // Check if versions match exactly, including any build metadata (like SHA)
   if (latestVersion === MACRO.VERSION) {
     writeToStdout(
       chalk.green(`Open Code CLI is up to date (${MACRO.VERSION})`) + '\n',
     )
     await gracefulShutdown(0)
   }
-
   writeToStdout(
     `New version available: ${latestVersion} (current: ${MACRO.VERSION})\n`,
   )
   writeToStdout('Installing update...\n')
-
-  // Determine update method based on what's actually running
   let useLocalUpdate = false
   let updateMethodName = ''
-
   switch (diagnostic.installationType) {
     case 'npm-local':
       useLocalUpdate = true
@@ -332,7 +277,6 @@ export async function update() {
       updateMethodName = 'global'
       break
     case 'unknown': {
-      // Fallback to detection if we can't determine installation type
       const isLocal = await localInstallationExists()
       useLocalUpdate = isLocal
       updateMethodName = isLocal ? 'local' : 'global'
@@ -350,14 +294,10 @@ export async function update() {
       )
       await gracefulShutdown(1)
   }
-
   writeToStdout(`Using ${updateMethodName} installation update method...\n`)
-
   logForDebugging(`update: Update method determined: ${updateMethodName}`)
   logForDebugging(`update: useLocalUpdate: ${useLocalUpdate}`)
-
   let status: InstallStatus
-
   if (useLocalUpdate) {
     logForDebugging(
       'update: Calling installOrUpdateOpenCodeCliPackage() for local update',
@@ -367,9 +307,7 @@ export async function update() {
     logForDebugging('update: Calling installGlobalPackage() for global update')
     status = await installGlobalPackage()
   }
-
   logForDebugging(`update: Installation status: ${status}`)
-
   switch (status) {
     case 'success':
       writeToStdout(

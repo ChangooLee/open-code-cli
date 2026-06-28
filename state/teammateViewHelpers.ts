@@ -1,16 +1,8 @@
 import { logEvent } from '../services/analytics/index.js'
 import { isTerminalTaskStatus } from '../Task.js'
 import type { LocalAgentTaskState } from '../tasks/LocalAgentTask/LocalAgentTask.js'
-
-// Inlined from framework.ts — importing creates a cycle through
-// BackgroundTasksDialog. Keep in sync with PANEL_GRACE_MS there.
 const PANEL_GRACE_MS = 30_000
-
 import type { AppState } from './AppState.js'
-
-// Inline type check instead of importing isLocalAgentTask — breaks the
-// teammateViewHelpers → LocalAgentTask runtime edge that creates a cycle
-// through BackgroundTasksDialog.
 function isLocalAgent(task: unknown): task is LocalAgentTaskState {
   return (
     typeof task === 'object' &&
@@ -19,12 +11,6 @@ function isLocalAgent(task: unknown): task is LocalAgentTaskState {
     task.type === 'local_agent'
   )
 }
-
-/**
- * Return the task released back to placeholder form: retain dropped, messages
- * cleared, evictAfter set if terminal. Shared by exitTeammateView and
- * the switch-away path in enterTeammateView.
- */
 function release(task: LocalAgentTaskState): LocalAgentTaskState {
   return {
     ...task,
@@ -36,13 +22,6 @@ function release(task: LocalAgentTaskState): LocalAgentTaskState {
       : undefined,
   }
 }
-
-/**
- * Transitions the UI to view a teammate's transcript.
- * Sets viewingAgentTaskId and, for local_agent, retain: true (blocks eviction,
- * enables stream-append, triggers disk bootstrap) and clears evictAfter.
- * If switching from another agent, releases the previous one back to placeholder.
- */
 export function enterTeammateView(
   taskId: string,
   setAppState: (updater: (prev: AppState) => AppState) => void,
@@ -79,12 +58,6 @@ export function enterTeammateView(
     }
   })
 }
-
-/**
- * Exit teammate transcript view and return to leader's view.
- * Drops retain and clears messages back to placeholder form; if terminal,
- * schedules eviction via evictAfter so the row lingers briefly.
- */
 export function exitTeammateView(
   setAppState: (updater: (prev: AppState) => AppState) => void,
 ): void {
@@ -107,12 +80,6 @@ export function exitTeammateView(
     }
   })
 }
-
-/**
- * Context-sensitive x: running → abort, terminal → dismiss.
- * Dismiss sets evictAfter=0 so the filter hides immediately.
- * If viewing the dismissed agent, also exits to leader.
- */
 export function stopOrDismissAgent(
   taskId: string,
   setAppState: (updater: (prev: AppState) => AppState) => void,

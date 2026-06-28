@@ -1,6 +1,3 @@
-// --
-// Adapter interface for the layout engine (Yoga)
-
 export const LayoutEdge = {
   All: 'all',
   Horizontal: 'horizontal',
@@ -13,20 +10,17 @@ export const LayoutEdge = {
   End: 'end',
 } as const
 export type LayoutEdge = (typeof LayoutEdge)[keyof typeof LayoutEdge]
-
 export const LayoutGutter = {
   All: 'all',
   Column: 'column',
   Row: 'row',
 } as const
 export type LayoutGutter = (typeof LayoutGutter)[keyof typeof LayoutGutter]
-
 export const LayoutDisplay = {
   Flex: 'flex',
   None: 'none',
 } as const
 export type LayoutDisplay = (typeof LayoutDisplay)[keyof typeof LayoutDisplay]
-
 export const LayoutFlexDirection = {
   Row: 'row',
   RowReverse: 'row-reverse',
@@ -35,7 +29,6 @@ export const LayoutFlexDirection = {
 } as const
 export type LayoutFlexDirection =
   (typeof LayoutFlexDirection)[keyof typeof LayoutFlexDirection]
-
 export const LayoutAlign = {
   Auto: 'auto',
   Stretch: 'stretch',
@@ -44,7 +37,6 @@ export const LayoutAlign = {
   FlexEnd: 'flex-end',
 } as const
 export type LayoutAlign = (typeof LayoutAlign)[keyof typeof LayoutAlign]
-
 export const LayoutJustify = {
   FlexStart: 'flex-start',
   Center: 'center',
@@ -54,21 +46,18 @@ export const LayoutJustify = {
   SpaceEvenly: 'space-evenly',
 } as const
 export type LayoutJustify = (typeof LayoutJustify)[keyof typeof LayoutJustify]
-
 export const LayoutWrap = {
   NoWrap: 'nowrap',
   Wrap: 'wrap',
   WrapReverse: 'wrap-reverse',
 } as const
 export type LayoutWrap = (typeof LayoutWrap)[keyof typeof LayoutWrap]
-
 export const LayoutPositionType = {
   Relative: 'relative',
   Absolute: 'absolute',
 } as const
 export type LayoutPositionType =
   (typeof LayoutPositionType)[keyof typeof LayoutPositionType]
-
 export const LayoutOverflow = {
   Visible: 'visible',
   Hidden: 'hidden',
@@ -76,12 +65,10 @@ export const LayoutOverflow = {
 } as const
 export type LayoutOverflow =
   (typeof LayoutOverflow)[keyof typeof LayoutOverflow]
-
 export type LayoutMeasureFunc = (
   width: number,
   widthMode: LayoutMeasureMode,
 ) => { width: number; height: number }
-
 export const LayoutMeasureMode = {
   Undefined: 'undefined',
   Exactly: 'exactly',
@@ -89,29 +76,21 @@ export const LayoutMeasureMode = {
 } as const
 export type LayoutMeasureMode =
   (typeof LayoutMeasureMode)[keyof typeof LayoutMeasureMode]
-
 export type LayoutNode = {
-  // Tree
   insertChild(child: LayoutNode, index: number): void
   removeChild(child: LayoutNode): void
   getChildCount(): number
   getParent(): LayoutNode | null
-
-  // Layout computation
   calculateLayout(width?: number, height?: number): void
   setMeasureFunc(fn: LayoutMeasureFunc): void
   unsetMeasureFunc(): void
   markDirty(): void
-
-  // Layout reading (post-layout)
   getComputedLeft(): number
   getComputedTop(): number
   getComputedWidth(): number
   getComputedHeight(): number
   getComputedBorder(edge: LayoutEdge): number
   getComputedPadding(edge: LayoutEdge): number
-
-  // Style setters
   setWidth(value: number): void
   setWidthPercent(value: number): void
   setWidthAuto(): void
@@ -145,8 +124,6 @@ export type LayoutNode = {
   setPadding(edge: LayoutEdge, value: number): void
   setBorder(edge: LayoutEdge, value: number): void
   setGap(gutter: LayoutGutter, value: number): void
-
-  // Lifecycle
   free(): void
   freeRecursive(): void
 }

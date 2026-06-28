@@ -12,9 +12,7 @@ export type IDEAtMentioned = {
   lineStart?: number
   lineEnd?: number
 }
-
 const NOTIFICATION_METHOD = 'at_mentioned'
-
 const AtMentionedSchema = lazySchema(() =>
   z.object({
     method: z.literal(NOTIFICATION_METHOD),
@@ -25,26 +23,16 @@ const AtMentionedSchema = lazySchema(() =>
     }),
   }),
 )
-
-/**
- * A hook that tracks IDE at-mention notifications by directly registering
- * with MCP client notification handlers,
- */
 export function useIdeAtMentioned(
   mcpClients: MCPServerConnection[],
   onAtMentioned: (atMentioned: IDEAtMentioned) => void,
 ): void {
   const ideClientRef = useRef<ConnectedMCPServer | undefined>(undefined)
-
   useEffect(() => {
-    // Find the IDE client from the MCP clients list
     const ideClient = getConnectedIdeClient(mcpClients)
-
     if (ideClientRef.current !== ideClient) {
       ideClientRef.current = ideClient
     }
-
-    // If we found a connected IDE client, register our handler
     if (ideClient) {
       ideClient.client.setNotificationHandler(
         AtMentionedSchema(),
@@ -54,7 +42,6 @@ export function useIdeAtMentioned(
           }
           try {
             const data = notification.params
-            // Adjust line numbers to be 1-based instead of 0-based
             const lineStart =
               data.lineStart !== undefined ? data.lineStart + 1 : undefined
             const lineEnd =
@@ -70,7 +57,5 @@ export function useIdeAtMentioned(
         },
       )
     }
-
-    // No cleanup needed as MCP clients manage their own lifecycle
   }, [mcpClients, onAtMentioned])
 }

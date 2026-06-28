@@ -23,68 +23,44 @@ import { GLOB_TOOL_NAME } from '../GlobTool/prompt.js'
 import { GREP_TOOL_NAME } from '../GrepTool/prompt.js'
 import { TodoWriteTool } from '../TodoWriteTool/TodoWriteTool.js'
 import { BASH_TOOL_NAME } from './toolName.js'
-
 import { getOpenCodeCliEnv } from '../../utils/envUtils.js';
 export function getDefaultTimeoutMs(): number {
   return getDefaultBashTimeoutMs()
 }
-
 export function getMaxTimeoutMs(): number {
   return getMaxBashTimeoutMs()
 }
-
 function getBackgroundUsageNote(): string | null {
   if (isEnvTruthy(getOpenCodeCliEnv('DISABLE_BACKGROUND_TASKS'))) {
     return null
   }
   return "You can use the `run_in_background` parameter to run the command in the background. Only use this if you don't need the result immediately and are OK being notified when the command completes later. You do not need to check the output right away - you'll be notified when it finishes. You do not need to use '&' at the end of the command when using this parameter."
 }
-
 function getCommitAndPRInstructions(): string {
-  // Defense-in-depth: undercover instructions must survive even if the user
-  // has disabled git instructions entirely. Attribution stripping and model-ID
-  // hiding are mechanical and work regardless, but the explicit "don't blow
-  // your cover" instructions are the last line of defense against the model
-  // volunteering an internal codename in a commit message.
   const undercoverSection =
     process.env.USER_TYPE === 'ant' && isUndercover()
       ? getUndercoverInstructions() + '\n'
       : ''
-
   if (!shouldIncludeGitInstructions()) return undercoverSection
-
-  // For ant users, use the short version pointing to skills
   if (process.env.USER_TYPE === 'ant') {
     const skillsSection = !isEnvTruthy(getOpenCodeCliEnv('SIMPLE'))
       ? `For git commits and pull requests, use the \`/commit\` and \`/commit-push-pr\` skills:
 - \`/commit\` - Create a git commit with staged changes
 - \`/commit-push-pr\` - Commit, push, and create a pull request
-
 These skills handle git safety protocols, proper commit message formatting, and PR creation.
-
 Before creating a pull request, run \`/simplify\` to review your changes, then test end-to-end (e.g. via \`/tmux\` for interactive features).
-
 `
       : ''
     return `${undercoverSection}# Git operations
-
 ${skillsSection}IMPORTANT: NEVER skip hooks (--no-verify, --no-gpg-sign, etc) unless the user explicitly requests it.
-
 Use the gh command via the Bash tool for other GitHub-related tasks including working with issues, checks, and releases. If given a Github URL use the gh command to get the information needed.
-
 # Other common operations
 - View comments on a Github PR: gh api repos/foo/bar/pulls/123/comments`
   }
-
-  // For external users, include full inline instructions
   const { commit: commitAttribution, pr: prAttribution } = getAttributionTexts()
-
   return `# Committing changes with git
-
 Only create commits when requested by the user. If unclear, ask first. When the user asks you to create a new git commit, follow these steps carefully:
-
 You can call multiple tools in a single response. When multiple independent pieces of information are requested and all commands are likely to succeed, run multiple tool calls in parallel for optimal performance. The numbered steps below indicate which commands should be batched in parallel.
-
 Git Safety Protocol:
 - NEVER update the git config
 - NEVER run destructive git commands (push --force, reset --hard, checkout ., restore ., clean -f, branch -D) unless the user explicitly requests these actions. Taking unauthorized destructive actions is unhelpful and can result in lost work, so it's best to ONLY run these commands when given direct instructions
@@ -93,7 +69,6 @@ Git Safety Protocol:
 - CRITICAL: Always create NEW commits rather than amending, unless the user explicitly requests a git amend. When a pre-commit hook fails, the commit did NOT happen — so --amend would modify the PREVIOUS commit, which may result in destroying work or losing previous changes. Instead, after hook failure, fix the issue, re-stage, and create a NEW commit
 - When staging files, prefer adding specific files by name rather than using "git add -A" or "git add .", which can accidentally include sensitive files (.env, credentials) or large binaries
 - NEVER commit changes unless the user explicitly asks you to. It is VERY IMPORTANT to only commit when explicitly asked, otherwise the user will feel that you are being too proactive
-
 1. Run the following bash commands in parallel, each using the ${BASH_TOOL_NAME} tool:
   - Run a git status command to see all untracked files. IMPORTANT: Never use the -uall flag as it can cause memory issues on large repos.
   - Run a git diff command to see both staged and unstaged changes that will be committed.
@@ -109,7 +84,6 @@ Git Safety Protocol:
    - Run git status after the commit completes to verify success.
    Note: git status depends on the commit completing, so run it sequentially after the commit.
 4. If the commit fails due to pre-commit hook: fix the issue and create a NEW commit
-
 Important notes:
 - NEVER run additional commands to read or explore code, besides git bash commands
 - NEVER use the ${TodoWriteTool.name} or ${AGENT_TOOL_NAME} tools
@@ -124,12 +98,9 @@ git commit -m "$(cat <<'EOF'
    EOF
    )"
 </example>
-
 # Creating pull requests
 Use the gh command via the Bash tool for ALL GitHub-related tasks including working with issues, pull requests, checks, and releases. If given a Github URL use the gh command to get the information needed.
-
 IMPORTANT: When the user asks you to create a pull request, follow these steps carefully:
-
 1. Run the following bash commands in parallel using the ${BASH_TOOL_NAME} tool, in order to understand the current state of the branch since it diverged from the main branch:
    - Run a git status command to see all untracked files (never use -uall flag)
    - Run a git diff command to see both staged and unstaged changes that will be committed
@@ -146,35 +117,25 @@ IMPORTANT: When the user asks you to create a pull request, follow these steps c
 gh pr create --title "the pr title" --body "$(cat <<'EOF'
 ## Summary
 <1-3 bullet points>
-
 ## Test plan
 [Bulleted markdown checklist of TODOs for testing the pull request...]${prAttribution ? `\n\n${prAttribution}` : ''}
 EOF
 )"
 </example>
-
 Important:
 - DO NOT use the ${TodoWriteTool.name} or ${AGENT_TOOL_NAME} tools
 - Return the PR URL when you're done, so the user can see it
-
 # Other common operations
 - View comments on a Github PR: gh api repos/foo/bar/pulls/123/comments`
 }
-
-// SandboxManager merges config from multiple sources (settings layers, defaults,
-// CLI flags) without deduping, so paths like ~/.cache appear 3× in allowOnly.
-// Dedup here before inlining into the prompt — affects only what the model sees,
-// not sandbox enforcement. Saves ~150-200 tokens/request when sandbox is enabled.
 function dedup<T>(arr: T[] | undefined): T[] | undefined {
   if (!arr || arr.length === 0) return arr
   return [...new Set(arr)]
 }
-
 function getSimpleSandboxSection(): string {
   if (!SandboxManager.isSandboxingEnabled()) {
     return ''
   }
-
   const fsReadConfig = SandboxManager.getFsReadConfig()
   const fsWriteConfig = SandboxManager.getFsWriteConfig()
   const networkRestrictionConfig = SandboxManager.getNetworkRestrictionConfig()
@@ -182,14 +143,9 @@ function getSimpleSandboxSection(): string {
   const ignoreViolations = SandboxManager.getIgnoreViolations()
   const allowUnsandboxedCommands =
     SandboxManager.areUnsandboxedCommandsAllowed()
-
-  // Replace the per-UID temp dir literal (e.g. /private/tmp/open-code-cli-1001/) with
-  // "$TMPDIR" so the prompt is identical across users — avoids busting the
-  // cross-user global prompt cache. The sandbox already sets $TMPDIR at runtime.
   const openCodeCliTempDir = getOpenCodeCliTempDir()
   const normalizeAllowOnly = (paths: string[]): string[] =>
     [...new Set(paths)].map(p => (p === openCodeCliTempDir ? '$TMPDIR' : p))
-
   const filesystemConfig = {
     read: {
       denyOnly: dedup(fsReadConfig.denyOnly),
@@ -202,7 +158,6 @@ function getSimpleSandboxSection(): string {
       denyWithinAllow: dedup(fsWriteConfig.denyWithinAllow),
     },
   }
-
   const networkConfig = {
     ...(networkRestrictionConfig?.allowedHosts && {
       allowedHosts: dedup(networkRestrictionConfig.allowedHosts),
@@ -212,7 +167,6 @@ function getSimpleSandboxSection(): string {
     }),
     ...(allowUnixSockets && { allowUnixSockets: dedup(allowUnixSockets) }),
   }
-
   const restrictionsLines = []
   if (Object.keys(filesystemConfig).length > 0) {
     restrictionsLines.push(`Filesystem: ${jsonStringify(filesystemConfig)}`)
@@ -225,7 +179,6 @@ function getSimpleSandboxSection(): string {
       `Ignored violations: ${jsonStringify(ignoreViolations)}`,
     )
   }
-
   const sandboxOverrideItems: Array<string | string[]> =
     allowUnsandboxedCommands
       ? [
@@ -255,12 +208,10 @@ function getSimpleSandboxSection(): string {
           'Commands cannot run outside the sandbox under any circumstances.',
           'If a command fails due to sandbox restrictions, work with the user to adjust sandbox settings instead.',
         ]
-
   const items: Array<string | string[]> = [
     ...sandboxOverrideItems,
     'For temporary files, always use the `$TMPDIR` environment variable. TMPDIR is automatically set to the correct sandbox-writable directory in sandbox mode. Do NOT use `/tmp` directly - use `$TMPDIR` instead.',
   ]
-
   return [
     '',
     '## Command sandbox',
@@ -272,12 +223,8 @@ function getSimpleSandboxSection(): string {
     ...prependBullets(items),
   ].join('\n')
 }
-
 export function getSimplePrompt(): string {
-  // Ant-native builds alias find/grep to embedded bfs/ugrep in Open Code CLI's shell,
-  // so we don't steer away from them (and Glob/Grep tools are removed).
   const embedded = hasEmbeddedSearchTools()
-
   const toolPreferenceItems = [
     ...(embedded
       ? []
@@ -290,24 +237,20 @@ export function getSimplePrompt(): string {
     `Write files: Use ${FILE_WRITE_TOOL_NAME} (NOT echo >/cat <<EOF)`,
     'Communication: Output text directly (NOT echo/printf)',
   ]
-
   const avoidCommands = embedded
     ? '`cat`, `head`, `tail`, `sed`, `awk`, or `echo`'
     : '`find`, `grep`, `cat`, `head`, `tail`, `sed`, `awk`, or `echo`'
-
   const multipleCommandsSubitems = [
     `If the commands are independent and can run in parallel, make multiple ${BASH_TOOL_NAME} tool calls in a single message. Example: if you need to run "git status" and "git diff", send a single message with two ${BASH_TOOL_NAME} tool calls in parallel.`,
     `If the commands depend on each other and must run sequentially, use a single ${BASH_TOOL_NAME} call with '&&' to chain them together.`,
     "Use ';' only when you need to run commands sequentially but don't care if earlier commands fail.",
     'DO NOT use newlines to separate commands (newlines are ok in quoted strings).',
   ]
-
   const gitSubitems = [
     'Prefer to create a new commit rather than amending an existing commit.',
     'Before running destructive operations (e.g., git reset --hard, git push --force, git checkout --), consider whether there is a safer alternative that achieves the same goal. Only use destructive operations when they are truly the best approach.',
     'Never skip hooks (--no-verify) or bypass signing (--no-gpg-sign, -c commit.gpgsign=false) unless the user has explicitly asked for it. If a hook fails, investigate and fix the underlying issue.',
   ]
-
   const sleepSubitems = [
     'Do not sleep between commands that can run immediately — just run them.',
     ...(feature('MONITOR_TOOL')
@@ -328,7 +271,6 @@ export function getSimplePrompt(): string {
         ]),
   ]
   const backgroundNote = getBackgroundUsageNote()
-
   const instructionItems: Array<string | string[]> = [
     'If your command will create new directories or files, first use this tool to run `ls` to verify the parent directory exists and is the correct location.',
     'Always quote file paths that contain spaces with double quotes in your command (e.g., cd "path with spaces/file.txt")',
@@ -343,15 +285,10 @@ export function getSimplePrompt(): string {
     sleepSubitems,
     ...(embedded
       ? [
-          // bfs (which backs `find`) uses Oniguruma for -regex, which picks the
-          // FIRST matching alternative (leftmost-first), unlike GNU find's
-          // POSIX leftmost-longest. This silently drops matches when a shorter
-          // alternative is a prefix of a longer one.
           "When using `find -regex` with alternation, put the longest alternative first. Example: use `'.*\\.\\(tsx\\|ts\\)'` not `'.*\\.\\(ts\\|tsx\\)'` — the second form silently skips `.tsx` files.",
         ]
       : []),
   ]
-
   return [
     'Executes a given bash command and returns its output.',
     '',

@@ -1,25 +1,14 @@
-/**
- * Thin HTTP wrappers for the CCR v2 code-session API.
- *
- * Separate file from remoteBridgeCore.ts so the SDK /bridge subpath can
- * export createCodeSession + fetchRemoteCredentials without bundling the
- * heavy CLI tree (analytics, transport, etc.). Callers supply explicit
- * accessToken + baseUrl — no implicit auth or config reads.
- */
-
 import axios from 'axios'
 import { logForDebugging } from '../utils/debug.js'
 import { errorMessage } from '../utils/errors.js'
 import { jsonStringify } from '../utils/slowOperations.js'
 import { extractErrorDetail } from './debugUtils.js'
-
 function oauthHeaders(accessToken: string): Record<string, string> {
   return {
     Authorization: `Bearer ${accessToken}`,
     'Content-Type': 'application/json',
   }
 }
-
 export async function createCodeSession(
   baseUrl: string,
   accessToken: string,
@@ -32,9 +21,6 @@ export async function createCodeSession(
   try {
     response = await axios.post(
       url,
-      // bridge: {} is the positive signal for the oneof runner — omitting it
-      // (or sending environment_id: "") now 400s. BridgeRunner is an empty
-      // message today; it's a placeholder for future bridge-specific options.
       { title, bridge: {}, ...(tags?.length ? { tags } : {}) },
       {
         headers: oauthHeaders(accessToken),
@@ -48,7 +34,6 @@ export async function createCodeSession(
     )
     return null
   }
-
   if (response.status !== 200 && response.status !== 201) {
     const detail = extractErrorDetail(response.data)
     logForDebugging(
@@ -56,7 +41,6 @@ export async function createCodeSession(
     )
     return null
   }
-
   const data: unknown = response.data
   if (
     !data ||
@@ -75,18 +59,12 @@ export async function createCodeSession(
   }
   return data.session.id
 }
-
-/**
- * Credentials from POST /bridge. JWT is opaque — do not decode.
- * Each /bridge call bumps worker_epoch server-side (it IS the register).
- */
 export type RemoteCredentials = {
   worker_jwt: string
   api_base_url: string
   expires_in: number
   worker_epoch: number
 }
-
 export async function fetchRemoteCredentials(
   sessionId: string,
   baseUrl: string,
@@ -116,7 +94,6 @@ export async function fetchRemoteCredentials(
     )
     return null
   }
-
   if (response.status !== 200) {
     const detail = extractErrorDetail(response.data)
     logForDebugging(
@@ -124,7 +101,6 @@ export async function fetchRemoteCredentials(
     )
     return null
   }
-
   const data: unknown = response.data
   if (
     data === null ||
@@ -142,8 +118,6 @@ export async function fetchRemoteCredentials(
     )
     return null
   }
-  // protojson serializes int64 as a string to avoid JS precision loss;
-  // Go may also return a number depending on encoder settings.
   const rawEpoch = data.worker_epoch
   const epoch = typeof rawEpoch === 'string' ? Number(rawEpoch) : rawEpoch
   if (

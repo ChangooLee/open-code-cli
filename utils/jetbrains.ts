@@ -2,10 +2,7 @@ import { homedir, platform } from 'os'
 import { join } from 'path'
 import { getFsImplementation } from '../utils/fsOperations.js'
 import type { IdeType } from './ide.js'
-
 const PLUGIN_PREFIX = 'open-code-cli-jetbrains-plugin'
-
-// Map of IDE names to their directory patterns
 const ideNameToDirMap: { [key: string]: string[] } = {
   pycharm: ['PyCharm'],
   intellij: ['IntelliJIdea', 'IdeaIC'],
@@ -23,9 +20,6 @@ const ideNameToDirMap: { [key: string]: string[] } = {
   fleet: ['Fleet'],
   androidstudio: ['AndroidStudio'],
 }
-
-// Build plugin directory paths
-// https://www.jetbrains.com/help/pycharm/directories-used-by-the-ide-to-store-settings-caches-plugins-and-logs.html#plugins-directory
 function buildCommonPluginDirectoryPaths(ideName: string): string[] {
   const homeDir = homedir()
   const directories: string[] = []
@@ -33,11 +27,9 @@ function buildCommonPluginDirectoryPaths(ideName: string): string[] {
   if (!idePatterns) {
     return directories
   }
-
   const appData = process.env.APPDATA || join(homeDir, 'AppData', 'Roaming')
   const localAppData =
     process.env.LOCALAPPDATA || join(homeDir, 'AppData', 'Local')
-
   switch (platform()) {
     case 'darwin':
       directories.push(
@@ -50,7 +42,6 @@ function buildCommonPluginDirectoryPaths(ideName: string): string[] {
         )
       }
       break
-
     case 'win32':
       directories.push(
         join(appData, 'JetBrains'),
@@ -61,7 +52,6 @@ function buildCommonPluginDirectoryPaths(ideName: string): string[] {
         directories.push(join(localAppData, 'Google'))
       }
       break
-
     case 'linux':
       directories.push(
         join(homeDir, '.config', 'JetBrains'),
@@ -77,36 +67,25 @@ function buildCommonPluginDirectoryPaths(ideName: string): string[] {
     default:
       break
   }
-
   return directories
 }
-
-// Find all actual plugin directories that exist
 async function detectPluginDirectories(ideName: string): Promise<string[]> {
   const foundDirectories: string[] = []
   const fs = getFsImplementation()
-
   const pluginDirPaths = buildCommonPluginDirectoryPaths(ideName)
   const idePatterns = ideNameToDirMap[ideName.toLowerCase()]
   if (!idePatterns) {
     return foundDirectories
   }
-
-  // Precompile once — idePatterns is invariant across baseDirs
   const regexes = idePatterns.map(p => new RegExp('^' + p))
-
   for (const baseDir of pluginDirPaths) {
     try {
       const entries = await fs.readdir(baseDir)
       for (const regex of regexes) {
         for (const entry of entries) {
           if (!regex.test(entry.name)) continue
-          // Accept symlinks too — dirent.isDirectory() is false for symlinks,
-          // but GNU stow users symlink their JetBrains config dirs. Downstream
-          // fs.stat() calls will filter out symlinks that don't point to dirs.
           if (!entry.isDirectory() && !entry.isSymbolicLink()) continue
           const dir = join(baseDir, entry.name)
-          // Linux is the only OS to not have a plugins directory
           if (platform() === 'linux') {
             foundDirectories.push(dir)
             continue
@@ -116,21 +95,17 @@ async function detectPluginDirectories(ideName: string): Promise<string[]> {
             await fs.stat(pluginDir)
             foundDirectories.push(pluginDir)
           } catch {
-            // Plugin directory doesn't exist, skip
           }
         }
       }
     } catch {
-      // Ignore errors from stale IDE directories (ENOENT, EACCES, etc.)
       continue
     }
   }
-
   return foundDirectories.filter(
     (dir, index) => foundDirectories.indexOf(dir) === index,
   )
 }
-
 export async function isJetBrainsPluginInstalled(
   ideType: IdeType,
 ): Promise<boolean> {
@@ -141,15 +116,12 @@ export async function isJetBrainsPluginInstalled(
       await getFsImplementation().stat(pluginPath)
       return true
     } catch {
-      // Plugin not found in this directory, continue
     }
   }
   return false
 }
-
 const pluginInstalledCache = new Map<IdeType, boolean>()
 const pluginInstalledPromiseCache = new Map<IdeType, Promise<boolean>>()
-
 async function isJetBrainsPluginInstalledMemoized(
   ideType: IdeType,
   forceRefresh = false,
@@ -167,7 +139,6 @@ async function isJetBrainsPluginInstalledMemoized(
   pluginInstalledPromiseCache.set(ideType, promise)
   return promise
 }
-
 export async function isJetBrainsPluginInstalledCached(
   ideType: IdeType,
   forceRefresh = false,
@@ -178,12 +149,6 @@ export async function isJetBrainsPluginInstalledCached(
   }
   return isJetBrainsPluginInstalledMemoized(ideType, forceRefresh)
 }
-
-/**
- * Returns the cached result of isJetBrainsPluginInstalled synchronously.
- * Returns false if the result hasn't been resolved yet.
- * Use this only in sync contexts (e.g., status notice isActive checks).
- */
 export function isJetBrainsPluginInstalledCachedSync(
   ideType: IdeType,
 ): boolean {

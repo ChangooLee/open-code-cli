@@ -1,5 +1,3 @@
-/* eslint-disable custom-rules/no-top-level-side-effects */
-
 import { appendFileSync } from 'fs'
 import createReconciler from 'react-reconciler'
 import { getYogaCounters } from 'src/native-ts/yoga-layout/index.js'
@@ -26,60 +24,41 @@ import { EVENT_HANDLER_PROPS } from './events/event-handlers.js'
 import { getFocusManager, getRootNode } from './focus.js'
 import { LayoutDisplay } from './layout/node.js'
 import applyStyles, { type Styles, type TextStyles } from './styles.js'
-
-// We need to conditionally perform devtools connection to avoid
-// accidentally breaking other third-party code.
-// See https://github.com/vadimdemedes/ink/issues/384
 if (process.env.NODE_ENV === 'development') {
   try {
-    // eslint-disable-next-line custom-rules/no-top-level-dynamic-import -- dev-only; NODE_ENV check is DCE'd in production
     void import('./devtools.js')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (error: any) {
     if (error.code === 'ERR_MODULE_NOT_FOUND') {
-      // biome-ignore lint/suspicious/noConsole: intentional warning
       console.warn(
         `
 The environment variable DEV is set to true, so Ink tried to import \`react-devtools-core\`,
 but this failed as it was not installed. Debugging with React Devtools requires it.
-
 To install use this command:
-
 $ npm install --save-dev react-devtools-core
 				`.trim() + '\n',
       )
     } else {
-      // eslint-disable-next-line @typescript-eslint/only-throw-error
       throw error
     }
   }
 }
-
-// --
-
 type AnyObject = Record<string, unknown>
-
 const diff = (before: AnyObject, after: AnyObject): AnyObject | undefined => {
   if (before === after) {
     return
   }
-
   if (!before) {
     return after
   }
-
   const changed: AnyObject = {}
   let isChanged = false
-
   for (const key of Object.keys(before)) {
     const isDeleted = after ? !Object.hasOwn(after, key) : true
-
     if (isDeleted) {
       changed[key] = undefined
       isChanged = true
     }
   }
-
   if (after) {
     for (const key of Object.keys(after)) {
       if (after[key] !== before[key]) {
@@ -88,39 +67,28 @@ const diff = (before: AnyObject, after: AnyObject): AnyObject | undefined => {
       }
     }
   }
-
   return isChanged ? changed : undefined
 }
-
 const cleanupYogaNode = (node: DOMElement | TextNode): void => {
   const yogaNode = node.yogaNode
   if (yogaNode) {
     yogaNode.unsetMeasureFunc()
-    // Clear all references BEFORE freeing to prevent other code from
-    // accessing freed WASM memory during concurrent operations
     clearYogaNodeReferences(node)
     yogaNode.freeRecursive()
   }
 }
-
-// --
-
 type Props = Record<string, unknown>
-
 type HostContext = {
   isInsideText: boolean
 }
-
 function setEventHandler(node: DOMElement, key: string, value: unknown): void {
   if (!node._eventHandlers) {
     node._eventHandlers = {}
   }
   node._eventHandlers[key] = value
 }
-
 function applyProp(node: DOMElement, key: string, value: unknown): void {
   if (key === 'children') return
-
   if (key === 'style') {
     setStyle(node, value as Styles)
     if (node.yogaNode) {
@@ -128,33 +96,21 @@ function applyProp(node: DOMElement, key: string, value: unknown): void {
     }
     return
   }
-
   if (key === 'textStyles') {
     node.textStyles = value as TextStyles
     return
   }
-
   if (EVENT_HANDLER_PROPS.has(key)) {
     setEventHandler(node, key, value)
     return
   }
-
   setAttribute(node, key, value as DOMNodeAttribute)
 }
-
-// --
-
-// react-reconciler's Fiber shape — only the fields we walk. The 5th arg to
-// createInstance is the Fiber (`workInProgress` in react-reconciler.dev.js).
-// _debugOwner is the component that rendered this element (dev builds only);
-// return is the parent fiber (always present). We prefer _debugOwner since it
-// skips past Box/Text wrappers to the actual named component.
 type FiberLike = {
   elementType?: { displayName?: string; name?: string } | string | null
   _debugOwner?: FiberLike | null
   return?: FiberLike | null
 }
-
 export function getOwnerChain(fiber: unknown): string[] {
   const chain: string[] = []
   const seen = new Set<unknown>()
@@ -168,14 +124,13 @@ export function getOwnerChain(fiber: unknown): string[] {
         ? (t as { displayName?: string; name?: string }).displayName ||
           (t as { displayName?: string; name?: string }).name
         : typeof t === 'string'
-          ? undefined // host element (ink-box etc) — skip
+          ? undefined 
           : t?.displayName || t?.name
     if (name && name !== chain[chain.length - 1]) chain.push(name)
     cur = cur._debugOwner ?? cur.return
   }
   return chain
 }
-
 let debugRepaints: boolean | undefined
 export function isDebugRepaintsEnabled(): boolean {
   if (debugRepaints === undefined) {
@@ -183,11 +138,7 @@ export function isDebugRepaintsEnabled(): boolean {
   }
   return debugRepaints
 }
-
 export const dispatcher = new Dispatcher()
-
-// --- COMMIT INSTRUMENTATION (temp debugging) ---
-// eslint-disable-next-line custom-rules/no-process-env-top-level -- debug instrumentation, read-once is fine
 const COMMIT_LOG = process.env.OPEN_CODE_CLI_COMMIT_LOG
 let _commits = 0
 let _lastLog = 0
@@ -195,10 +146,6 @@ let _lastCommitAt = 0
 let _maxGapMs = 0
 let _createCount = 0
 let _prepareAt = 0
-// --- END ---
-
-// --- SCROLL PROFILING (bench/scroll-e2e.sh reads via getLastYogaMs) ---
-// Set by onComputeLayout wrapper in ink.tsx; read by onRender for phases.
 let _lastYogaMs = 0
 let _lastCommitMs = 0
 let _commitStart = 0
@@ -219,8 +166,6 @@ export function resetProfileCounters(): void {
   _lastCommitMs = 0
   _commitStart = 0
 }
-// --- END ---
-
 const reconciler = createReconciler<
   ElementNames,
   Props,
@@ -255,7 +200,6 @@ const reconciler = createReconciler<
       _lastCommitAt = now
       const reconcileMs = _prepareAt > 0 ? now - _prepareAt : 0
       if (gap > 30 || reconcileMs > 20 || _createCount > 50) {
-        // eslint-disable-next-line custom-rules/no-sync-fs -- debug instrumentation
         appendFileSync(
           COMMIT_LOG,
           `${now.toFixed(1)} gap=${gap.toFixed(1)}ms reconcile=${reconcileMs.toFixed(1)}ms creates=${_createCount}\n`,
@@ -263,7 +207,6 @@ const reconciler = createReconciler<
       }
       _createCount = 0
       if (now - _lastLog > 1000) {
-        // eslint-disable-next-line custom-rules/no-sync-fs -- debug instrumentation
         appendFileSync(
           COMMIT_LOG,
           `${now.toFixed(1)} commits=${_commits}/s maxGap=${_maxGapMs.toFixed(1)}ms\n`,
@@ -281,14 +224,12 @@ const reconciler = createReconciler<
       const layoutMs = performance.now() - _t0
       if (layoutMs > 20) {
         const c = getYogaCounters()
-        // eslint-disable-next-line custom-rules/no-sync-fs -- debug instrumentation
         appendFileSync(
           COMMIT_LOG,
           `${_t0.toFixed(1)} SLOW_YOGA ${layoutMs.toFixed(1)}ms visited=${c.visited} measured=${c.measured} hits=${c.cacheHits} live=${c.live}\n`,
         )
       }
     }
-
     if (process.env.NODE_ENV === 'test') {
       if (rootNode.childNodes.length === 0 && rootNode.hasRenderedContent) {
         return
@@ -299,13 +240,11 @@ const reconciler = createReconciler<
       rootNode.onImmediateRender?.()
       return
     }
-
     const _tr = COMMIT_LOG ? performance.now() : 0
     rootNode.onRender?.()
     if (COMMIT_LOG) {
       const renderMs = performance.now() - _tr
       if (renderMs > 10) {
-        // eslint-disable-next-line custom-rules/no-sync-fs -- debug instrumentation
         appendFileSync(
           COMMIT_LOG,
           `${_tr.toFixed(1)} SLOW_PAINT ${renderMs.toFixed(1)}ms\n`,
@@ -320,11 +259,9 @@ const reconciler = createReconciler<
     const previousIsInsideText = parentHostContext.isInsideText
     const isInsideText =
       type === 'ink-text' || type === 'ink-virtual-text' || type === 'ink-link'
-
     if (previousIsInsideText === isInsideText) {
       return parentHostContext
     }
-
     return { isInsideText }
   },
   shouldSetTextContent: () => false,
@@ -338,23 +275,18 @@ const reconciler = createReconciler<
     if (hostContext.isInsideText && originalType === 'ink-box') {
       throw new Error(`<Box> can't be nested inside <Text> component`)
     }
-
     const type =
       originalType === 'ink-text' && hostContext.isInsideText
         ? 'ink-virtual-text'
         : originalType
-
     const node = createNode(type)
     if (COMMIT_LOG) _createCount++
-
     for (const [key, value] of Object.entries(newProps)) {
       applyProp(node, key, value)
     }
-
     if (isDebugRepaintsEnabled()) {
       node.debugOwnerChain = getOwnerChain(internalHandle)
     }
-
     return node
   },
   createTextInstance(
@@ -367,7 +299,6 @@ const reconciler = createReconciler<
         `Text string "${text}" must be rendered inside <Text> component`,
       )
     }
-
     return createTextNode(text)
   },
   resetTextContent() {},
@@ -422,7 +353,6 @@ const reconciler = createReconciler<
     cleanupYogaNode(removeNode)
     getFocusManager(node).handleNodeRemoved(removeNode, node)
   },
-  // React 19 commitUpdate receives old and new props directly instead of an updatePayload
   commitUpdate(
     node: DOMElement,
     _type: ElementNames,
@@ -431,28 +361,23 @@ const reconciler = createReconciler<
   ): void {
     const props = diff(oldProps, newProps)
     const style = diff(oldProps['style'] as Styles, newProps['style'] as Styles)
-
     if (props) {
       for (const [key, value] of Object.entries(props)) {
         if (key === 'style') {
           setStyle(node, value as Styles)
           continue
         }
-
         if (key === 'textStyles') {
           setTextStyles(node, value as TextStyles)
           continue
         }
-
         if (EVENT_HANDLER_PROPS.has(key)) {
           setEventHandler(node, key, value)
           continue
         }
-
         setAttribute(node, key, value as DOMNodeAttribute)
       }
     }
-
     if (style && node.yogaNode) {
       applyStyles(node.yogaNode, style, newProps['style'] as Styles)
     }
@@ -468,7 +393,6 @@ const reconciler = createReconciler<
       root.focusManager!.handleNodeRemoved(removeNode, root)
     }
   },
-  // React 19 required methods
   maySuspendCommit(): boolean {
     return false
   },
@@ -504,9 +428,5 @@ const reconciler = createReconciler<
     return dispatcher.currentEvent?.timeStamp ?? -1.1
   },
 })
-
-// Wire the reconciler's discreteUpdates into the dispatcher.
-// This breaks the import cycle: dispatcher.ts doesn't import reconciler.ts.
 dispatcher.discreteUpdates = reconciler.discreteUpdates.bind(reconciler)
-
 export default reconciler

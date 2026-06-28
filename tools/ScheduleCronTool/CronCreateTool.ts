@@ -21,9 +21,7 @@ import {
   isKairosCronEnabled,
 } from './prompt.js'
 import { renderCreateResultMessage, renderCreateToolUseMessage } from './UI.js'
-
 const MAX_JOBS = 50
-
 const inputSchema = lazySchema(() =>
   z.strictObject({
     cron: z
@@ -41,7 +39,6 @@ const inputSchema = lazySchema(() =>
   }),
 )
 type InputSchema = ReturnType<typeof inputSchema>
-
 const outputSchema = lazySchema(() =>
   z.object({
     id: z.string(),
@@ -52,7 +49,6 @@ const outputSchema = lazySchema(() =>
 )
 type OutputSchema = ReturnType<typeof outputSchema>
 export type CreateOutput = z.infer<OutputSchema>
-
 export const CronCreateTool = buildTool({
   name: CRON_CREATE_TOOL_NAME,
   searchHint: 'schedule a recurring or one-shot prompt',
@@ -102,8 +98,6 @@ export const CronCreateTool = buildTool({
         errorCode: 3,
       }
     }
-    // Teammates don't persist across sessions, so a durable teammate cron
-    // would orphan on restart (agentId would point to a nonexistent teammate).
     if (input.durable && getTeammateContext()) {
       return {
         result: false,
@@ -115,8 +109,6 @@ export const CronCreateTool = buildTool({
     return { result: true }
   },
   async call({ cron, prompt, recurring = true, durable = false }) {
-    // Kill switch forces session-only; schema stays stable so the model sees
-    // no validation errors when the gate flips mid-session.
     const effectiveDurable = durable && isDurableCronEnabled()
     const id = await addCronTask(
       cron,
@@ -125,11 +117,6 @@ export const CronCreateTool = buildTool({
       effectiveDurable,
       getTeammateContext()?.agentId,
     )
-    // Enable the scheduler so the task fires in this session. The
-    // useScheduledTasks hook polls this flag and will start watching
-    // on the next tick. For durable: false tasks the file never changes
-    // — check() reads the session store directly — but the enable flag
-    // is still what starts the tick loop.
     setScheduledTasksEnabled(true)
     return {
       data: {

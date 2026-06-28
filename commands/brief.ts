@@ -15,26 +15,15 @@ import type {
   LocalJSXCommandOnDone,
 } from '../types/command.js'
 import { lazySchema } from '../utils/lazySchema.js'
-
-// Zod guards against fat-fingered GB pushes (same pattern as pollConfig.ts /
-// cronScheduler.ts). A malformed config falls back to DEFAULT_BRIEF_CONFIG
-// entirely rather than being partially trusted.
 const briefConfigSchema = lazySchema(() =>
   z.object({
     enable_slash_command: z.boolean(),
   }),
 )
 type BriefConfig = z.infer<ReturnType<typeof briefConfigSchema>>
-
 const DEFAULT_BRIEF_CONFIG: BriefConfig = {
   enable_slash_command: false,
 }
-
-// No TTL — this gate controls slash-command *visibility*, not a kill switch.
-// CACHED_MAY_BE_STALE still has one background-update flip (first call kicks
-// off fetch; second call sees fresh value), but no additional flips after that.
-// The tool-availability gate (open_code_cli_kairos_brief in isBriefEnabled) keeps its
-// 5-min TTL because that one IS a kill switch.
 function getBriefConfig(): BriefConfig {
   const raw = getFeatureValue_CACHED_MAY_BE_STALE<unknown>(
     'open_code_cli_kairos_brief_config',
@@ -43,7 +32,6 @@ function getBriefConfig(): BriefConfig {
   const parsed = briefConfigSchema().safeParse(raw)
   return parsed.success ? parsed.data : DEFAULT_BRIEF_CONFIG
 }
-
 const brief = {
   type: 'local-jsx',
   name: 'brief',
@@ -63,9 +51,6 @@ const brief = {
       ): Promise<React.ReactNode> {
         const current = context.getAppState().isBriefOnly
         const newState = !current
-
-        // Entitlement check only gates the on-transition — off is always
-        // allowed so a user whose GB gate flipped mid-session isn't stuck.
         if (newState && !isBriefEntitled()) {
           logEvent('open_code_cli_brief_mode_toggled', {
             enabled: false,
@@ -78,36 +63,17 @@ const brief = {
           })
           return null
         }
-
-        // Two-way: userMsgOptIn tracks isBriefOnly so the tool is available
-        // exactly when brief mode is on. This invalidates prompt cache on
-        // each toggle (tool list changes), but a stale tool list is worse —
-        // when /brief is enabled mid-session the model was previously left
-        // without the tool, emitting plain text the filter hides.
         setUserMsgOptIn(newState)
-
         context.setAppState(prev => {
           if (prev.isBriefOnly === newState) return prev
           return { ...prev, isBriefOnly: newState }
         })
-
         logEvent('open_code_cli_brief_mode_toggled', {
           enabled: newState,
           gated: false,
           source:
             'slash_command' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
         })
-
-        // The tool list change alone isn't a strong enough signal mid-session
-        // (model may keep emitting plain text from inertia, or keep calling a
-        // tool that just vanished). Inject an explicit reminder into the next
-        // turn's context so the transition is unambiguous.
-        // Skip when Kairos is active: isBriefEnabled() short-circuits on
-        // getKairosActive() so the tool never actually leaves the list, and
-        // the Kairos system prompt already mandates SendUserMessage.
-        // Inline <system-reminder> wrap — importing wrapInSystemReminder from
-        // utils/messages.ts pulls constants/xml.ts into the bridge SDK bundle
-        // via this module's import chain, tripping the excluded-strings check.
         const metaMessages = getKairosActive()
           ? undefined
           : [
@@ -117,7 +83,6 @@ const brief = {
                   : `Brief mode is now disabled. The ${BRIEF_TOOL_NAME} tool is no longer available — reply with plain text.`
               }\n</system-reminder>`,
             ]
-
         onDone(
           newState ? 'Brief-only mode enabled' : 'Brief-only mode disabled',
           { display: 'system', metaMessages },
@@ -126,5 +91,4 @@ const brief = {
       },
     }),
 } satisfies Command
-
 export default brief

@@ -1,9 +1,4 @@
 import type { LocalJSXCommandOnDone } from '../../types/command.js'
-
-/**
- * Top-level navigation state for the plugin settings UI. Children receive a
- * `setViewState` callback typed against this union to drive parent navigation.
- */
 export type ViewState =
   | { type: 'menu' }
   | { type: 'help' }
@@ -28,7 +23,6 @@ export type ViewState =
   | { type: 'marketplace-list' }
   | { type: 'marketplace-menu' }
   | { type: 'add-marketplace'; initialValue?: string }
-
 export type PluginSettingsProps = {
   onComplete: LocalJSXCommandOnDone
   args?: string

@@ -18,7 +18,6 @@ import {
   renderToolUseMessage,
   userFacingName,
 } from './UI.js'
-
 export const inputSchema = lazySchema(() =>
   z.object({
     server: z.string().describe('The MCP server name'),
@@ -26,7 +25,6 @@ export const inputSchema = lazySchema(() =>
   }),
 )
 type InputSchema = ReturnType<typeof inputSchema>
-
 export const outputSchema = lazySchema(() =>
   z.object({
     contents: z.array(
@@ -43,9 +41,7 @@ export const outputSchema = lazySchema(() =>
   }),
 )
 type OutputSchema = ReturnType<typeof outputSchema>
-
 export type Output = z.infer<OutputSchema>
-
 export const ReadMcpResourceTool = buildTool({
   isConcurrencySafe() {
     return true
@@ -74,23 +70,18 @@ export const ReadMcpResourceTool = buildTool({
   },
   async call(input, { options: { mcpClients } }) {
     const { server: serverName, uri } = input
-
     const client = mcpClients.find(client => client.name === serverName)
-
     if (!client) {
       throw new Error(
         `Server "${serverName}" not found. Available servers: ${mcpClients.map(c => c.name).join(', ')}`,
       )
     }
-
     if (client.type !== 'connected') {
       throw new Error(`Server "${serverName}" is not connected`)
     }
-
     if (!client.capabilities?.resources) {
       throw new Error(`Server "${serverName}" does not support resources`)
     }
-
     const connectedClient = await ensureConnectedClient(client)
     const result = (await connectedClient.client.request(
       {
@@ -99,10 +90,6 @@ export const ReadMcpResourceTool = buildTool({
       },
       ReadResourceResultSchema,
     )) as ReadResourceResult
-
-    // Intercept any blob fields: decode, write raw bytes to disk with a
-    // mime-derived extension, and replace with a path. Otherwise the base64
-    // would be stringified straight into the context.
     const contents = await Promise.all(
       result.contents.map(async (c, i) => {
         if ('text' in c) {
@@ -137,7 +124,6 @@ export const ReadMcpResourceTool = buildTool({
         }
       }),
     )
-
     return {
       data: { contents },
     }

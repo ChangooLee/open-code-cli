@@ -22,19 +22,16 @@ import {
   toDateString,
   withStatsCacheLock,
 } from './statsCache.js'
-
 export type DailyActivity = {
-  date: string // YYYY-MM-DD format
+  date: string 
   messageCount: number
   sessionCount: number
   toolCallCount: number
 }
-
 export type DailyModelTokens = {
-  date: string // YYYY-MM-DD format
-  tokensByModel: { [modelName: string]: number } // total tokens (input + output) per model
+  date: string 
+  tokensByModel: { [modelName: string]: number } 
 }
-
 export type StreakInfo = {
   currentStreak: number
   longestStreak: number
@@ -42,53 +39,30 @@ export type StreakInfo = {
   longestStreakStart: string | null
   longestStreakEnd: string | null
 }
-
 export type SessionStats = {
   sessionId: string
-  duration: number // in milliseconds
+  duration: number 
   messageCount: number
   timestamp: string
 }
-
 export type OpenCodeCliCodeStats = {
-  // Activity overview
   totalSessions: number
   totalMessages: number
   totalDays: number
   activeDays: number
-
-  // Streaks
   streaks: StreakInfo
-
-  // Daily activity for heatmap
   dailyActivity: DailyActivity[]
-
-  // Daily token usage per model for charts
   dailyModelTokens: DailyModelTokens[]
-
-  // Session info
   longestSession: SessionStats | null
-
-  // Model usage aggregated
   modelUsage: { [modelName: string]: ModelUsage }
-
-  // Time stats
   firstSessionDate: string | null
   lastSessionDate: string | null
   peakActivityDay: string | null
   peakActivityHour: number | null
-
-  // Speculation time saved
   totalSpeculationTimeSavedMs: number
-
-  // Shot stats (ant-only, gated by SHOT_STATS feature flag)
   shotDistribution?: { [shotCount: number]: number }
   oneShotRate?: number
 }
-
-/**
- * Result of processing session files - intermediate stats that can be merged.
- */
 type ProcessedStats = {
   dailyActivity: DailyActivity[]
   dailyModelTokens: DailyModelTokens[]
@@ -99,28 +73,16 @@ type ProcessedStats = {
   totalSpeculationTimeSavedMs: number
   shotDistribution?: { [shotCount: number]: number }
 }
-
-/**
- * Options for processing session files.
- */
 type ProcessOptions = {
-  // Only include data from dates >= this date (YYYY-MM-DD format)
   fromDate?: string
-  // Only include data from dates <= this date (YYYY-MM-DD format)
   toDate?: string
 }
-
-/**
- * Process session files and extract stats.
- * Can filter by date range.
- */
 async function processSessionFiles(
   sessionFiles: string[],
   options: ProcessOptions = {},
 ): Promise<ProcessedStats> {
   const { fromDate, toDate } = options
   const fs = getFsImplementation()
-
   const dailyActivityMap = new Map<string, DailyActivity>()
   const dailyModelTokensMap = new Map<string, { [modelName: string]: number }>()
   const sessions: SessionStats[] = []
@@ -131,17 +93,13 @@ async function processSessionFiles(
   const shotDistributionMap = feature('SHOT_STATS')
     ? new Map<number, number>()
     : undefined
-  // Track parent sessions that already recorded a shot count (dedup across subagents)
   const sessionsWithShotCount = new Set<string>()
-
-  // Process session files in parallel batches for better performance
   const BATCH_SIZE = 20
   for (let i = 0; i < sessionFiles.length; i += BATCH_SIZE) {
     const batch = sessionFiles.slice(i, i + BATCH_SIZE)
     const results = await Promise.all(
       batch.map(async sessionFile => {
         try {
-          // If we have a fromDate filter, skip files that haven't been modified since then
           if (fromDate) {
             let fileSize = 0
             try {
@@ -157,11 +115,7 @@ async function processSessionFiles(
               }
               fileSize = fileStat.size
             } catch {
-              // If we can't stat the file, try to read it anyway
             }
-            // For large files, peek at the session start date before reading everything.
-            // Sessions that pass the mtime filter but started before fromDate are skipped
-            // (e.g. a month-old session resumed today gets a new mtime write but old start date).
             if (fileSize > 65536) {
               const startDate = await readSessionStartDate(sessionFile)
               if (startDate && isDateBefore(startDate, fromDate)) {
@@ -181,7 +135,6 @@ async function processSessionFiles(
         }
       }),
     )
-
     for (const { sessionFile, entries, error, skipped } of results) {
       if (skipped) continue
       if (error || !entries) {
@@ -190,10 +143,8 @@ async function processSessionFiles(
         )
         continue
       }
-
       const sessionId = basename(sessionFile, '.jsonl')
       const messages: TranscriptMessage[] = []
-
       for (const entry of entries) {
         if (isTranscriptMessage(entry)) {
           messages.push(entry)
@@ -201,21 +152,12 @@ async function processSessionFiles(
           totalSpeculationTimeSavedMs += entry.timeSavedMs
         }
       }
-
       if (messages.length === 0) continue
-
-      // Subagent transcripts mark all messages as sidechain. We still want
-      // their token usage counted, but not as separate sessions.
       const isSubagentFile = sessionFile.includes(`${sep}subagents${sep}`)
-
-      // Extract shot count from PR attribution in gh pr create calls (ant-only)
-      // This must run before the sidechain filter since subagent transcripts
-      // mark all messages as sidechain
       if (feature('SHOT_STATS') && shotDistributionMap) {
         const parentSessionId = isSubagentFile
           ? basename(dirname(dirname(sessionFile)))
           : sessionId
-
         if (!sessionsWithShotCount.has(parentSessionId)) {
           const shotCount = extractShotCountFromMessages(messages)
           if (shotCount !== null) {
@@ -227,70 +169,46 @@ async function processSessionFiles(
           }
         }
       }
-
-      // Filter out sidechain messages for session metadata (duration, counts).
-      // For subagent files, use all messages since they're all sidechain.
       const mainMessages = isSubagentFile
         ? messages
         : messages.filter(m => !m.isSidechain)
       if (mainMessages.length === 0) continue
-
       const firstMessage = mainMessages[0]!
       const lastMessage = mainMessages.at(-1)!
-
       const firstTimestamp = new Date(firstMessage.timestamp)
       const lastTimestamp = new Date(lastMessage.timestamp)
-
-      // Skip sessions with malformed timestamps — some transcripts on disk
-      // have entries missing the timestamp field (e.g. partial/remote writes).
-      // new Date(undefined) produces an Invalid Date, and toDateString() would
-      // throw RangeError: Invalid Date on .toISOString().
       if (isNaN(firstTimestamp.getTime()) || isNaN(lastTimestamp.getTime())) {
         logForDebugging(
           `Skipping session with invalid timestamp: ${sessionFile}`,
         )
         continue
       }
-
       const dateKey = toDateString(firstTimestamp)
-
-      // Apply date filters
       if (fromDate && isDateBefore(dateKey, fromDate)) continue
       if (toDate && isDateBefore(toDate, dateKey)) continue
-
-      // Track daily activity (use first message date as session date)
       const existing = dailyActivityMap.get(dateKey) || {
         date: dateKey,
         messageCount: 0,
         sessionCount: 0,
         toolCallCount: 0,
       }
-
-      // Subagent files contribute tokens and tool calls, but aren't sessions.
       if (!isSubagentFile) {
         const duration = lastTimestamp.getTime() - firstTimestamp.getTime()
-
         sessions.push({
           sessionId,
           duration,
           messageCount: mainMessages.length,
           timestamp: firstMessage.timestamp,
         })
-
         totalMessages += mainMessages.length
-
         existing.sessionCount++
         existing.messageCount += mainMessages.length
-
         const hour = firstTimestamp.getHours()
         hourCounts.set(hour, (hourCounts.get(hour) || 0) + 1)
       }
-
       if (!isSubagentFile || dailyActivityMap.has(dateKey)) {
         dailyActivityMap.set(dateKey, existing)
       }
-
-      // Process messages for tool usage and model stats
       for (const message of mainMessages) {
         if (message.type === 'assistant') {
           const content = message.message?.content
@@ -304,17 +222,12 @@ async function processSessionFiles(
               }
             }
           }
-
-          // Track model usage if available (skip synthetic messages)
           if (message.message?.usage) {
             const usage = message.message.usage
             const model = message.message.model || 'unknown'
-
-            // Skip synthetic messages - they are internal and shouldn't appear in stats
             if (model === SYNTHETIC_MODEL) {
               continue
             }
-
             if (!modelUsageAgg[model]) {
               modelUsageAgg[model] = {
                 inputTokens: 0,
@@ -327,15 +240,12 @@ async function processSessionFiles(
                 maxOutputTokens: 0,
               }
             }
-
             modelUsageAgg[model]!.inputTokens += usage.input_tokens || 0
             modelUsageAgg[model]!.outputTokens += usage.output_tokens || 0
             modelUsageAgg[model]!.cacheReadInputTokens +=
               usage.cache_read_input_tokens || 0
             modelUsageAgg[model]!.cacheCreationInputTokens +=
               usage.cache_creation_input_tokens || 0
-
-            // Track daily tokens per model
             const totalTokens =
               (usage.input_tokens || 0) + (usage.output_tokens || 0)
             if (totalTokens > 0) {
@@ -348,7 +258,6 @@ async function processSessionFiles(
       }
     }
   }
-
   return {
     dailyActivity: Array.from(dailyActivityMap.values()).sort((a, b) =>
       a.date.localeCompare(b.date),
@@ -366,16 +275,9 @@ async function processSessionFiles(
       : {}),
   }
 }
-
-/**
- * Get all session files from all project directories.
- * Includes both main session files and subagent transcript files.
- */
 async function getAllSessionFiles(): Promise<string[]> {
   const projectsDir = getProjectsDir()
   const fs = getFsImplementation()
-
-  // Get all project directories
   let allEntries
   try {
     allEntries = await fs.readdir(projectsDir)
@@ -386,20 +288,13 @@ async function getAllSessionFiles(): Promise<string[]> {
   const projectDirs = allEntries
     .filter(dirent => dirent.isDirectory())
     .map(dirent => join(projectsDir, dirent.name))
-
-  // Collect all session files from all projects in parallel
   const projectResults = await Promise.all(
     projectDirs.map(async projectDir => {
       try {
         const entries = await fs.readdir(projectDir)
-
-        // Collect main session files (*.jsonl directly in project dir)
         const mainFiles = entries
           .filter(dirent => dirent.isFile() && dirent.name.endsWith('.jsonl'))
           .map(dirent => join(projectDir, dirent.name))
-
-        // Collect subagent files from session subdirectories in parallel
-        // Structure: {projectDir}/{sessionId}/subagents/agent-{agentId}.jsonl
         const sessionDirs = entries.filter(dirent => dirent.isDirectory())
         const subagentResults = await Promise.all(
           sessionDirs.map(async sessionDir => {
@@ -415,12 +310,10 @@ async function getAllSessionFiles(): Promise<string[]> {
                 )
                 .map(dirent => join(subagentsDir, dirent.name))
             } catch {
-              // subagents directory doesn't exist for this session, skip
               return []
             }
           }),
         )
-
         return [...mainFiles, ...subagentResults.flat()]
       } catch (error) {
         logForDebugging(
@@ -430,18 +323,12 @@ async function getAllSessionFiles(): Promise<string[]> {
       }
     }),
   )
-
   return projectResults.flat()
 }
-
-/**
- * Convert a PersistedStatsCache to Open Code CLICodeStats by computing derived fields.
- */
 function cacheToStats(
   cache: PersistedStatsCache,
   todayStats: ProcessedStats | null,
 ): OpenCodeCliCodeStats {
-  // Merge cache with today's stats
   const dailyActivityMap = new Map<string, DailyActivity>()
   for (const day of cache.dailyActivity) {
     dailyActivityMap.set(day.date, { ...day })
@@ -458,7 +345,6 @@ function cacheToStats(
       }
     }
   }
-
   const dailyModelTokensMap = new Map<string, { [model: string]: number }>()
   for (const day of cache.dailyModelTokens) {
     dailyModelTokensMap.set(day.date, { ...day.tokensByModel })
@@ -475,8 +361,6 @@ function cacheToStats(
       }
     }
   }
-
-  // Merge model usage
   const modelUsage = { ...cache.modelUsage }
   if (todayStats) {
     for (const [model, usage] of Object.entries(todayStats.modelUsage)) {
@@ -507,8 +391,6 @@ function cacheToStats(
       }
     }
   }
-
-  // Merge hour counts
   const hourCountsMap = new Map<number, number>()
   for (const [hour, count] of Object.entries(cache.hourCounts)) {
     hourCountsMap.set(parseInt(hour, 10), count)
@@ -519,23 +401,16 @@ function cacheToStats(
       hourCountsMap.set(hourNum, (hourCountsMap.get(hourNum) || 0) + count)
     }
   }
-
-  // Calculate derived stats
   const dailyActivityArray = Array.from(dailyActivityMap.values()).sort(
     (a, b) => a.date.localeCompare(b.date),
   )
   const streaks = calculateStreaks(dailyActivityArray)
-
   const dailyModelTokens = Array.from(dailyModelTokensMap.entries())
     .map(([date, tokensByModel]) => ({ date, tokensByModel }))
     .sort((a, b) => a.date.localeCompare(b.date))
-
-  // Compute session aggregates: combine cache aggregates with today's stats
   const totalSessions =
     cache.totalSessions + (todayStats?.sessionStats.length || 0)
   const totalMessages = cache.totalMessages + (todayStats?.totalMessages || 0)
-
-  // Find longest session (compare cache's longest with today's sessions)
   let longestSession = cache.longestSession
   if (todayStats) {
     for (const session of todayStats.sessionStats) {
@@ -544,8 +419,6 @@ function cacheToStats(
       }
     }
   }
-
-  // Find first/last session dates
   let firstSessionDate = cache.firstSessionDate
   let lastSessionDate: string | null = null
   if (todayStats) {
@@ -558,25 +431,21 @@ function cacheToStats(
       }
     }
   }
-  // If no today sessions, derive lastSessionDate from dailyActivity
   if (!lastSessionDate && dailyActivityArray.length > 0) {
     lastSessionDate = dailyActivityArray.at(-1)!.date
   }
-
   const peakActivityDay =
     dailyActivityArray.length > 0
       ? dailyActivityArray.reduce((max, d) =>
           d.messageCount > max.messageCount ? d : max,
         ).date
       : null
-
   const peakActivityHour =
     hourCountsMap.size > 0
       ? Array.from(hourCountsMap.entries()).reduce((max, [hour, count]) =>
           count > max[1] ? [hour, count] : max,
         )[0]
       : null
-
   const totalDays =
     firstSessionDate && lastSessionDate
       ? Math.ceil(
@@ -585,11 +454,9 @@ function cacheToStats(
             (1000 * 60 * 60 * 24),
         ) + 1
       : 0
-
   const totalSpeculationTimeSavedMs =
     cache.totalSpeculationTimeSavedMs +
     (todayStats?.totalSpeculationTimeSavedMs || 0)
-
   const result: OpenCodeCliCodeStats = {
     totalSessions,
     totalMessages,
@@ -606,7 +473,6 @@ function cacheToStats(
     peakActivityHour,
     totalSpeculationTimeSavedMs,
   }
-
   if (feature('SHOT_STATS')) {
     const shotDistribution: { [shotCount: number]: number } = {
       ...(cache.shotDistribution || {}),
@@ -629,39 +495,22 @@ function cacheToStats(
         ? Math.round(((shotDistribution[1] || 0) / totalWithShots) * 100)
         : 0
   }
-
   return result
 }
-
-/**
- * Aggregates stats from all Open Code CLI sessions across all projects.
- * Uses a disk cache to avoid reprocessing historical data.
- */
 export async function aggregateOpenCodeCliCodeStats(): Promise<OpenCodeCliCodeStats> {
   const allSessionFiles = await getAllSessionFiles()
-
   if (allSessionFiles.length === 0) {
     return getEmptyStats()
   }
-
-  // Use lock to prevent race conditions with background cache updates
   const updatedCache = await withStatsCacheLock(async () => {
-    // Load the cache
     const cache = await loadStatsCache()
     const yesterday = getYesterdayDateString()
-
-    // Determine what needs to be processed
-    // - If no cache: process everything up to yesterday, then today separately
-    // - If cache exists: process from day after lastComputedDate to yesterday, then today
     let result = cache
-
     if (!cache.lastComputedDate) {
-      // No cache - process all historical data (everything before today)
       logForDebugging('Stats cache empty, processing all historical data')
       const historicalStats = await processSessionFiles(allSessionFiles, {
         toDate: yesterday,
       })
-
       if (
         historicalStats.sessionStats.length > 0 ||
         historicalStats.dailyActivity.length > 0
@@ -670,8 +519,6 @@ export async function aggregateOpenCodeCliCodeStats(): Promise<OpenCodeCliCodeSt
         await saveStatsCache(result)
       }
     } else if (isDateBefore(cache.lastComputedDate, yesterday)) {
-      // Cache is stale - process new days
-      // Process from day after lastComputedDate to yesterday
       const nextDay = getNextDay(cache.lastComputedDate)
       logForDebugging(
         `Stats cache stale (${cache.lastComputedDate}), processing ${nextDay} to ${yesterday}`,
@@ -680,7 +527,6 @@ export async function aggregateOpenCodeCliCodeStats(): Promise<OpenCodeCliCodeSt
         fromDate: nextDay,
         toDate: yesterday,
       })
-
       if (
         newStats.sessionStats.length > 0 ||
         newStats.dailyActivity.length > 0
@@ -688,64 +534,40 @@ export async function aggregateOpenCodeCliCodeStats(): Promise<OpenCodeCliCodeSt
         result = mergeCacheWithNewStats(cache, newStats, yesterday)
         await saveStatsCache(result)
       } else {
-        // No new data, but update lastComputedDate
         result = { ...cache, lastComputedDate: yesterday }
         await saveStatsCache(result)
       }
     }
-
     return result
   })
-
-  // Always process today's data live (it's incomplete)
-  // This doesn't need to be in the lock since it doesn't modify the cache
   const today = getTodayDateString()
   const todayStats = await processSessionFiles(allSessionFiles, {
     fromDate: today,
     toDate: today,
   })
-
-  // Combine cache with today's stats
   return cacheToStats(updatedCache, todayStats)
 }
-
 export type StatsDateRange = '7d' | '30d' | 'all'
-
-/**
- * Aggregates stats for a specific date range.
- * For 'all', uses the cached aggregation. For other ranges, processes files directly.
- */
 export async function aggregateOpenCodeCliCodeStatsForRange(
   range: StatsDateRange,
 ): Promise<OpenCodeCliCodeStats> {
   if (range === 'all') {
     return aggregateOpenCodeCliCodeStats()
   }
-
   const allSessionFiles = await getAllSessionFiles()
   if (allSessionFiles.length === 0) {
     return getEmptyStats()
   }
-
-  // Calculate fromDate based on range
   const today = new Date()
   const daysBack = range === '7d' ? 7 : 30
   const fromDate = new Date(today)
-  fromDate.setDate(today.getDate() - daysBack + 1) // +1 to include today
+  fromDate.setDate(today.getDate() - daysBack + 1) 
   const fromDateStr = toDateString(fromDate)
-
-  // Process session files for the date range
   const stats = await processSessionFiles(allSessionFiles, {
     fromDate: fromDateStr,
   })
-
   return processedStatsToOpenCodeCliCodeStats(stats)
 }
-
-/**
- * Convert ProcessedStats to Open Code CLICodeStats.
- * Used for filtered date ranges that bypass the cache.
- */
 function processedStatsToOpenCodeCliCodeStats(
   stats: ProcessedStats,
 ): OpenCodeCliCodeStats {
@@ -755,19 +577,13 @@ function processedStatsToOpenCodeCliCodeStats(
   const dailyModelTokensSorted = stats.dailyModelTokens
     .slice()
     .sort((a, b) => a.date.localeCompare(b.date))
-
-  // Calculate streaks from daily activity
   const streaks = calculateStreaks(dailyActivitySorted)
-
-  // Find longest session
   let longestSession: SessionStats | null = null
   for (const session of stats.sessionStats) {
     if (!longestSession || session.duration > longestSession.duration) {
       longestSession = session
     }
   }
-
-  // Find first/last session dates
   let firstSessionDate: string | null = null
   let lastSessionDate: string | null = null
   for (const session of stats.sessionStats) {
@@ -778,16 +594,12 @@ function processedStatsToOpenCodeCliCodeStats(
       lastSessionDate = session.timestamp
     }
   }
-
-  // Peak activity day
   const peakActivityDay =
     dailyActivitySorted.length > 0
       ? dailyActivitySorted.reduce((max, d) =>
           d.messageCount > max.messageCount ? d : max,
         ).date
       : null
-
-  // Peak activity hour
   const hourEntries = Object.entries(stats.hourCounts)
   const peakActivityHour =
     hourEntries.length > 0
@@ -798,8 +610,6 @@ function processedStatsToOpenCodeCliCodeStats(
           10,
         )
       : null
-
-  // Total days in range
   const totalDays =
     firstSessionDate && lastSessionDate
       ? Math.ceil(
@@ -808,7 +618,6 @@ function processedStatsToOpenCodeCliCodeStats(
             (1000 * 60 * 60 * 24),
         ) + 1
       : 0
-
   const result: OpenCodeCliCodeStats = {
     totalSessions: stats.sessionStats.length,
     totalMessages: stats.totalMessages,
@@ -825,7 +634,6 @@ function processedStatsToOpenCodeCliCodeStats(
     peakActivityHour,
     totalSpeculationTimeSavedMs: stats.totalSpeculationTimeSavedMs,
   }
-
   if (feature('SHOT_STATS') && stats.shotDistribution) {
     result.shotDistribution = stats.shotDistribution
     const totalWithShots = Object.values(stats.shotDistribution).reduce(
@@ -837,19 +645,13 @@ function processedStatsToOpenCodeCliCodeStats(
         ? Math.round(((stats.shotDistribution[1] || 0) / totalWithShots) * 100)
         : 0
   }
-
   return result
 }
-
-/**
- * Get the next day after a given date string (YYYY-MM-DD format).
- */
 function getNextDay(dateStr: string): string {
   const date = new Date(dateStr)
   date.setDate(date.getDate() + 1)
   return toDateString(date)
 }
-
 function calculateStreaks(dailyActivity: DailyActivity[]): StreakInfo {
   if (dailyActivity.length === 0) {
     return {
@@ -860,18 +662,12 @@ function calculateStreaks(dailyActivity: DailyActivity[]): StreakInfo {
       longestStreakEnd: null,
     }
   }
-
   const today = new Date()
   today.setHours(0, 0, 0, 0)
-
-  // Calculate current streak (working backwards from today)
   let currentStreak = 0
   let currentStreakStart: string | null = null
   const checkDate = new Date(today)
-
-  // Build a set of active dates for quick lookup
   const activeDates = new Set(dailyActivity.map(d => d.date))
-
   while (true) {
     const dateStr = toDateString(checkDate)
     if (!activeDates.has(dateStr)) {
@@ -881,25 +677,19 @@ function calculateStreaks(dailyActivity: DailyActivity[]): StreakInfo {
     currentStreakStart = dateStr
     checkDate.setDate(checkDate.getDate() - 1)
   }
-
-  // Calculate longest streak
   let longestStreak = 0
   let longestStreakStart: string | null = null
   let longestStreakEnd: string | null = null
-
   if (dailyActivity.length > 0) {
     const sortedDates = Array.from(activeDates).sort()
     let tempStreak = 1
     let tempStart = sortedDates[0]!
-
     for (let i = 1; i < sortedDates.length; i++) {
       const prevDate = new Date(sortedDates[i - 1]!)
       const currDate = new Date(sortedDates[i]!)
-
       const dayDiff = Math.round(
         (currDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24),
       )
-
       if (dayDiff === 1) {
         tempStreak++
       } else {
@@ -912,15 +702,12 @@ function calculateStreaks(dailyActivity: DailyActivity[]): StreakInfo {
         tempStart = sortedDates[i]!
       }
     }
-
-    // Check final streak
     if (tempStreak > longestStreak) {
       longestStreak = tempStreak
       longestStreakStart = tempStart
       longestStreakEnd = sortedDates.at(-1)!
     }
   }
-
   return {
     currentStreak,
     longestStreak,
@@ -929,14 +716,7 @@ function calculateStreaks(dailyActivity: DailyActivity[]): StreakInfo {
     longestStreakEnd,
   }
 }
-
 const SHOT_COUNT_REGEX = /(\d+)-shotted by/
-
-/**
- * Extract the shot count from PR attribution text in a `gh pr create` Bash call.
- * The attribution format is: "N-shotted by model-name"
- * Returns the shot count, or null if not found.
- */
 function extractShotCountFromMessages(
   messages: TranscriptMessage[],
 ): number | null {
@@ -963,11 +743,6 @@ function extractShotCountFromMessages(
   }
   return null
 }
-
-// Transcript message types — must match isTranscriptMessage() in sessionStorage.ts.
-// The canonical dateKey (see processSessionFiles) reads mainMessages[0].timestamp,
-// where mainMessages = entries.filter(isTranscriptMessage).filter(!isSidechain).
-// This peek must extract the same value to be a safe skip optimization.
 const TRANSCRIPT_MESSAGE_TYPES = new Set([
   'user',
   'assistant',
@@ -975,22 +750,6 @@ const TRANSCRIPT_MESSAGE_TYPES = new Set([
   'system',
   'progress',
 ])
-
-/**
- * Peeks at the head of a session file to get the session start date.
- * Uses a small 4 KB read to avoid loading the full file.
- *
- * Session files typically begin with non-transcript entries (`mode`,
- * `file-history-snapshot`, `attribution-snapshot`) before the first transcript
- * message, so we scan lines until we hit one. Each complete line is JSON-parsed
- * — naive string search is unsafe here because `file-history-snapshot` entries
- * embed a nested `snapshot.timestamp` carrying the *previous* session's date
- * (written by copyFileHistoryForResume), which would cause resumed sessions to
- * be miscategorised as old and silently dropped from stats.
- *
- * Returns a YYYY-MM-DD string, or null if no transcript message fits in the
- * head (caller falls through to the full read — safe default).
- */
 export async function readSessionStartDate(
   filePath: string,
 ): Promise<string | null> {
@@ -1001,11 +760,8 @@ export async function readSessionStartDate(
       const { bytesRead } = await fd.read(buf, 0, buf.length, 0)
       if (bytesRead === 0) return null
       const head = buf.toString('utf8', 0, bytesRead)
-
-      // Only trust complete lines — the 4KB boundary may bisect a JSON entry.
       const lastNewline = head.lastIndexOf('\n')
       if (lastNewline < 0) return null
-
       for (const line of head.slice(0, lastNewline).split('\n')) {
         if (!line) continue
         let entry: {
@@ -1034,7 +790,6 @@ export async function readSessionStartDate(
     return null
   }
 }
-
 function getEmptyStats(): OpenCodeCliCodeStats {
   return {
     totalSessions: 0,

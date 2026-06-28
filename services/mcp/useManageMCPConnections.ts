@@ -17,8 +17,6 @@ import type {
   ScopedMcpServerConfig,
   ServerResource,
 } from './types.js'
-
-/* eslint-disable @typescript-eslint/no-require-imports */
 const fetchMcpSkillsForClient = feature('MCP_SKILLS')
   ? (
       require('../../skills/mcpSkills.js') as typeof import('../../skills/mcpSkills.js')
@@ -29,7 +27,6 @@ const clearSkillIndexCache = feature('EXPERIMENTAL_SKILL_SEARCH')
       require('../skillSearch/localSearch.js') as typeof import('../skillSearch/localSearch.js')
     ).clearSkillIndexCache
   : null
-
 import {
   PromptListChangedNotificationSchema,
   ResourceListChangedNotificationSchema,
@@ -60,7 +57,6 @@ import {
   useSetAppState,
 } from '../../state/AppState.js'
 import { errorMessage } from '../../utils/errors.js'
-/* eslint-enable @typescript-eslint/no-require-imports */
 import { logMCPDebug, logMCPError } from '../../utils/log.js'
 import { enqueue } from '../../utils/messageQueueManager.js'
 import {
@@ -83,44 +79,28 @@ import {
 import { registerElicitationHandler } from './elicitationHandler.js'
 import { getMcpPrefix } from './mcpStringUtils.js'
 import { commandBelongsToServer, excludeStalePluginClients } from './utils.js'
-
-// Constants for reconnection with exponential backoff
 const MAX_RECONNECT_ATTEMPTS = 5
 const INITIAL_BACKOFF_MS = 1000
 const MAX_BACKOFF_MS = 30000
-
-/**
- * Create a unique key for a plugin error to enable deduplication
- */
 function getErrorKey(error: PluginError): string {
   const plugin = 'plugin' in error ? error.plugin : 'no-plugin'
   return `${error.type}:${error.source}:${plugin}`
 }
-
-/**
- * Add errors to AppState, deduplicating to avoid showing the same error multiple times
- */
 function addErrorsToAppState(
   setAppState: (updater: (prev: AppState) => AppState) => void,
   newErrors: PluginError[],
 ): void {
   if (newErrors.length === 0) return
-
   setAppState(prevState => {
-    // Build set of existing error keys
     const existingKeys = new Set(
       prevState.plugins.errors.map(e => getErrorKey(e)),
     )
-
-    // Only add errors that don't already exist
     const uniqueNewErrors = newErrors.filter(
       error => !existingKeys.has(getErrorKey(error)),
     )
-
     if (uniqueNewErrors.length === 0) {
       return prevState
     }
-
     return {
       ...prevState,
       plugins: {
@@ -130,41 +110,18 @@ function addErrorsToAppState(
     }
   })
 }
-
-/**
- * Hook to manage MCP (Model Context Protocol) server connections and updates
- *
- * This hook:
- * 1. Initializes MCP client connections based on config
- * 2. Sets up handlers for connection lifecycle events and sync with app state
- * 3. Manages automatic reconnection for SSE connections
- * 4. Returns a reconnect function
- */
 export function useManageMCPConnections(
   dynamicMcpConfig: Record<string, ScopedMcpServerConfig> | undefined,
   isStrictMcpConfig = false,
 ) {
   const store = useAppStateStore()
   const _authVersion = useAppState(s => s.authVersion)
-  // Incremented by /reload-plugins (refreshActivePlugins) to pick up newly
-  // enabled plugin MCP servers. getOpenCodeCliMcpConfigs() reads loadAllPlugins()
-  // which has been cleared by refreshActivePlugins, so the effects below see
-  // fresh plugin data on re-run.
   const _pluginReconnectKey = useAppState(s => s.mcp.pluginReconnectKey)
   const setAppState = useSetAppState()
-
-  // Track active reconnection attempts to allow cancellation
   const reconnectTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map())
-
-  // Dedup the --channels blocked warning per skip kind so that a user who
-  // sees "run /login" (auth skip), logs in, then hits the policy gate
-  // gets a second toast.
   const channelWarnedKindsRef = useRef<
     Set<'disabled' | 'auth' | 'policy' | 'marketplace' | 'allowlist'>
   >(new Set())
-  // Channel permission callbacks — constructed once, stable ref. Stored in
-  // AppState so interactiveHandler can subscribe. The pending Map lives inside
-  // the closure (not module-level, not AppState — functions-in-state is brittle).
   const channelPermCallbacksRef = useRef<ChannelPermissionCallbacks | null>(
     null,
   )
@@ -174,17 +131,10 @@ export function useManageMCPConnections(
   ) {
     channelPermCallbacksRef.current = createChannelPermissionCallbacks()
   }
-  // Store callbacks in AppState so interactiveHandler.ts can reach them via
-  // ctx.toolUseContext.getAppState(). One-time set — the ref is stable.
   useEffect(() => {
     if (feature('KAIROS') || feature('KAIROS_CHANNELS')) {
       const callbacks = channelPermCallbacksRef.current
       if (!callbacks) return
-      // GrowthBook runtime gate — separate from channels so channels can
-      // ship without this. Checked at mount; mid-session flips need restart.
-      // If off, callbacks never go into AppState → interactiveHandler sees
-      // undefined → never sends → intercept has nothing pending → "yes tbxkq"
-      // flows to Open Code CLI as normal chat. One gate, full disable.
       if (!isChannelPermissionRelayEnabled()) return
       setAppState(prev => {
         if (prev.channelPermissionCallbacks === callbacks) return prev
@@ -199,11 +149,6 @@ export function useManageMCPConnections(
     }
   }, [setAppState])
   const { addNotification } = useNotifications()
-
-  // Batched MCP state updates: queue individual server updates and flush them
-  // in a single setAppState call via setTimeout. Using a time-based window
-  // (instead of queueMicrotask) ensures updates are batched even when
-  // connection callbacks arrive at different times due to network I/O.
   const MCP_BATCH_FLUSH_MS = 16
   type PendingUpdate = MCPServerConnection & {
     tools?: Tool[]
@@ -212,16 +157,13 @@ export function useManageMCPConnections(
   }
   const pendingUpdatesRef = useRef<PendingUpdate[]>([])
   const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
   const flushPendingUpdates = useCallback(() => {
     flushTimerRef.current = null
     const updates = pendingUpdatesRef.current
     if (updates.length === 0) return
     pendingUpdatesRef.current = []
-
     setAppState(prevState => {
       let mcp = prevState.mcp
-
       for (const update of updates) {
         const {
           tools: rawTools,
@@ -241,22 +183,18 @@ export function useManageMCPConnections(
           client.type === 'disabled' || client.type === 'failed'
             ? (rawRes ?? [])
             : rawRes
-
         const prefix = getMcpPrefix(client.name)
         const existingClientIndex = mcp.clients.findIndex(
           c => c.name === client.name,
         )
-
         const updatedClients =
           existingClientIndex === -1
             ? [...mcp.clients, client]
             : mcp.clients.map(c => (c.name === client.name ? client : c))
-
         const updatedTools =
           tools === undefined
             ? mcp.tools
             : [...reject(mcp.tools, t => t.name?.startsWith(prefix)), ...tools]
-
         const updatedCommands =
           commands === undefined
             ? mcp.commands
@@ -266,7 +204,6 @@ export function useManageMCPConnections(
                 ),
                 ...commands,
               ]
-
         const updatedResources =
           resources === undefined
             ? mcp.resources
@@ -276,7 +213,6 @@ export function useManageMCPConnections(
                   ? { [client.name]: resources }
                   : omit(mcp.resources, client.name)),
               }
-
         mcp = {
           ...mcp,
           clients: updatedClients,
@@ -285,15 +221,9 @@ export function useManageMCPConnections(
           resources: updatedResources,
         }
       }
-
       return { ...prevState, mcp }
     })
   }, [setAppState])
-
-  // Update server state, tools, commands, and resources.
-  // When tools, commands, or resources are undefined, the existing values are preserved.
-  // When type is 'disabled' or 'failed', tools/commands/resources are automatically cleared.
-  // Updates are batched via setTimeout to coalesce updates arriving within MCP_BATCH_FLUSH_MS.
   const updateServer = useCallback(
     (update: PendingUpdate) => {
       pendingUpdatesRef.current.push(update)
@@ -306,7 +236,6 @@ export function useManageMCPConnections(
     },
     [flushPendingUpdates],
   )
-
   const onConnectionAttempt = useCallback(
     ({
       client,
@@ -320,29 +249,16 @@ export function useManageMCPConnections(
       resources?: ServerResource[]
     }) => {
       updateServer({ ...client, tools, commands, resources })
-
-      // Handle side effects based on client state
       switch (client.type) {
         case 'connected': {
-          // Overwrite the default elicitation handler registered in connectToServer
-          // with the real one (queues elicitation in AppState for UI). Registering
-          // here (once per connect) instead of in a [mcpClients] effect avoids
-          // re-running for every already-connected server on each state change.
           registerElicitationHandler(client.client, client.name, setAppState)
-
           client.client.onclose = () => {
             const configType = client.config.type ?? 'stdio'
-
             clearServerCache(client.name, client.config).catch(() => {
               logForDebugging(
                 `Failed to invalidate the server cache: ${client.name}`,
               )
             })
-
-            // TODO: This really isn't great: ideally we'd check appstate as the source of truth
-            // as to whether it was disconnected due to a disable, but appstate is stale at this
-            // point. Getting a live reference to appstate feels a little hacky, so we'll just
-            // check the disk state. We may want to refactor some of this.
             if (isMcpServerDisabled(client.name)) {
               logMCPDebug(
                 client.name,
@@ -350,31 +266,23 @@ export function useManageMCPConnections(
               )
               return
             }
-
-            // Handle automatic reconnection for remote transports
-            // Skip stdio (local process) and sdk (internal) - they don't support reconnection
             if (configType !== 'stdio' && configType !== 'sdk') {
               const transportType = getTransportDisplayName(configType)
               logMCPDebug(
                 client.name,
                 `${transportType} transport closed/disconnected, attempting automatic reconnection`,
               )
-
-              // Cancel any existing reconnection attempt for this server
               const existingTimer = reconnectTimersRef.current.get(client.name)
               if (existingTimer) {
                 clearTimeout(existingTimer)
                 reconnectTimersRef.current.delete(client.name)
               }
-
-              // Attempt reconnection with exponential backoff
               const reconnectWithBackoff = async () => {
                 for (
                   let attempt = 1;
                   attempt <= MAX_RECONNECT_ATTEMPTS;
                   attempt++
                 ) {
-                  // Check if server was disabled while we were waiting
                   if (isMcpServerDisabled(client.name)) {
                     logMCPDebug(
                       client.name,
@@ -383,14 +291,12 @@ export function useManageMCPConnections(
                     reconnectTimersRef.current.delete(client.name)
                     return
                   }
-
                   updateServer({
                     ...client,
                     type: 'pending',
                     reconnectAttempt: attempt,
                     maxReconnectAttempts: MAX_RECONNECT_ATTEMPTS,
                   })
-
                   const reconnectStartTime = Date.now()
                   try {
                     const result = await reconnectMcpServerImpl(
@@ -398,7 +304,6 @@ export function useManageMCPConnections(
                       client.config,
                     )
                     const elapsed = Date.now() - reconnectStartTime
-
                     if (result.client.type === 'connected') {
                       logMCPDebug(
                         client.name,
@@ -408,13 +313,10 @@ export function useManageMCPConnections(
                       onConnectionAttempt(result)
                       return
                     }
-
                     logMCPDebug(
                       client.name,
                       `${transportType} reconnection attempt ${attempt} completed with status: ${result.client.type}`,
                     )
-
-                    // On final attempt, update state with the result
                     if (attempt === MAX_RECONNECT_ATTEMPTS) {
                       logMCPDebug(
                         client.name,
@@ -430,8 +332,6 @@ export function useManageMCPConnections(
                       client.name,
                       `${transportType} reconnection attempt ${attempt} failed after ${elapsed}ms: ${error}`,
                     )
-
-                    // On final attempt, mark as failed
                     if (attempt === MAX_RECONNECT_ATTEMPTS) {
                       logMCPDebug(
                         client.name,
@@ -442,8 +342,6 @@ export function useManageMCPConnections(
                       return
                     }
                   }
-
-                  // Schedule next retry with exponential backoff
                   const backoffMs = Math.min(
                     INITIAL_BACKOFF_MS * Math.pow(2, attempt - 1),
                     MAX_BACKOFF_MS,
@@ -452,24 +350,17 @@ export function useManageMCPConnections(
                     client.name,
                     `Scheduling reconnection attempt ${attempt + 1} in ${backoffMs}ms`,
                   )
-
                   await new Promise<void>(resolve => {
-                    // eslint-disable-next-line no-restricted-syntax -- timer stored in ref for cancellation; sleep() doesn't expose the handle
                     const timer = setTimeout(resolve, backoffMs)
                     reconnectTimersRef.current.set(client.name, timer)
                   })
                 }
               }
-
               void reconnectWithBackoff()
             } else {
               updateServer({ ...client, type: 'failed' })
             }
           }
-
-          // Channel push: notifications/open-code-cli/channel → enqueue().
-          // Gate decides whether to register the handler; connection stays
-          // up either way (allowedMcpServers controls that).
           if (feature('KAIROS') || feature('KAIROS_CHANNELS')) {
             const gate = gateChannelServer(
               client.name,
@@ -477,17 +368,10 @@ export function useManageMCPConnections(
               client.config.pluginSource,
             )
             const entry = findChannelEntry(client.name, getAllowedChannels())
-            // Plugin identifier for telemetry — log name@marketplace for any
-            // plugin-kind entry (same tier as open_code_cli_plugin_installed, which
-            // logs arbitrary plugin_id+marketplace_name ungated). server-kind
-            // names are MCP-server-name tier; those are opt-in-only elsewhere
-            // (see isAnalyticsToolDetailsLoggingEnabled in metadata.ts) and
-            // stay unlogged here. is_dev/entry_kind segment the rest.
             const pluginId =
               entry?.kind === 'plugin'
                 ? (`${entry.name}@${entry.marketplace}` as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS)
                 : undefined
-            // Skip capability-miss — every non-channel MCP server trips it.
             if (gate.action === 'register' || gate.kind !== 'capability') {
               logEvent('open_code_cli_mcp_channel_gate', {
                 registered: gate.action === 'register',
@@ -530,12 +414,6 @@ export function useManageMCPConnections(
                     })
                   },
                 )
-                // Permission-reply handler — separate event, separate
-                // capability. Only registers if the server declares
-                // open-code-cli/channel/permission (same opt-in check as the send
-                // path in interactiveHandler.ts). Server parses the user's
-                // reply and emits {request_id, behavior}; no regex on our
-                // side, text in the general channel can't accidentally match.
                 if (
                   client.capabilities?.experimental?.[
                     'open-code-cli/channel/permission'
@@ -560,11 +438,6 @@ export function useManageMCPConnections(
                 }
                 break
               case 'skip':
-                // Idempotent teardown so a register→skip re-gate (e.g.
-                // effect re-runs after /logout) actually removes the live
-                // handler. Without this, mid-session demotion is one-way:
-                // the gate says skip but the earlier handler keeps enqueuing.
-                // Map.delete — safe when never registered.
                 client.client.removeNotificationHandler(
                   'notifications/open-code-cli/channel',
                 )
@@ -575,12 +448,6 @@ export function useManageMCPConnections(
                   client.name,
                   `Channel notifications skipped: ${gate.reason}`,
                 )
-                // Surface a once-per-kind toast when a channel server is
-                // blocked. This is the only
-                // user-visible signal (logMCPDebug above requires --debug).
-                // Capability/session skips are expected noise and stay
-                // debug-only. marketplace/allowlist run after session — if
-                // we're here with those kinds, the user asked for it.
                 if (
                   gate.kind !== 'capability' &&
                   gate.kind !== 'session' &&
@@ -590,9 +457,6 @@ export function useManageMCPConnections(
                     entry !== undefined)
                 ) {
                   channelWarnedKindsRef.current.add(gate.kind)
-                  // disabled/auth/policy get custom toast copy (shorter, actionable);
-                  // marketplace/allowlist reuse the gate's reason verbatim
-                  // since it already names the mismatch.
                   const text =
                     gate.kind === 'disabled'
                       ? 'Channels are not currently available'
@@ -612,9 +476,6 @@ export function useManageMCPConnections(
                 break
             }
           }
-
-          // Register notification handlers for list_changed notifications
-          // These allow the server to notify us when tools, prompts, or resources change
           if (client.capabilities?.tools?.listChanged) {
             client.client.setNotificationHandler(
               ToolListChangedNotificationSchema,
@@ -624,7 +485,6 @@ export function useManageMCPConnections(
                   `Received tools/list_changed notification, refreshing tools`,
                 )
                 try {
-                  // Grab cached promise before invalidating to log previous count
                   const previousToolsPromise = fetchToolsForClient.cache.get(
                     client.name,
                   )
@@ -663,7 +523,6 @@ export function useManageMCPConnections(
               },
             )
           }
-
           if (client.capabilities?.prompts?.listChanged) {
             client.client.setNotificationHandler(
               PromptListChangedNotificationSchema,
@@ -676,8 +535,6 @@ export function useManageMCPConnections(
                   type: 'prompts' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
                 })
                 try {
-                  // Skills come from resources, not prompts — don't invalidate their
-                  // cache here. fetchMcpSkillsForClient returns the cached result.
                   fetchCommandsForClient.cache.delete(client.name)
                   const [mcpPrompts, mcpSkills] = await Promise.all([
                     fetchCommandsForClient(client),
@@ -689,8 +546,6 @@ export function useManageMCPConnections(
                     ...client,
                     commands: [...mcpPrompts, ...mcpSkills],
                   })
-                  // MCP skills changed — invalidate skill-search index so
-                  // next discovery rebuilds with the new set.
                   clearSkillIndexCache?.()
                 } catch (error) {
                   logMCPError(
@@ -701,7 +556,6 @@ export function useManageMCPConnections(
               },
             )
           }
-
           if (client.capabilities?.resources?.listChanged) {
             client.client.setNotificationHandler(
               ResourceListChangedNotificationSchema,
@@ -716,10 +570,6 @@ export function useManageMCPConnections(
                 try {
                   fetchResourcesForClient.cache.delete(client.name)
                   if (feature('MCP_SKILLS')) {
-                    // Skills are discovered from resources, so refresh them too.
-                    // Invalidate prompts cache as well: we write commands here,
-                    // and a concurrent prompts/list_changed could otherwise have
-                    // us stomp its fresh result with our cached stale one.
                     fetchMcpSkillsForClient!.cache.delete(client.name)
                     fetchCommandsForClient.cache.delete(client.name)
                     const [newResources, mcpPrompts, mcpSkills] =
@@ -733,8 +583,6 @@ export function useManageMCPConnections(
                       resources: newResources,
                       commands: [...mcpPrompts, ...mcpSkills],
                     })
-                    // MCP skills changed — invalidate skill-search index so
-                    // next discovery rebuilds with the new set.
                     clearSkillIndexCache?.()
                   } else {
                     const newResources = await fetchResourcesForClient(client)
@@ -751,7 +599,6 @@ export function useManageMCPConnections(
           }
           break
         }
-
         case 'needs-auth':
         case 'failed':
         case 'pending':
@@ -761,13 +608,6 @@ export function useManageMCPConnections(
     },
     [updateServer],
   )
-
-  // Initialize all servers to pending state if they don't exist in appState.
-  // Re-runs on session change (/clear) and on /reload-plugins (pluginReconnectKey).
-  // On plugin reload, also disconnects stale plugin MCP servers (scope 'dynamic')
-  // that no longer appear in configs — prevents ghost tools from disabled plugins.
-  // Skip Open Code CLI dedup here to avoid blocking on the network fetch; the connect
-  // useEffect below runs immediately after and dedups before connecting.
   const sessionId = getSessionId()
   useEffect(() => {
     async function initializeServersAsPending() {
@@ -775,30 +615,12 @@ export function useManageMCPConnections(
         ? { servers: {}, errors: [] }
         : await getOpenCodeCliMcpConfigs(dynamicMcpConfig)
       const configs = { ...existingConfigs, ...dynamicMcpConfig }
-
-      // Add MCP errors to plugin errors for UI visibility (deduplicated)
       addErrorsToAppState(setAppState, mcpErrors)
-
       setAppState(prevState => {
-        // Disconnect MCP servers that are stale: plugin servers removed from
-        // config, or any server whose config hash changed (edited .mcp.json).
-        // Stale servers get re-added as 'pending' below since their name is
-        // now absent from mcpWithoutStale.clients.
         const { stale, ...mcpWithoutStale } = excludeStalePluginClients(
           prevState.mcp,
           configs,
         )
-        // Clean up stale connections. Fire-and-forget — state updaters must
-        // be synchronous. Three hazards to defuse before calling cleanup:
-        //   1. Pending reconnect timer would fire with the OLD config.
-        //   2. onclose (set at L254) starts reconnectWithBackoff with the
-        //      OLD config from its closure — it checks isMcpServerDisabled
-        //      but config-changed servers aren't disabled, so it'd race the
-        //      fresh connection and last updateServer wins.
-        //   3. clearServerCache internally calls connectToServer (memoized).
-        //      For never-connected servers (disabled/pending/failed) the
-        //      cache is empty → real connect attempt → spawn/OAuth just to
-        //      immediately kill it. Only connected servers need cleanup.
         for (const s of stale) {
           const timer = reconnectTimersRef.current.get(s.name)
           if (timer) {
@@ -810,7 +632,6 @@ export function useManageMCPConnections(
             void clearServerCache(s.name, s.config).catch(() => {})
           }
         }
-
         const existingServerNames = new Set(
           mcpWithoutStale.clients.map(c => c.name),
         )
@@ -823,11 +644,9 @@ export function useManageMCPConnections(
               : ('pending' as const),
             config,
           }))
-
         if (newClients.length === 0 && stale.length === 0) {
           return prevState
         }
-
         return {
           ...prevState,
           mcp: {
@@ -838,7 +657,6 @@ export function useManageMCPConnections(
         }
       })
     }
-
     void initializeServersAsPending().catch(error => {
       logMCPError(
         'useManageMCPConnections',
@@ -852,18 +670,9 @@ export function useManageMCPConnections(
     sessionId,
     _pluginReconnectKey,
   ])
-
-  // Load MCP configs and connect to servers
-  // Two-phase loading: Open Code CLI configs first (fast), then Open Code CLI configs (may be slow)
   useEffect(() => {
     let cancelled = false
-
     async function loadAndConnectMcpConfigs() {
-      // Clear Open Code CLI MCP cache so we fetch fresh configs with current auth
-      // state. This is important when authVersion changes (e.g., after login/
-      // logout). Kick off the fetch now so it overlaps with loadAllPlugins()
-      // inside getOpenCodeCliMcpConfigs; it's awaited only at the dedup step.
-      // Phase 2 below awaits the same promise — no second network call.
       let openCodeCliPromise: Promise<Record<string, ScopedMcpServerConfig>>
       if (isStrictMcpConfig || doesEnterpriseMcpConfigExist()) {
         openCodeCliPromise = Promise.resolve({})
@@ -871,23 +680,13 @@ export function useManageMCPConnections(
         clearOpenCodeCliMcpConfigsCache()
         openCodeCliPromise = fetchOpenCodeCliMcpConfigsIfEligible()
       }
-
-      // Phase 1: Load Open Code CLI configs. Plugin MCP servers that duplicate a
-      // --mcp-config entry or a Open Code CLI connector are suppressed here so they
-      // don't connect alongside the connector in Phase 2.
       const { servers: mcpJsonConfigs, errors: mcpErrors } =
         isStrictMcpConfig
           ? { servers: {}, errors: [] }
           : await getOpenCodeCliMcpConfigs(dynamicMcpConfig, openCodeCliPromise)
       if (cancelled) return
-
-      // Add MCP errors to plugin errors for UI visibility (deduplicated)
       addErrorsToAppState(setAppState, mcpErrors)
-
       const configs = { ...mcpJsonConfigs, ...dynamicMcpConfig }
-
-      // Start connecting to Open Code CLI servers (don't wait - runs concurrently with Phase 2)
-      // Filter out disabled servers to avoid unnecessary connection attempts
       const enabledConfigs = Object.fromEntries(
         Object.entries(configs).filter(([name]) => !isMcpServerDisabled(name)),
       )
@@ -900,18 +699,12 @@ export function useManageMCPConnections(
           `Failed to get MCP resources: ${errorMessage(error)}`,
         )
       })
-
-      // Phase 2: Await Open Code CLI configs (started above; memoized — no second fetch)
       let openCodeCliConfigs: Record<string, ScopedMcpServerConfig> = {}
       if (!isStrictMcpConfig) {
         openCodeCliConfigs = filterMcpServersByPolicy(
           await openCodeCliPromise,
         ).allowed
         if (cancelled) return
-
-        // Suppress Open Code CLI connectors that duplicate an enabled manual server.
-        // Keys never collide (`slack` vs `Open Code CLI Slack`) so the merge below
-        // won't catch this — need content-based dedup by URL signature.
         if (Object.keys(openCodeCliConfigs).length > 0) {
           const { servers: dedupedOpenCodeCli } = dedupOpenCodeCliMcpServers(
             openCodeCliConfigs,
@@ -919,9 +712,7 @@ export function useManageMCPConnections(
           )
           openCodeCliConfigs = dedupedOpenCodeCli
         }
-
         if (Object.keys(openCodeCliConfigs).length > 0) {
-          // Add Open Code CLI servers as pending immediately so they show up in UI
           setAppState(prevState => {
             const existingServerNames = new Set(
               prevState.mcp.clients.map(c => c.name),
@@ -944,8 +735,6 @@ export function useManageMCPConnections(
               },
             }
           })
-
-          // Now start connecting (only enabled servers)
           const enabledOpenCodeCliaiConfigs = Object.fromEntries(
             Object.entries(openCodeCliConfigs).filter(
               ([name]) => !isMcpServerDisabled(name),
@@ -962,8 +751,6 @@ export function useManageMCPConnections(
           })
         }
       }
-
-      // Log server counts after both phases complete
       const allConfigs = { ...configs, ...openCodeCliConfigs }
       const counts = {
         enterprise: 0,
@@ -973,9 +760,6 @@ export function useManageMCPConnections(
         plugin: 0,
         openCodeCli: 0,
       }
-      // Ant-only: collect stdio command basenames to correlate with RSS/FPS
-      // metrics. Stdio servers like rust-analyzer can be heavy and we want to
-      // know which ones correlate with poor session performance.
       const stdioCommands: string[] = []
       for (const [name, serverConfig] of Object.entries(allConfigs)) {
         if (serverConfig.scope === 'enterprise') counts.enterprise++
@@ -984,7 +768,6 @@ export function useManageMCPConnections(
         else if (serverConfig.scope === 'local') counts.user++
         else if (serverConfig.scope === 'dynamic') counts.plugin++
         else if (serverConfig.scope === 'openCodeCli') counts.openCodeCli++
-
         if (
           process.env.USER_TYPE === 'ant' &&
           !isMcpServerDisabled(name) &&
@@ -1007,9 +790,7 @@ export function useManageMCPConnections(
           : {}),
       })
     }
-
     void loadAndConnectMcpConfigs()
-
     return () => {
       cancelled = true
     }
@@ -1022,8 +803,6 @@ export function useManageMCPConnections(
     sessionId,
     _pluginReconnectKey,
   ])
-
-  // Cleanup all timers on unmount
   useEffect(() => {
     const timers = reconnectTimersRef.current
     return () => {
@@ -1031,7 +810,6 @@ export function useManageMCPConnections(
         clearTimeout(timer)
       }
       timers.clear()
-      // Flush any pending batched MCP updates before unmount
       if (flushTimerRef.current !== null) {
         clearTimeout(flushTimerRef.current)
         flushTimerRef.current = null
@@ -1039,10 +817,6 @@ export function useManageMCPConnections(
       }
     }
   }, [flushPendingUpdates])
-
-  // Expose reconnectMcpServer function for components to use.
-  // Reads mcp.clients via store.getState() so this callback stays stable
-  // across client state transitions (no need to re-create on every connect).
   const reconnectMcpServer = useCallback(
     async (serverName: string) => {
       const client = store
@@ -1051,26 +825,17 @@ export function useManageMCPConnections(
       if (!client) {
         throw new Error(`MCP server ${serverName} not found`)
       }
-
-      // Cancel any pending automatic reconnection attempt
       const existingTimer = reconnectTimersRef.current.get(serverName)
       if (existingTimer) {
         clearTimeout(existingTimer)
         reconnectTimersRef.current.delete(serverName)
       }
-
       const result = await reconnectMcpServerImpl(serverName, client.config)
-
       onConnectionAttempt(result)
-
-      // Don't throw, just let UI handle the client type in case the reconnect failed
-      // (Detailed logs are within the reconnectMcpServerImpl via --debug)
       return result
     },
     [store, onConnectionAttempt],
   )
-
-  // Expose function to toggle server enabled/disabled state
   const toggleMcpServer = useCallback(
     async (serverName: string): Promise<void> => {
       const client = store
@@ -1079,55 +844,37 @@ export function useManageMCPConnections(
       if (!client) {
         throw new Error(`MCP server ${serverName} not found`)
       }
-
       const isCurrentlyDisabled = client.type === 'disabled'
-
       if (!isCurrentlyDisabled) {
-        // Cancel any pending automatic reconnection attempt
         const existingTimer = reconnectTimersRef.current.get(serverName)
         if (existingTimer) {
           clearTimeout(existingTimer)
           reconnectTimersRef.current.delete(serverName)
         }
-
-        // Persist disabled state to disk FIRST before clearing cache
-        // This is important because the onclose handler checks disk state
         setMcpServerEnabled(serverName, false)
-
-        // Disabling: disconnect and clean up if currently connected
         if (client.type === 'connected') {
           await clearServerCache(serverName, client.config)
         }
-
-        // Update to disabled state (tools/commands/resources auto-cleared)
         updateServer({
           name: serverName,
           type: 'disabled',
           config: client.config,
         })
       } else {
-        // Enabling: persist enabled state to disk first
         setMcpServerEnabled(serverName, true)
-
-        // Mark as pending and reconnect
         updateServer({
           name: serverName,
           type: 'pending',
           config: client.config,
         })
-
-        // Reconnect the server
         const result = await reconnectMcpServerImpl(serverName, client.config)
-
         onConnectionAttempt(result)
       }
     },
     [store, updateServer, onConnectionAttempt],
   )
-
   return { reconnectMcpServer, toggleMcpServer }
 }
-
 function getTransportDisplayName(type: string): string {
   switch (type) {
     case 'http':

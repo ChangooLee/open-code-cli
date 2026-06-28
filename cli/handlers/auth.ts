@@ -1,5 +1,3 @@
-/* eslint-disable custom-rules/no-process-exit -- CLI subcommand handler intentionally exits */
-
 import {
   clearAuthRelatedCaches,
   performLogout,
@@ -42,16 +40,8 @@ import {
   buildAccountProperties,
   buildAPIProviderProperties,
 } from '../../utils/status.js'
-
-/**
- * Shared post-token-acquisition logic. Saves tokens, fetches profile/roles,
- * and sets up the local auth state.
- */
 export async function installOAuthTokens(tokens: OAuthTokens): Promise<void> {
-  // Clear old state before saving new credentials
   await performLogout({ clearOnboarding: false })
-
-  // Reuse pre-fetched profile if available, otherwise fetch fresh
   const profile =
     tokens.profile ?? (await getOauthProfileFromOauthToken(tokens.accessToken))
   if (profile) {
@@ -68,36 +58,28 @@ export async function installOAuthTokens(tokens: OAuthTokens): Promise<void> {
       accountCreatedAt: profile.account.created_at,
     })
   } else if (tokens.tokenAccount) {
-    // Fallback to token exchange account data when profile endpoint fails
     storeOAuthAccountInfo({
       accountUuid: tokens.tokenAccount.uuid,
       emailAddress: tokens.tokenAccount.emailAddress,
       organizationUuid: tokens.tokenAccount.organizationUuid,
     })
   }
-
   const storageResult = saveOAuthTokensIfNeeded(tokens)
   clearOAuthTokenCache()
-
   if (storageResult.warning) {
     logEvent('open_code_cli_oauth_storage_warning', {
       warning:
         storageResult.warning as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
     })
   }
-
-  // Roles and first-token-date may fail for limited-scope tokens (e.g.
-  // inference-only from setup-token). They're not required for core auth.
   await fetchAndStoreUserRoles(tokens.accessToken).catch(err =>
     logForDebugging(String(err), { level: 'error' }),
   )
-
   if (shouldUseOpenCodeCliAuth(tokens.scopes)) {
     await fetchAndStoreOpenCodeCliCodeFirstTokenDate().catch(err =>
       logForDebugging(String(err), { level: 'error' }),
     )
   } else {
-    // API key creation is critical for Console users — let it throw.
     const apiKey = await createAndStoreApiKey(tokens.accessToken)
     if (!apiKey) {
       throw new Error(
@@ -105,10 +87,8 @@ export async function installOAuthTokens(tokens: OAuthTokens): Promise<void> {
       )
     }
   }
-
   await clearAuthRelatedCaches()
 }
-
 export async function authLogin({
   email,
   sso,
@@ -126,17 +106,11 @@ export async function authLogin({
     )
     process.exit(1)
   }
-
   const settings = getInitialSettings()
-  // forceLoginMethod is a hard constraint (enterprise setting) — matches ConsoleOAuthFlow behavior.
-  // Without it, --console selects Console; --openCodeCli (or no flag) selects Open Code CLI.
   const loginWithOpenCodeCli = settings.forceLoginMethod
     ? settings.forceLoginMethod === 'openCodeCli'
     : !useConsole
   const orgUUID = settings.forceLoginOrgUUID
-
-  // Fast path: if a refresh token is provided via env var, skip the browser
-  // OAuth flow and exchange it directly for tokens.
   const envRefreshToken = process.env.OPEN_CODE_CLI_OAUTH_REFRESH_TOKEN
   if (envRefreshToken) {
     const envScopes = process.env.OPEN_CODE_CLI_OAUTH_SCOPES
@@ -148,28 +122,20 @@ export async function authLogin({
       )
       process.exit(1)
     }
-
     const scopes = envScopes.split(/\s+/).filter(Boolean)
-
     try {
       logEvent('open_code_cli_login_from_refresh_token', {})
-
       const tokens = await refreshOAuthToken(envRefreshToken, { scopes })
       await installOAuthTokens(tokens)
-
       const orgResult = await validateForceLoginOrg()
       if (!orgResult.valid) {
         process.stderr.write(orgResult.message + '\n')
         process.exit(1)
       }
-
-      // Mark onboarding complete — interactive paths handle this via
-      // the Onboarding component, but the env var path skips it.
       saveGlobalConfig(current => {
         if (current.hasCompletedOnboarding) return current
         return { ...current, hasCompletedOnboarding: true }
       })
-
       logEvent('open_code_cli_oauth_success', {
         loginWithOpenCodeCli: shouldUseOpenCodeCliAuth(tokens.scopes),
       })
@@ -184,14 +150,10 @@ export async function authLogin({
       process.exit(1)
     }
   }
-
   const resolvedLoginMethod = sso ? 'sso' : undefined
-
   const oauthService = new OAuthService()
-
   try {
     logEvent('open_code_cli_oauth_flow_start', { loginWithOpenCodeCli })
-
     const result = await oauthService.startOAuthFlow(
       async url => {
         process.stdout.write('Opening browser to sign in…\n')
@@ -204,17 +166,13 @@ export async function authLogin({
         orgUUID,
       },
     )
-
     await installOAuthTokens(result)
-
     const orgResult = await validateForceLoginOrg()
     if (!orgResult.valid) {
       process.stderr.write(orgResult.message + '\n')
       process.exit(1)
     }
-
     logEvent('open_code_cli_oauth_success', { loginWithOpenCodeCli })
-
     process.stdout.write('Login successful.\n')
     process.exit(0)
   } catch (err) {
@@ -228,7 +186,6 @@ export async function authLogin({
     oauthService.cleanup()
   }
 }
-
 export async function authStatus(opts: {
   json?: boolean
   text?: boolean
@@ -242,8 +199,6 @@ export async function authStatus(opts: {
   const using3P = isUsing3PServices()
   const loggedIn =
     hasToken || apiKeySource !== 'none' || hasApiKeyEnvVar || using3P
-
-  // Determine auth method
   let authMethod: string = 'none'
   if (using3P) {
     authMethod = 'third_party'
@@ -258,7 +213,6 @@ export async function authStatus(opts: {
   } else if (apiKeySource === '/login managed key') {
     authMethod = 'Open Code CLI'
   }
-
   if (opts.text) {
     const properties = [
       ...buildAccountProperties(),
@@ -312,12 +266,10 @@ export async function authStatus(opts: {
       output.orgName = oauthAccount?.organizationName ?? null
       output.subscriptionType = subscriptionType ?? null
     }
-
     process.stdout.write(jsonStringify(output, null, 2) + '\n')
   }
   process.exit(loggedIn ? 0 : 1)
 }
-
 export async function authLogout(): Promise<void> {
   try {
     await performLogout({ clearOnboarding: false })

@@ -1,5 +1,3 @@
-// Generated from coreSchemas.ts (z.infer of each lazySchema).
-// Produced by scripts/generate-sdk-types.ts.
 import type { z } from 'zod/v4'
 import type {
   ModelUsageSchema,
@@ -128,7 +126,6 @@ import type {
   SDKMessageSchema,
   FastModeStateSchema,
 } from './coreSchemas.js'
-
 export type ModelUsage = z.infer<ReturnType<typeof ModelUsageSchema>>
 export type OutputFormatType = z.infer<ReturnType<typeof OutputFormatTypeSchema>>
 export type BaseOutputFormat = z.infer<ReturnType<typeof BaseOutputFormatSchema>>

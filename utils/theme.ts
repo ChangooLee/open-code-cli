@@ -1,42 +1,37 @@
 import chalk, { Chalk } from 'chalk'
 import { env } from './env.js'
-
 export type Theme = {
   autoAccept: string
   bashBorder: string
   'open-code-cli': string
-  openCodeCliShimmer: string // Lighter version of open-code-cli color for shimmer effect
+  openCodeCliShimmer: string 
   openCodeCliBlue_FOR_SYSTEM_SPINNER: string
   openCodeCliBlueShimmer_FOR_SYSTEM_SPINNER: string
   permission: string
-  permissionShimmer: string // Lighter version of permission color for shimmer effect
+  permissionShimmer: string 
   planMode: string
   ide: string
   promptBorder: string
-  promptBorderShimmer: string // Lighter version of promptBorder color for shimmer effect
+  promptBorderShimmer: string 
   text: string
   inverseText: string
   inactive: string
-  inactiveShimmer: string // Lighter version of inactive color for shimmer effect
+  inactiveShimmer: string 
   subtle: string
   suggestion: string
   remember: string
   background: string
-  // Semantic colors
   success: string
   error: string
   warning: string
   merged: string
-  warningShimmer: string // Lighter version of warning color for shimmer effect
-  // Diff colors
+  warningShimmer: string 
   diffAdded: string
   diffRemoved: string
   diffAddedDimmed: string
   diffRemovedDimmed: string
-  // Word-level diff highlighting
   diffAddedWord: string
   diffRemovedWord: string
-  // Agent colors
   red_FOR_SUBAGENTS_ONLY: string
   blue_FOR_SUBAGENTS_ONLY: string
   green_FOR_SUBAGENTS_ONLY: string
@@ -45,33 +40,22 @@ export type Theme = {
   orange_FOR_SUBAGENTS_ONLY: string
   pink_FOR_SUBAGENTS_ONLY: string
   cyan_FOR_SUBAGENTS_ONLY: string
-  // Grove colors
   professionalBlue: string
-  // Chrome colors
   chromeYellow: string
-  // TUI V2 colors
   clawd_body: string
   clawd_background: string
   userMessageBackground: string
   userMessageBackgroundHover: string
-  /** Message-actions selection. Cool shift toward `suggestion` blue; distinct from default AND userMessageBackground. */
   messageActionsBackground: string
-  /** Text-selection highlight background (alt-screen mouse selection). Solid
-   *  bg that REPLACES the cell's bg while preserving its fg — matches native
-   *  terminal selection. Previously SGR-7 inverse (swapped fg/bg per cell),
-   *  which fragmented badly over syntax highlighting. */
   selectionBg: string
   bashMessageBackgroundColor: string
-
   memoryBackgroundColor: string
   rate_limit_fill: string
   rate_limit_empty: string
   fastMode: string
   fastModeShimmer: string
-  // Brief/assistant mode label colors
   briefLabelYou: string
   'briefLabelOpen Code CLI': string
-  // Rainbow colors for ultrathink keyword highlighting
   rainbow_red: string
   rainbow_orange: string
   rainbow_yellow: string
@@ -87,7 +71,6 @@ export type Theme = {
   rainbow_indigo_shimmer: string
   rainbow_violet_shimmer: string
 }
-
 export const THEME_NAMES = [
   'dark',
   'light',
@@ -96,22 +79,9 @@ export const THEME_NAMES = [
   'light-ansi',
   'dark-ansi',
 ] as const
-
-/** A renderable theme. Always resolvable to a concrete color palette. */
 export type ThemeName = (typeof THEME_NAMES)[number]
-
 export const THEME_SETTINGS = ['auto', ...THEME_NAMES] as const
-
-/**
- * A theme preference as stored in user config. `'auto'` follows the system
- * dark/light mode and is resolved to a ThemeName at runtime.
- */
 export type ThemeSetting = (typeof THEME_SETTINGS)[number]
-
-/**
- * Light theme using explicit RGB values to avoid inconsistencies
- * from users' custom terminal ANSI color definitions
- */
 const lightTheme: Theme = {
   autoAccept: 'rgb(135,0,255)', // Electric violet
   bashBorder: 'rgb(255,0,135)', // Vibrant pink
@@ -144,7 +114,6 @@ const lightTheme: Theme = {
   diffRemovedDimmed: 'rgb(253,210,216)', // Very light red
   diffAddedWord: 'rgb(47,157,68)', // Medium green
   diffRemovedWord: 'rgb(209,69,75)', // Medium red
-  // Agent colors
   red_FOR_SUBAGENTS_ONLY: 'rgb(220,38,38)', // Red 600
   blue_FOR_SUBAGENTS_ONLY: 'rgb(37,99,235)', // Blue 600
   green_FOR_SUBAGENTS_ONLY: 'rgb(22,163,74)', // Green 600
@@ -153,11 +122,8 @@ const lightTheme: Theme = {
   orange_FOR_SUBAGENTS_ONLY: 'rgb(234,88,12)', // Orange 600
   pink_FOR_SUBAGENTS_ONLY: 'rgb(219,39,119)', // Pink 600
   cyan_FOR_SUBAGENTS_ONLY: 'rgb(8,145,178)', // Cyan 600
-  // Grove colors
   professionalBlue: 'rgb(106,155,204)',
-  // Chrome colors
   chromeYellow: 'rgb(251,188,4)', // Chrome yellow
-  // TUI V2 colors
   clawd_body: 'rgb(215,119,87)',
   clawd_background: 'rgb(0,0,0)',
   userMessageBackground: 'rgb(240, 240, 240)', // Slightly darker grey for optimal contrast
@@ -165,13 +131,11 @@ const lightTheme: Theme = {
   messageActionsBackground: 'rgb(232, 236, 244)', // cool gray — darker than userMsg 240 (visible on white), slight blue toward `suggestion`
   selectionBg: 'rgb(180, 213, 255)', // classic light-mode selection blue (macOS/VS Code-ish); dark fgs stay readable
   bashMessageBackgroundColor: 'rgb(250, 245, 250)',
-
   memoryBackgroundColor: 'rgb(230, 245, 250)',
   rate_limit_fill: 'rgb(87,105,247)', // Medium blue
   rate_limit_empty: 'rgb(39,47,111)', // Dark blue
   fastMode: 'rgb(255,106,0)', // Electric orange
   fastModeShimmer: 'rgb(255,150,50)', // Lighter orange for shimmer
-  // Brief/assistant mode
   briefLabelYou: 'rgb(37,99,235)', // Blue
   'briefLabelOpen Code CLI': 'rgb(215,119,87)', // Brand orange
   rainbow_red: 'rgb(235,95,87)',
@@ -189,11 +153,6 @@ const lightTheme: Theme = {
   rainbow_indigo_shimmer: 'rgb(195,180,230)',
   rainbow_violet_shimmer: 'rgb(230,180,210)',
 }
-
-/**
- * Light ANSI theme using only the 16 standard ANSI colors
- * for terminals without true color support
- */
 const lightAnsiTheme: Theme = {
   autoAccept: 'ansi:magenta',
   bashBorder: 'ansi:magenta',
@@ -226,7 +185,6 @@ const lightAnsiTheme: Theme = {
   diffRemovedDimmed: 'ansi:red',
   diffAddedWord: 'ansi:greenBright',
   diffRemovedWord: 'ansi:redBright',
-  // Agent colors
   red_FOR_SUBAGENTS_ONLY: 'ansi:red',
   blue_FOR_SUBAGENTS_ONLY: 'ansi:blue',
   green_FOR_SUBAGENTS_ONLY: 'ansi:green',
@@ -235,11 +193,8 @@ const lightAnsiTheme: Theme = {
   orange_FOR_SUBAGENTS_ONLY: 'ansi:redBright',
   pink_FOR_SUBAGENTS_ONLY: 'ansi:magentaBright',
   cyan_FOR_SUBAGENTS_ONLY: 'ansi:cyan',
-  // Grove colors
   professionalBlue: 'ansi:blueBright',
-  // Chrome colors
   chromeYellow: 'ansi:yellow', // Chrome yellow
-  // TUI V2 colors
   clawd_body: 'ansi:redBright',
   clawd_background: 'ansi:black',
   userMessageBackground: 'ansi:white',
@@ -247,7 +202,6 @@ const lightAnsiTheme: Theme = {
   messageActionsBackground: 'ansi:white',
   selectionBg: 'ansi:cyan', // lighter named bg for light-ansi; dark fgs stay readable
   bashMessageBackgroundColor: 'ansi:whiteBright',
-
   memoryBackgroundColor: 'ansi:white',
   rate_limit_fill: 'ansi:yellow',
   rate_limit_empty: 'ansi:black',
@@ -270,11 +224,6 @@ const lightAnsiTheme: Theme = {
   rainbow_indigo_shimmer: 'ansi:blueBright',
   rainbow_violet_shimmer: 'ansi:magentaBright',
 }
-
-/**
- * Dark ANSI theme using only the 16 standard ANSI colors
- * for terminals without true color support
- */
 const darkAnsiTheme: Theme = {
   autoAccept: 'ansi:magentaBright',
   bashBorder: 'ansi:magentaBright',
@@ -307,7 +256,6 @@ const darkAnsiTheme: Theme = {
   diffRemovedDimmed: 'ansi:red',
   diffAddedWord: 'ansi:greenBright',
   diffRemovedWord: 'ansi:redBright',
-  // Agent colors
   red_FOR_SUBAGENTS_ONLY: 'ansi:redBright',
   blue_FOR_SUBAGENTS_ONLY: 'ansi:blueBright',
   green_FOR_SUBAGENTS_ONLY: 'ansi:greenBright',
@@ -316,11 +264,8 @@ const darkAnsiTheme: Theme = {
   orange_FOR_SUBAGENTS_ONLY: 'ansi:redBright',
   pink_FOR_SUBAGENTS_ONLY: 'ansi:magentaBright',
   cyan_FOR_SUBAGENTS_ONLY: 'ansi:cyanBright',
-  // Grove colors
   professionalBlue: 'rgb(106,155,204)',
-  // Chrome colors
   chromeYellow: 'ansi:yellowBright', // Chrome yellow
-  // TUI V2 colors
   clawd_body: 'ansi:redBright',
   clawd_background: 'ansi:black',
   userMessageBackground: 'ansi:blackBright',
@@ -328,7 +273,6 @@ const darkAnsiTheme: Theme = {
   messageActionsBackground: 'ansi:blackBright',
   selectionBg: 'ansi:blue', // darker named bg for dark-ansi; bright fgs stay readable
   bashMessageBackgroundColor: 'ansi:black',
-
   memoryBackgroundColor: 'ansi:blackBright',
   rate_limit_fill: 'ansi:yellow',
   rate_limit_empty: 'ansi:white',
@@ -351,11 +295,6 @@ const darkAnsiTheme: Theme = {
   rainbow_indigo_shimmer: 'ansi:blueBright',
   rainbow_violet_shimmer: 'ansi:magentaBright',
 }
-
-/**
- * Light daltonized theme (color-blind friendly) using explicit RGB values
- * to avoid inconsistencies from users' custom terminal ANSI color definitions
- */
 const lightDaltonizedTheme: Theme = {
   autoAccept: 'rgb(135,0,255)', // Electric violet
   bashBorder: 'rgb(0,102,204)', // Blue instead of pink
@@ -388,7 +327,6 @@ const lightDaltonizedTheme: Theme = {
   diffRemovedDimmed: 'rgb(255,233,233)', // Very light red
   diffAddedWord: 'rgb(51,102,204)', // Medium blue (less intense than deep blue)
   diffRemovedWord: 'rgb(153,51,51)', // Softer red (less intense than deep red)
-  // Agent colors (daltonism-friendly)
   red_FOR_SUBAGENTS_ONLY: 'rgb(204,0,0)', // Pure red
   blue_FOR_SUBAGENTS_ONLY: 'rgb(0,102,204)', // Pure blue
   green_FOR_SUBAGENTS_ONLY: 'rgb(0,204,0)', // Pure green
@@ -397,11 +335,8 @@ const lightDaltonizedTheme: Theme = {
   orange_FOR_SUBAGENTS_ONLY: 'rgb(255,128,0)', // True orange
   pink_FOR_SUBAGENTS_ONLY: 'rgb(255,102,178)', // Adjusted pink
   cyan_FOR_SUBAGENTS_ONLY: 'rgb(0,178,178)', // Adjusted cyan
-  // Grove colors
   professionalBlue: 'rgb(106,155,204)',
-  // Chrome colors
   chromeYellow: 'rgb(251,188,4)', // Chrome yellow
-  // TUI V2 colors
   clawd_body: 'rgb(215,119,87)',
   clawd_background: 'rgb(0,0,0)',
   userMessageBackground: 'rgb(220, 220, 220)', // Slightly darker grey for optimal contrast
@@ -409,7 +344,6 @@ const lightDaltonizedTheme: Theme = {
   messageActionsBackground: 'rgb(210, 216, 226)', // cool gray — darker than userMsg 220, slight blue
   selectionBg: 'rgb(180, 213, 255)', // light selection blue; daltonized fgs are yellows/blues, both readable on light blue
   bashMessageBackgroundColor: 'rgb(250, 245, 250)',
-
   memoryBackgroundColor: 'rgb(230, 245, 250)',
   rate_limit_fill: 'rgb(51,102,255)', // Bright blue
   rate_limit_empty: 'rgb(23,46,114)', // Dark blue
@@ -432,11 +366,6 @@ const lightDaltonizedTheme: Theme = {
   rainbow_indigo_shimmer: 'rgb(195,180,230)',
   rainbow_violet_shimmer: 'rgb(230,180,210)',
 }
-
-/**
- * Dark theme using explicit RGB values to avoid inconsistencies
- * from users' custom terminal ANSI color definitions
- */
 const darkTheme: Theme = {
   autoAccept: 'rgb(175,135,255)', // Electric violet
   bashBorder: 'rgb(253,93,177)', // Bright pink
@@ -469,7 +398,6 @@ const darkTheme: Theme = {
   diffRemovedDimmed: 'rgb(105,72,77)', // Very dark red
   diffAddedWord: 'rgb(56,166,96)', // Medium green
   diffRemovedWord: 'rgb(179,89,107)', // Softer red (less intense than bright red)
-  // Agent colors
   red_FOR_SUBAGENTS_ONLY: 'rgb(220,38,38)', // Red 600
   blue_FOR_SUBAGENTS_ONLY: 'rgb(37,99,235)', // Blue 600
   green_FOR_SUBAGENTS_ONLY: 'rgb(22,163,74)', // Green 600
@@ -478,11 +406,8 @@ const darkTheme: Theme = {
   orange_FOR_SUBAGENTS_ONLY: 'rgb(234,88,12)', // Orange 600
   pink_FOR_SUBAGENTS_ONLY: 'rgb(219,39,119)', // Pink 600
   cyan_FOR_SUBAGENTS_ONLY: 'rgb(8,145,178)', // Cyan 600
-  // Grove colors
   professionalBlue: 'rgb(106,155,204)',
-  // Chrome colors
   chromeYellow: 'rgb(251,188,4)', // Chrome yellow
-  // TUI V2 colors
   clawd_body: 'rgb(215,119,87)',
   clawd_background: 'rgb(0,0,0)',
   userMessageBackground: 'rgb(55, 55, 55)', // Lighter grey for better visual contrast
@@ -490,7 +415,6 @@ const darkTheme: Theme = {
   messageActionsBackground: 'rgb(44, 50, 62)', // cool gray, slight blue
   selectionBg: 'rgb(38, 79, 120)', // classic dark-mode selection blue (VS Code dark default); light fgs stay readable
   bashMessageBackgroundColor: 'rgb(65, 60, 65)',
-
   memoryBackgroundColor: 'rgb(55, 65, 70)',
   rate_limit_fill: 'rgb(177,185,249)', // Light blue-purple
   rate_limit_empty: 'rgb(80,83,112)', // Medium blue-purple
@@ -513,11 +437,6 @@ const darkTheme: Theme = {
   rainbow_indigo_shimmer: 'rgb(195,180,230)',
   rainbow_violet_shimmer: 'rgb(230,180,210)',
 }
-
-/**
- * Dark daltonized theme (color-blind friendly) using explicit RGB values
- * to avoid inconsistencies from users' custom terminal ANSI color definitions
- */
 const darkDaltonizedTheme: Theme = {
   autoAccept: 'rgb(175,135,255)', // Electric violet
   bashBorder: 'rgb(51,153,255)', // Bright blue
@@ -550,7 +469,6 @@ const darkDaltonizedTheme: Theme = {
   diffRemovedDimmed: 'rgb(62,44,44)', // Dimmed red
   diffAddedWord: 'rgb(0,119,179)', // Medium blue
   diffRemovedWord: 'rgb(179,0,0)', // Medium red
-  // Agent colors (daltonism-friendly, dark mode)
   red_FOR_SUBAGENTS_ONLY: 'rgb(255,102,102)', // Bright red
   blue_FOR_SUBAGENTS_ONLY: 'rgb(102,178,255)', // Bright blue
   green_FOR_SUBAGENTS_ONLY: 'rgb(102,255,102)', // Bright green
@@ -559,11 +477,8 @@ const darkDaltonizedTheme: Theme = {
   orange_FOR_SUBAGENTS_ONLY: 'rgb(255,178,102)', // Bright orange
   pink_FOR_SUBAGENTS_ONLY: 'rgb(255,153,204)', // Bright pink
   cyan_FOR_SUBAGENTS_ONLY: 'rgb(102,204,204)', // Bright cyan
-  // Grove colors
   professionalBlue: 'rgb(106,155,204)',
-  // Chrome colors
   chromeYellow: 'rgb(251,188,4)', // Chrome yellow
-  // TUI V2 colors
   clawd_body: 'rgb(215,119,87)',
   clawd_background: 'rgb(0,0,0)',
   userMessageBackground: 'rgb(55, 55, 55)', // Lighter grey for better visual contrast
@@ -571,7 +486,6 @@ const darkDaltonizedTheme: Theme = {
   messageActionsBackground: 'rgb(44, 50, 62)', // cool gray, slight blue
   selectionBg: 'rgb(38, 79, 120)', // classic dark-mode selection blue (VS Code dark default); light fgs stay readable
   bashMessageBackgroundColor: 'rgb(65, 60, 65)',
-
   memoryBackgroundColor: 'rgb(55, 65, 70)',
   rate_limit_fill: 'rgb(153,204,255)', // Light blue
   rate_limit_empty: 'rgb(69,92,115)', // Dark blue
@@ -594,7 +508,6 @@ const darkDaltonizedTheme: Theme = {
   rainbow_indigo_shimmer: 'rgb(195,180,230)',
   rainbow_violet_shimmer: 'rgb(230,180,210)',
 }
-
 export function getTheme(themeName: ThemeName): Theme {
   switch (themeName) {
     case 'light':
@@ -611,29 +524,18 @@ export function getTheme(themeName: ThemeName): Theme {
       return darkTheme
   }
 }
-
-// Create a chalk instance with 256-color level for Apple Terminal
-// Apple Terminal doesn't handle 24-bit color escape sequences well
 const chalkForChart =
   env.terminal === 'Apple_Terminal'
-    ? new Chalk({ level: 2 }) // 256 colors
+    ? new Chalk({ level: 2 }) 
     : chalk
-
-/**
- * Converts a theme color to an ANSI escape sequence for use with asciichart.
- * Uses chalk to generate the escape codes, with 256-color mode for Apple Terminal.
- */
 export function themeColorToAnsi(themeColor: string): string {
   const rgbMatch = themeColor.match(/rgb\(\s?(\d+),\s?(\d+),\s?(\d+)\s?\)/)
   if (rgbMatch) {
     const r = parseInt(rgbMatch[1]!, 10)
     const g = parseInt(rgbMatch[2]!, 10)
     const b = parseInt(rgbMatch[3]!, 10)
-    // Use chalk.rgb which auto-converts to 256 colors when level is 2
-    // Extract just the opening escape sequence by using a marker
     const colored = chalkForChart.rgb(r, g, b)('X')
     return colored.slice(0, colored.indexOf('X'))
   }
-  // Fallback to magenta if parsing fails
   return '\x1b[35m'
 }

@@ -30,7 +30,6 @@ import type { PermissionUpdate } from '../../../utils/permissions/PermissionUpda
 import { hasPermissionsToUseTool } from '../../../utils/permissions/permissions.js'
 import type { PermissionContext } from '../PermissionContext.js'
 import { createResolveOnce } from '../PermissionContext.js'
-
 type InteractivePermissionParams = {
   ctx: PermissionContext
   description: string
@@ -39,21 +38,6 @@ type InteractivePermissionParams = {
   bridgeCallbacks?: BridgePermissionCallbacks
   channelCallbacks?: ChannelPermissionCallbacks
 }
-
-/**
- * Handles the interactive (main-agent) permission flow.
- *
- * Pushes a ToolUseConfirm entry to the confirm queue with callbacks:
- * onAbort, onAllow, onReject, recheckPermission, onUserInteraction.
- *
- * Runs permission hooks and bash classifier checks asynchronously in the
- * background, racing them against user interaction. Uses a resolve-once
- * guard and `userInteracted` flag to prevent multiple resolutions.
- *
- * This function does NOT return a Promise -- it sets up callbacks that
- * eventually call `resolve()` to resolve the outer promise owned by
- * the caller.
- */
 function handleInteractivePermission(
   params: InteractivePermissionParams,
   resolve: (decision: PermissionDecision) => void,
@@ -66,29 +50,19 @@ function handleInteractivePermission(
     bridgeCallbacks,
     channelCallbacks,
   } = params
-
   const { resolve: resolveOnce, isResolved, claim } = createResolveOnce(resolve)
   let userInteracted = false
   let checkmarkTransitionTimer: ReturnType<typeof setTimeout> | undefined
-  // Hoisted so onDismissCheckmark (Esc during checkmark window) can also
-  // remove the abort listener — not just the timer callback.
   let checkmarkAbortHandler: (() => void) | undefined
   const bridgeRequestId = bridgeCallbacks ? randomUUID() : undefined
-  // Hoisted so local/hook/classifier wins can remove the pending channel
-  // entry. No "tell remote to dismiss" equivalent — the text sits in your
-  // phone, and a stale "yes abc123" after local-resolve falls through
-  // tryConsumeReply (entry gone) and gets enqueued as normal chat.
   let channelUnsubscribe: (() => void) | undefined
-
   const permissionPromptStartTimeMs = Date.now()
   const displayInput = result.updatedInput ?? ctx.input
-
   function clearClassifierIndicator(): void {
     if (feature('BASH_CLASSIFIER')) {
       ctx.updateQueueItem({ classifierCheckInProgress: false })
     }
   }
-
   ctx.pushToQueue({
     assistantMessage: ctx.assistantMessage,
     tool: ctx.tool,
@@ -106,12 +80,6 @@ function handleInteractivePermission(
         }
       : {}),
     onUserInteraction() {
-      // Called when user starts interacting with the permission dialog
-      // (e.g., arrow keys, tab, typing feedback)
-      // Hide the classifier indicator since auto-approve is no longer possible
-      //
-      // Grace period: ignore interactions in the first 200ms to prevent
-      // accidental keypresses from canceling the classifier prematurely
       const GRACE_PERIOD_MS = 200
       if (Date.now() - permissionPromptStartTimeMs < GRACE_PERIOD_MS) {
         return
@@ -157,8 +125,7 @@ function handleInteractivePermission(
       feedback?: string,
       contentBlocks?: ContentBlockParam[],
     ) {
-      if (!claim()) return // atomic check-and-mark before await
-
+      if (!claim()) return 
       if (bridgeCallbacks && bridgeRequestId) {
         bridgeCallbacks.sendResponse(bridgeRequestId, {
           behavior: 'allow',
@@ -168,7 +135,6 @@ function handleInteractivePermission(
         bridgeCallbacks.cancelRequest(bridgeRequestId)
       }
       channelUnsubscribe?.()
-
       resolveOnce(
         await ctx.handleUserAllow(
           updatedInput,
@@ -182,7 +148,6 @@ function handleInteractivePermission(
     },
     onReject(feedback?: string, contentBlocks?: ContentBlockParam[]) {
       if (!claim()) return
-
       if (bridgeCallbacks && bridgeRequestId) {
         bridgeCallbacks.sendResponse(bridgeRequestId, {
           behavior: 'deny',
@@ -191,7 +156,6 @@ function handleInteractivePermission(
         bridgeCallbacks.cancelRequest(bridgeRequestId)
       }
       channelUnsubscribe?.()
-
       ctx.logDecision(
         {
           decision: 'reject',
@@ -211,14 +175,6 @@ function handleInteractivePermission(
         ctx.toolUseID,
       )
       if (freshResult.behavior === 'allow') {
-        // claim() (atomic check-and-mark), not isResolved() — the async
-        // hasPermissionsToUseTool call above opens a window where CCR
-        // could have responded in flight. Matches onAllow/onReject/hook
-        // paths. cancelRequest tells CCR to dismiss its prompt — without
-        // it, the web UI shows a stale prompt for a tool that's already
-        // executing (particularly visible when recheck is triggered by
-        // a CCR-initiated mode switch, the very case this callback exists
-        // for after useReplBridge started calling it).
         if (!claim()) return
         if (bridgeCallbacks && bridgeRequestId) {
           bridgeCallbacks.cancelRequest(bridgeRequestId)
@@ -230,17 +186,6 @@ function handleInteractivePermission(
       }
     },
   })
-
-  // Race 4: Bridge permission response from CCR (Open Code CLI)
-  // When the bridge is connected, send the permission request to CCR and
-  // subscribe for a response. Whichever side (CLI or CCR) responds first
-  // wins via claim().
-  //
-  // All tools are forwarded — CCR's generic allow/deny modal handles any
-  // tool, and can return `updatedInput` when it has a dedicated renderer
-  // (e.g. plan edit). Tools whose local dialog injects fields (ReviewArtifact
-  // `selected`, AskUserQuestion `answers`) tolerate the field being missing
-  // so generic remote approval degrades gracefully instead of throwing.
   if (bridgeCallbacks && bridgeRequestId) {
     bridgeCallbacks.sendRequest(
       bridgeRequestId,
@@ -251,18 +196,16 @@ function handleInteractivePermission(
       result.suggestions,
       result.blockedPath,
     )
-
     const signal = ctx.toolUseContext.abortController.signal
     const unsubscribe = bridgeCallbacks.onResponse(
       bridgeRequestId,
       response => {
-        if (!claim()) return // Local user/hook/classifier already responded
+        if (!claim()) return 
         signal.removeEventListener('abort', unsubscribe)
         clearClassifierChecking(ctx.toolUseID)
         clearClassifierIndicator()
         ctx.removeFromQueue()
         channelUnsubscribe?.()
-
         if (response.behavior === 'allow') {
           if (response.updatedPermissions?.length) {
             void ctx.persistPermissions(response.updatedPermissions)
@@ -293,26 +236,8 @@ function handleInteractivePermission(
         }
       },
     )
-
     signal.addEventListener('abort', unsubscribe, { once: true })
   }
-
-  // Channel permission relay — races alongside the bridge block above. Send a
-  // permission prompt to every active channel (Telegram, iMessage, etc.) via
-  // its MCP send_message tool, then race the reply against local/bridge/hook/
-  // classifier. The inbound "yes abc123" is intercepted in the notification
-  // handler (useManageMCPConnections.ts) BEFORE enqueue, so it never reaches
-  // Open Code CLI as a conversation turn.
-  //
-  // Unlike the bridge block, this still guards on `requiresUserInteraction` —
-  // channel replies are pure yes/no with no `updatedInput` path. In practice
-  // the guard is dead code today: all three `requiresUserInteraction` tools
-  // (ExitPlanMode, AskUserQuestion, ReviewArtifact) return `isEnabled()===false`
-  // when channels are configured, so they never reach this handler.
-  //
-  // Fire-and-forget send: if callTool fails (channel down, tool missing),
-  // the subscription never fires and another racer wins. Graceful degradation
-  // — the local dialog is always there as the floor.
   if (
     (feature('KAIROS') || feature('KAIROS_CHANNELS')) &&
     channelCallbacks &&
@@ -324,22 +249,15 @@ function handleInteractivePermission(
       ctx.toolUseContext.getAppState().mcp.clients,
       name => findChannelEntry(name, allowedChannels) !== undefined,
     )
-
     if (channelClients.length > 0) {
-      // Outbound is structured too (Kenneth's symmetry ask) — server owns
-      // message formatting for its platform (Telegram markdown, iMessage
-      // rich text, Discord embed). CC sends the RAW parts; server composes.
-      // The old callTool('send_message', {text,content,message}) triple-key
-      // hack is gone — no more guessing which arg name each plugin takes.
       const params: ChannelPermissionRequestParams = {
         request_id: channelRequestId,
         tool_name: ctx.tool.name,
         description,
         input_preview: truncateForPreview(displayInput),
       }
-
       for (const client of channelClients) {
-        if (client.type !== 'connected') continue // refine for TS
+        if (client.type !== 'connected') continue 
         void client.client
           .notification({
             method: CHANNEL_PERMISSION_REQUEST_METHOD,
@@ -352,27 +270,18 @@ function handleInteractivePermission(
             )
           })
       }
-
       const channelSignal = ctx.toolUseContext.abortController.signal
-      // Wrap so BOTH the map delete AND the abort-listener teardown happen
-      // at every call site. The 6 channelUnsubscribe?.() sites after local/
-      // hook/classifier wins previously only deleted the map entry — the
-      // dead closure stayed registered on the session-scoped abort signal
-      // until the session ended. Not a functional bug (Map.delete is
-      // idempotent), but it held the closure alive.
       const mapUnsub = channelCallbacks.onResponse(
         channelRequestId,
         response => {
-          if (!claim()) return // Another racer won
-          channelUnsubscribe?.() // both: map delete + listener remove
+          if (!claim()) return 
+          channelUnsubscribe?.() 
           clearClassifierChecking(ctx.toolUseID)
           clearClassifierIndicator()
           ctx.removeFromQueue()
-          // Bridge is the other remote — tell it we're done.
           if (bridgeCallbacks && bridgeRequestId) {
             bridgeCallbacks.cancelRequest(bridgeRequestId)
           }
-
           if (response.behavior === 'allow') {
             ctx.logDecision(
               {
@@ -400,17 +309,12 @@ function handleInteractivePermission(
         mapUnsub()
         channelSignal.removeEventListener('abort', channelUnsubscribe!)
       }
-
       channelSignal.addEventListener('abort', channelUnsubscribe, {
         once: true,
       })
     }
   }
-
-  // Skip hooks if they were already awaited in the coordinator branch above
   if (!awaitAutomatedChecksBeforeDialog) {
-    // Execute PermissionRequest hooks asynchronously
-    // If hook returns a decision before user responds, apply it
     void (async () => {
       if (isResolved()) return
       const currentAppState = ctx.toolUseContext.getAppState()
@@ -429,17 +333,12 @@ function handleInteractivePermission(
       resolveOnce(hookDecision)
     })()
   }
-
-  // Execute bash classifier check asynchronously (if applicable)
   if (
     feature('BASH_CLASSIFIER') &&
     result.pendingClassifierCheck &&
     ctx.tool.name === BASH_TOOL_NAME &&
     !awaitAutomatedChecksBeforeDialog
   ) {
-    // UI indicator for "classifier running" — set here (not in
-    // toolExecution.ts) so commands that auto-allow via prefix rules
-    // don't flash the indicator for a split second before allow returns.
     setClassifierChecking(ctx.toolUseID)
     void executeAsyncClassifierCheck(
       result.pendingClassifierCheck,
@@ -458,15 +357,12 @@ function handleInteractivePermission(
           }
           channelUnsubscribe?.()
           clearClassifierChecking(ctx.toolUseID)
-
           const matchedRule =
             decisionReason.type === 'classifier'
               ? (decisionReason.reason.match(
                   /^Allowed by prompt rule: "(.+)"$/,
                 )?.[1] ?? decisionReason.reason)
               : undefined
-
-          // Show auto-approved transition with dimmed options
           if (feature('TRANSCRIPT_CLASSIFIER')) {
             ctx.updateQueueItem({
               classifierCheckInProgress: false,
@@ -474,7 +370,6 @@ function handleInteractivePermission(
               classifierMatchedRule: matchedRule,
             })
           }
-
           if (
             feature('TRANSCRIPT_CLASSIFIER') &&
             decisionReason.type === 'classifier'
@@ -485,24 +380,16 @@ function handleInteractivePermission(
               setClassifierApproval(ctx.toolUseID, matchedRule)
             }
           }
-
           ctx.logDecision(
             { decision: 'accept', source: { type: 'classifier' } },
             { permissionPromptStartTimeMs },
           )
           resolveOnce(ctx.buildAllow(ctx.input, { decisionReason }))
-
-          // Keep checkmark visible, then remove dialog.
-          // 3s if terminal is focused (user can see it), 1s if not.
-          // User can dismiss early with Esc via onDismissCheckmark.
           const signal = ctx.toolUseContext.abortController.signal
           checkmarkAbortHandler = () => {
             if (checkmarkTransitionTimer) {
               clearTimeout(checkmarkTransitionTimer)
               checkmarkTransitionTimer = undefined
-              // Sibling Bash error can fire this (StreamingToolExecutor
-              // cascades via siblingAbortController) — must drop the
-              // cosmetic ✓ dialog or it blocks the next queued item.
               ctx.removeFromQueue()
             }
           }
@@ -521,16 +408,11 @@ function handleInteractivePermission(
         },
       },
     ).catch(error => {
-      // Log classifier API errors for debugging but don't propagate them as interruptions
-      // These errors can be network failures, rate limits, or model issues - not user cancellations
       logForDebugging(`Async classifier check failed: ${errorMessage(error)}`, {
         level: 'error',
       })
     })
   }
 }
-
-// --
-
 export { handleInteractivePermission }
 export type { InteractivePermissionParams }

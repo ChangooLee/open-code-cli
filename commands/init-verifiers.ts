@@ -244,7 +244,6 @@ allowed-tools:
   - Grep
 \`\`\`
 
-
 ## Phase 5: Confirm Creation
 
 After writing the skill file(s), inform the user:

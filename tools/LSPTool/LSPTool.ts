@@ -49,13 +49,7 @@ import {
   renderToolUseMessage,
   userFacingName,
 } from './UI.js'
-
 const MAX_LSP_FILE_SIZE_BYTES = 10_000_000
-
-/**
- * Tool-compatible input schema (regular ZodObject instead of discriminated union)
- * We validate against the discriminated union in validateInput for better error messages
- */
 const inputSchema = lazySchema(() =>
   z.strictObject({
     operation: z
@@ -85,7 +79,6 @@ const inputSchema = lazySchema(() =>
   }),
 )
 type InputSchema = ReturnType<typeof inputSchema>
-
 const outputSchema = lazySchema(() =>
   z.object({
     operation: z
@@ -120,10 +113,8 @@ const outputSchema = lazySchema(() =>
   }),
 )
 type OutputSchema = ReturnType<typeof outputSchema>
-
 export type Output = z.infer<OutputSchema>
 export type Input = z.infer<InputSchema>
-
 export const LSPTool = buildTool({
   name: LSP_TOOL_NAME,
   searchHint: 'code intelligence (definitions, references, symbols, hover)',
@@ -153,7 +144,6 @@ export const LSPTool = buildTool({
     return expandPath(filePath)
   },
   async validateInput(input: Input): Promise<ValidationResult> {
-    // First validate against the discriminated union for better type safety
     const parseResult = lspToolInputSchema().safeParse(input)
     if (!parseResult.success) {
       return {
@@ -162,16 +152,11 @@ export const LSPTool = buildTool({
         errorCode: 3,
       }
     }
-
-    // Validate file exists and is a regular file
     const fs = getFsImplementation()
     const absolutePath = expandPath(input.filePath)
-
-    // SECURITY: Skip filesystem operations for UNC paths to prevent NTLM credential leaks.
     if (absolutePath.startsWith('\\\\') || absolutePath.startsWith('//')) {
       return { result: true }
     }
-
     let stats
     try {
       stats = await fs.stat(absolutePath)
@@ -184,7 +169,6 @@ export const LSPTool = buildTool({
         }
       }
       const err = toError(error)
-      // Log filesystem access errors for tracking
       logError(
         new Error(
           `Failed to access file stats for LSP operation on ${input.filePath}: ${err.message}`,
@@ -196,7 +180,6 @@ export const LSPTool = buildTool({
         errorCode: 4,
       }
     }
-
     if (!stats.isFile()) {
       return {
         result: false,
@@ -204,7 +187,6 @@ export const LSPTool = buildTool({
         errorCode: 2,
       }
     }
-
     return { result: true }
   },
   async checkPermissions(input, context): Promise<PermissionDecision> {
@@ -224,22 +206,15 @@ export const LSPTool = buildTool({
   async call(input: Input, _context) {
     const absolutePath = expandPath(input.filePath)
     const cwd = getCwd()
-
-    // Wait for initialization if it's still pending
-    // This prevents returning "no server available" before init completes
     const status = getInitializationStatus()
     if (status.status === 'pending') {
       await waitForInitialization()
     }
-
-    // Get the LSP server manager
     const manager = getLspServerManager()
     if (!manager) {
-      // Log this system-level failure for tracking
       logError(
         new Error('LSP server manager not initialized when tool was called'),
       )
-
       const output: Output = {
         operation: input.operation,
         result:
@@ -250,14 +225,8 @@ export const LSPTool = buildTool({
         data: output,
       }
     }
-
-    // Map operation to LSP method and prepare params
     const { method, params } = getMethodAndParams(input, absolutePath)
-
     try {
-      // Ensure file is open in LSP server before making requests
-      // Most LSP servers require textDocument/didOpen before operations
-      // Only read the file if it's not already open to avoid unnecessary I/O
       if (!manager.isFileOpen(absolutePath)) {
         const handle = await open(absolutePath, 'r')
         try {
@@ -276,16 +245,11 @@ export const LSPTool = buildTool({
           await handle.close()
         }
       }
-
-      // Send request to LSP server
       let result = await manager.sendRequest(absolutePath, method, params)
-
       if (result === undefined) {
-        // Log for diagnostic purposes - helps track usage patterns and potential bugs
         logForDebugging(
           `No LSP server available for file type ${path.extname(absolutePath)} for operation ${input.operation} on file ${input.filePath}`,
         )
-
         const output: Output = {
           operation: input.operation,
           result: `No LSP server available for file type: ${path.extname(absolutePath)}`,
@@ -295,10 +259,6 @@ export const LSPTool = buildTool({
           data: output,
         }
       }
-
-      // For incomingCalls and outgoingCalls, we need a two-step process:
-      // 1. First get CallHierarchyItem(s) from prepareCallHierarchy
-      // 2. Then request the actual calls using that item
       if (
         input.operation === 'incomingCalls' ||
         input.operation === 'outgoingCalls'
@@ -314,26 +274,19 @@ export const LSPTool = buildTool({
           }
           return { data: output }
         }
-
-        // Use the first call hierarchy item to request calls
         const callMethod =
           input.operation === 'incomingCalls'
             ? 'callHierarchy/incomingCalls'
             : 'callHierarchy/outgoingCalls'
-
         result = await manager.sendRequest(absolutePath, callMethod, {
           item: callItems[0],
         })
-
         if (result === undefined) {
           logForDebugging(
             `LSP server returned undefined for ${callMethod} on ${input.filePath}`,
           )
-          // Continue to formatter which will handle empty/null gracefully
         }
       }
-
-      // Filter out gitignored files from location-based results
       if (
         result &&
         Array.isArray(result) &&
@@ -343,7 +296,6 @@ export const LSPTool = buildTool({
           input.operation === 'workspaceSymbol')
       ) {
         if (input.operation === 'workspaceSymbol') {
-          // SymbolInformation has location.uri — filter by extracting locations
           const symbols = result as SymbolInformation[]
           const locations = symbols
             .filter(s => s?.location?.uri)
@@ -357,7 +309,6 @@ export const LSPTool = buildTool({
             s => !s?.location?.uri || filteredUris.has(s.location.uri),
           )
         } else {
-          // Location[] or (Location | LocationLink)[]
           const locations = (result as (Location | LocationLink)[]).map(
             toLocation,
           )
@@ -372,14 +323,11 @@ export const LSPTool = buildTool({
           })
         }
       }
-
-      // Format the result based on operation type
       const { formatted, resultCount, fileCount } = formatResult(
         input.operation,
         result,
         cwd,
       )
-
       const output: Output = {
         operation: input.operation,
         result: formatted,
@@ -387,21 +335,17 @@ export const LSPTool = buildTool({
         resultCount,
         fileCount,
       }
-
       return {
         data: output,
       }
     } catch (error) {
       const err = toError(error)
       const errorMessage = err.message
-
-      // Log error for tracking
       logError(
         new Error(
           `LSP tool request failed for ${input.operation} on ${input.filePath}: ${errorMessage}`,
         ),
       )
-
       const output: Output = {
         operation: input.operation,
         result: `Error performing ${input.operation}: ${errorMessage}`,
@@ -420,21 +364,15 @@ export const LSPTool = buildTool({
     }
   },
 } satisfies ToolDef<InputSchema, Output>)
-
-/**
- * Maps LSPTool operation to LSP method and params
- */
 function getMethodAndParams(
   input: Input,
   absolutePath: string,
 ): { method: string; params: unknown } {
   const uri = pathToFileURL(absolutePath).href
-  // Convert from 1-based (user-friendly) to 0-based (LSP protocol)
   const position = {
     line: input.line - 1,
     character: input.character - 1,
   }
-
   switch (input.operation) {
     case 'goToDefinition':
       return {
@@ -492,8 +430,6 @@ function getMethodAndParams(
         },
       }
     case 'incomingCalls':
-      // For incoming/outgoing calls, we first need to prepare the call hierarchy
-      // The LSP server will return CallHierarchyItem(s) that we pass to the calls request
       return {
         method: 'textDocument/prepareCallHierarchy',
         params: {
@@ -511,10 +447,6 @@ function getMethodAndParams(
       }
   }
 }
-
-/**
- * Counts the total number of symbols including nested children
- */
 function countSymbols(symbols: DocumentSymbol[]): number {
   let count = symbols.length
   for (const symbol of symbols) {
@@ -524,35 +456,20 @@ function countSymbols(symbols: DocumentSymbol[]): number {
   }
   return count
 }
-
-/**
- * Counts unique files from an array of locations
- */
 function countUniqueFiles(locations: Location[]): number {
   return new Set(locations.map(loc => loc.uri)).size
 }
-
-/**
- * Extracts a file path from a file:// URI, decoding percent-encoded characters.
- */
 function uriToFilePath(uri: string): string {
   let filePath = uri.replace(/^file:\/\//, '')
-  // On Windows, file:///C:/path becomes /C:/path — strip the leading slash
   if (/^\/[A-Za-z]:/.test(filePath)) {
     filePath = filePath.slice(1)
   }
   try {
     filePath = decodeURIComponent(filePath)
   } catch {
-    // Use un-decoded path if malformed
   }
   return filePath
 }
-
-/**
- * Filters out locations whose file paths are gitignored.
- * Uses `git check-ignore` with batched path arguments for efficiency.
- */
 async function filterGitIgnoredLocations<T extends Location>(
   locations: T[],
   cwd: string,
@@ -560,22 +477,16 @@ async function filterGitIgnoredLocations<T extends Location>(
   if (locations.length === 0) {
     return locations
   }
-
-  // Collect unique file paths from URIs
   const uriToPath = new Map<string, string>()
   for (const loc of locations) {
     if (loc.uri && !uriToPath.has(loc.uri)) {
       uriToPath.set(loc.uri, uriToFilePath(loc.uri))
     }
   }
-
   const uniquePaths = uniq(uriToPath.values())
   if (uniquePaths.length === 0) {
     return locations
   }
-
-  // Batch check paths with git check-ignore
-  // Exit code 0 = at least one path is ignored, 1 = none ignored, 128 = not a git repo
   const ignoredPaths = new Set<string>()
   const BATCH_SIZE = 50
   for (let i = 0; i < uniquePaths.length; i += BATCH_SIZE) {
@@ -589,7 +500,6 @@ async function filterGitIgnoredLocations<T extends Location>(
         timeout: 5_000,
       },
     )
-
     if (result.code === 0 && result.stdout) {
       for (const line of result.stdout.split('\n')) {
         const trimmed = line.trim()
@@ -599,27 +509,17 @@ async function filterGitIgnoredLocations<T extends Location>(
       }
     }
   }
-
   if (ignoredPaths.size === 0) {
     return locations
   }
-
   return locations.filter(loc => {
     const filePath = uriToPath.get(loc.uri)
     return !filePath || !ignoredPaths.has(filePath)
   })
 }
-
-/**
- * Checks if item is LocationLink (has targetUri) vs Location (has uri)
- */
 function isLocationLink(item: Location | LocationLink): item is LocationLink {
   return 'targetUri' in item
 }
-
-/**
- * Converts LocationLink to Location format for uniform handling
- */
 function toLocation(item: Location | LocationLink): Location {
   if (isLocationLink(item)) {
     return {
@@ -629,10 +529,6 @@ function toLocation(item: Location | LocationLink): Location {
   }
   return item
 }
-
-/**
- * Formats LSP result based on operation type and extracts summary counts
- */
 function formatResult(
   operation: Input['operation'],
   result: unknown,
@@ -640,17 +536,12 @@ function formatResult(
 ): { formatted: string; resultCount: number; fileCount: number } {
   switch (operation) {
     case 'goToDefinition': {
-      // Handle both Location and LocationLink formats
       const rawResults = Array.isArray(result)
         ? result
         : result
           ? [result as Location | LocationLink]
           : []
-
-      // Convert LocationLinks to Locations for uniform handling
       const locations = rawResults.map(toLocation)
-
-      // Log and filter out locations with undefined uris
       const invalidLocations = locations.filter(loc => !loc || !loc.uri)
       if (invalidLocations.length > 0) {
         logError(
@@ -660,7 +551,6 @@ function formatResult(
           ),
         )
       }
-
       const validLocations = locations.filter(loc => loc && loc.uri)
       return {
         formatted: formatGoToDefinitionResult(
@@ -678,8 +568,6 @@ function formatResult(
     }
     case 'findReferences': {
       const locations = (result as Location[]) || []
-
-      // Log and filter out locations with undefined uris
       const invalidLocations = locations.filter(loc => !loc || !loc.uri)
       if (invalidLocations.length > 0) {
         logError(
@@ -689,7 +577,6 @@ function formatResult(
           ),
         )
       }
-
       const validLocations = locations.filter(loc => loc && loc.uri)
       return {
         formatted: formatFindReferencesResult(result as Location[] | null, cwd),
@@ -705,12 +592,9 @@ function formatResult(
       }
     }
     case 'documentSymbol': {
-      // LSP allows documentSymbol to return either DocumentSymbol[] or SymbolInformation[]
       const symbols = (result as (DocumentSymbol | SymbolInformation)[]) || []
-      // Detect format: DocumentSymbol has 'range', SymbolInformation has 'location'
       const isDocumentSymbol =
         symbols.length > 0 && symbols[0] && 'range' in symbols[0]
-      // Count symbols - DocumentSymbol can have nested children, SymbolInformation is flat
       const count = isDocumentSymbol
         ? countSymbols(symbols as DocumentSymbol[])
         : symbols.length
@@ -725,8 +609,6 @@ function formatResult(
     }
     case 'workspaceSymbol': {
       const symbols = (result as SymbolInformation[]) || []
-
-      // Log and filter out symbols with undefined location.uri
       const invalidSymbols = symbols.filter(
         sym => !sym || !sym.location || !sym.location.uri,
       )
@@ -738,7 +620,6 @@ function formatResult(
           ),
         )
       }
-
       const validSymbols = symbols.filter(
         sym => sym && sym.location && sym.location.uri,
       )
@@ -753,17 +634,12 @@ function formatResult(
       }
     }
     case 'goToImplementation': {
-      // Handle both Location and LocationLink formats (same as goToDefinition)
       const rawResults = Array.isArray(result)
         ? result
         : result
           ? [result as Location | LocationLink]
           : []
-
-      // Convert LocationLinks to Locations for uniform handling
       const locations = rawResults.map(toLocation)
-
-      // Log and filter out locations with undefined uris
       const invalidLocations = locations.filter(loc => !loc || !loc.uri)
       if (invalidLocations.length > 0) {
         logError(
@@ -773,10 +649,8 @@ function formatResult(
           ),
         )
       }
-
       const validLocations = locations.filter(loc => loc && loc.uri)
       return {
-        // Reuse goToDefinition formatter since the result format is identical
         formatted: formatGoToDefinitionResult(
           result as
             | Location
@@ -827,31 +701,16 @@ function formatResult(
     }
   }
 }
-
-/**
- * Counts unique files from CallHierarchyItem array
- * Filters out items with undefined URIs
- */
 function countUniqueFilesFromCallItems(items: CallHierarchyItem[]): number {
   const validUris = items.map(item => item.uri).filter(uri => uri)
   return new Set(validUris).size
 }
-
-/**
- * Counts unique files from CallHierarchyIncomingCall array
- * Filters out calls with undefined URIs
- */
 function countUniqueFilesFromIncomingCalls(
   calls: CallHierarchyIncomingCall[],
 ): number {
   const validUris = calls.map(call => call.from?.uri).filter(uri => uri)
   return new Set(validUris).size
 }
-
-/**
- * Counts unique files from CallHierarchyOutgoingCall array
- * Filters out calls with undefined URIs
- */
 function countUniqueFilesFromOutgoingCalls(
   calls: CallHierarchyOutgoingCall[],
 ): number {

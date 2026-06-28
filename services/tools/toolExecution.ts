@@ -129,24 +129,8 @@ import {
   runPostToolUseHooks,
   runPreToolUseHooks,
 } from './toolHooks.js'
-
-/** Minimum total hook duration (ms) to show inline timing summary */
 export const HOOK_TIMING_DISPLAY_THRESHOLD_MS = 500
-/** Log a debug warning when hooks/permission-decision block for this long. Matches
- * BashTool's PROGRESS_THRESHOLD_MS — the collapsed view feels stuck past this. */
 const SLOW_PHASE_LOG_THRESHOLD_MS = 2000
-
-/**
- * Classify a tool execution error into a telemetry-safe string.
- *
- * In minified/external builds, `error.constructor.name` is mangled into
- * short identifiers like "nJT" or "Chq" — useless for diagnostics.
- * This function extracts structured, telemetry-safe information instead:
- * - TelemetrySafeError: use its telemetryMessage (already vetted)
- * - Node.js fs errors: log the error code (ENOENT, EACCES, etc.)
- * - Known error types: use their unminified name
- * - Fallback: "Error" (better than a mangled 3-char identifier)
- */
 export function classifyToolError(error: unknown): string {
   if (
     error instanceof TelemetrySafeError_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS
@@ -154,14 +138,10 @@ export function classifyToolError(error: unknown): string {
     return error.telemetryMessage.slice(0, 200)
   }
   if (error instanceof Error) {
-    // Node.js filesystem errors have a `code` property (ENOENT, EACCES, etc.)
-    // These are safe to log and much more useful than the constructor name.
     const errnoCode = getErrnoCode(error)
     if (typeof errnoCode === 'string') {
       return `Error:${errnoCode}`
     }
-    // ShellError, ImageSizeError, etc. have stable `.name` properties
-    // that survive minification (they're set in the constructor).
     if (error.name && error.name !== 'Error' && error.name.length > 3) {
       return error.name.slice(0, 60)
     }
@@ -169,15 +149,6 @@ export function classifyToolError(error: unknown): string {
   }
   return 'UnknownError'
 }
-
-/**
- * Map a rule's origin to the documented OTel `source` vocabulary, matching
- * the interactive path's semantics (permissionLogging.ts:81): session-scoped
- * grants are temporary, on-disk grants are permanent, and user-authored
- * denies are user_reject regardless of persistence. Everything the user
- * didn't write (cliArg, policySettings, projectSettings, flagSettings) is
- * config.
- */
 function ruleSourceToOTelSource(
   ruleSource: string,
   behavior: 'allow' | 'deny',
@@ -192,18 +163,6 @@ function ruleSourceToOTelSource(
       return 'config'
   }
 }
-
-/**
- * Map a PermissionDecisionReason to the OTel `source` label for the
- * non-interactive tool_decision path, staying within the documented
- * vocabulary (config, hook, user_permanent, user_temporary, user_reject).
- *
- * For permissionPromptTool, the SDK host may set decisionClassification on
- * the PermissionResult to tell us exactly what happened (once vs always vs
- * cache hit — the host knows, we can't tell from {behavior:'allow'} alone).
- * Without it, we fall back conservatively: allow → user_temporary,
- * deny → user_reject.
- */
 function decisionReasonToOTelSource(
   reason: PermissionDecisionReason | undefined,
   behavior: 'allow' | 'deny',
@@ -213,9 +172,6 @@ function decisionReasonToOTelSource(
   }
   switch (reason.type) {
     case 'permissionPromptTool': {
-      // toolResult is typed `unknown` on PermissionDecisionReason but carries
-      // the parsed Output from PermissionPromptToolResultSchema. Narrow at
-      // runtime rather than widen the cross-file type.
       const toolResult = reason.toolResult as
         | { decisionClassification?: string }
         | undefined
@@ -248,7 +204,6 @@ function decisionReasonToOTelSource(
     }
   }
 }
-
 function getNextImagePasteId(messages: Message[]): number {
   let maxId = 0
   for (const message of messages) {
@@ -260,7 +215,6 @@ function getNextImagePasteId(messages: Message[]): number {
   }
   return maxId + 1
 }
-
 export type MessageUpdateLazy<M extends Message = Message> = {
   message: M
   contextModifier?: {
@@ -268,7 +222,6 @@ export type MessageUpdateLazy<M extends Message = Message> = {
     modifyContext: (context: ToolUseContext) => ToolUseContext
   }
 }
-
 export type McpServerType =
   | 'stdio'
   | 'sse'
@@ -279,7 +232,6 @@ export type McpServerType =
   | 'ws-ide'
   | 'openCodeCli-proxy'
   | undefined
-
 function findMcpServerConnection(
   toolName: string,
   mcpClients: MCPServerConnection[],
@@ -287,42 +239,24 @@ function findMcpServerConnection(
   if (!toolName.startsWith('mcp__')) {
     return undefined
   }
-
   const mcpInfo = mcpInfoFromString(toolName)
   if (!mcpInfo) {
     return undefined
   }
-
-  // mcpInfo.serverName is normalized (e.g., "open_code_cli_ai_Slack"), but client.name
-  // is the original name (e.g., "Open Code CLI Slack"). Normalize both for comparison.
   return mcpClients.find(
     client => normalizeNameForMCP(client.name) === mcpInfo.serverName,
   )
 }
-
-/**
- * Extracts the MCP server transport type from a tool name.
- * Returns the server type (stdio, sse, http, ws, sdk, etc.) for MCP tools,
- * or undefined for built-in tools.
- */
 function getMcpServerType(
   toolName: string,
   mcpClients: MCPServerConnection[],
 ): McpServerType {
   const serverConnection = findMcpServerConnection(toolName, mcpClients)
-
   if (serverConnection?.type === 'connected') {
-    // Handle stdio configs where type field is optional (defaults to 'stdio')
     return serverConnection.config.type ?? 'stdio'
   }
-
   return undefined
 }
-
-/**
- * Extracts the MCP server base URL for a tool by looking up its server connection.
- * Returns undefined for stdio servers, built-in tools, or if the server is not connected.
- */
 function getMcpServerBaseUrlFromToolName(
   toolName: string,
   mcpClients: MCPServerConnection[],
@@ -333,7 +267,6 @@ function getMcpServerBaseUrlFromToolName(
   }
   return getLoggingSafeMcpBaseUrl(serverConnection.config)
 }
-
 export async function* runToolUse(
   toolUse: ToolUseBlock,
   assistantMessage: AssistantMessage,
@@ -341,15 +274,9 @@ export async function* runToolUse(
   toolUseContext: ToolUseContext,
 ): AsyncGenerator<MessageUpdateLazy, void> {
   const toolName = toolUse.name
-  // First try to find in the available tools (what the model sees)
   let tool = findToolByName(toolUseContext.options.tools, toolName)
-
-  // If not found, check if it's a deprecated tool being called by alias
-  // (e.g., old transcripts calling "KillShell" which is now an alias for "TaskStop")
-  // Only fall back for tools where the name matches an alias, not the primary name
   if (!tool) {
     const fallbackTool = findToolByName(getAllBaseTools(), toolName)
-    // Only use fallback if the tool was found via alias (deprecated name)
     if (fallbackTool && fallbackTool.aliases?.includes(toolName)) {
       tool = fallbackTool
     }
@@ -364,8 +291,6 @@ export async function* runToolUse(
     toolName,
     toolUseContext.options.mcpClients,
   )
-
-  // Check if the tool exists
   if (!tool) {
     const sanitizedToolName = sanitizeToolNameForAnalytics(toolName)
     logForDebugging(`Unknown tool ${toolName}: ${toolUse.id}`)
@@ -409,7 +334,6 @@ export async function* runToolUse(
     }
     return
   }
-
   const toolInput = toolUse.input as { [key: string]: string }
   try {
     if (toolUseContext.abortController.signal.aborted) {
@@ -418,7 +342,6 @@ export async function* runToolUse(
         toolUseID:
           toolUse.id as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
         isMcp: tool.isMcp ?? false,
-
         queryChainId: toolUseContext.queryTracking
           ?.chainId as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
         queryDepth: toolUseContext.queryTracking?.depth,
@@ -451,7 +374,6 @@ export async function* runToolUse(
       }
       return
     }
-
     for await (const update of streamedCheckPermissionsAndCallTool(
       tool,
       toolUse.id,
@@ -471,7 +393,6 @@ export async function* runToolUse(
     const errorMessage = error instanceof Error ? error.message : String(error)
     const toolInfo = tool ? ` (${tool.name})` : ''
     const detailedError = `Error calling tool${toolInfo}: ${errorMessage}`
-
     yield {
       message: createUserMessage({
         content: [
@@ -488,7 +409,6 @@ export async function* runToolUse(
     }
   }
 }
-
 function streamedCheckPermissionsAndCallTool(
   tool: Tool,
   toolUseID: string,
@@ -501,11 +421,6 @@ function streamedCheckPermissionsAndCallTool(
   mcpServerType: McpServerType,
   mcpServerBaseUrl: ReturnType<typeof getLoggingSafeMcpBaseUrl>,
 ): AsyncIterable<MessageUpdateLazy> {
-  // This is a bit of a hack to get progress events and final results
-  // into a single async iterable.
-  //
-  // Ideally the progress reporting and tool call reporting would
-  // be via separate mechanisms.
   const stream = new Stream<MessageUpdateLazy>()
   checkPermissionsAndCallTool(
     tool,
@@ -524,7 +439,6 @@ function streamedCheckPermissionsAndCallTool(
           messageId as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
         toolName: sanitizeToolNameForAnalytics(tool.name),
         isMcp: tool.isMcp ?? false,
-
         queryChainId: toolUseContext.queryTracking
           ?.chainId as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
         queryDepth: toolUseContext.queryTracking?.depth,
@@ -568,22 +482,11 @@ function streamedCheckPermissionsAndCallTool(
     })
   return stream
 }
-
-/**
- * Appended to Zod errors when a deferred tool wasn't in the discovered-tool
- * set — re-runs the open-code-cli.ts schema-filter scan dispatch-time to detect the
- * mismatch. The raw Zod error ("expected array, got string") doesn't tell the
- * model to re-load the tool; this hint does. Null if the schema was sent.
- */
 export function buildSchemaNotSentHint(
   tool: Tool,
   messages: Message[],
   tools: readonly { name: string }[],
 ): string | null {
-  // Optimistic gating — restoring open-code-cli.ts's full useToolSearch
-  // computation is fragile. These two gates prevent pointing at a ToolSearch
-  // that isn't callable; occasional misfires (Haiku, tst-auto below threshold)
-  // cost one extra round-trip on an already-failing path.
   if (!isToolSearchEnabledOptimistic()) return null
   if (!isToolSearchToolAvailable(tools)) return null
   if (!isDeferredTool(tool)) return null
@@ -595,7 +498,6 @@ export function buildSchemaNotSentHint(
     `Load the tool first: call ${TOOL_SEARCH_TOOL_NAME} with query "select:${tool.name}", then retry this call.`
   )
 }
-
 async function checkPermissionsAndCallTool(
   tool: Tool,
   toolUseID: string,
@@ -611,11 +513,9 @@ async function checkPermissionsAndCallTool(
     progress: ToolProgress<ToolProgressData> | ProgressMessage<HookProgress>,
   ) => void,
 ): Promise<MessageUpdateLazy[]> {
-  // Validate input types with zod (surprisingly, the model is not great at generating valid input)
   const parsedInput = tool.inputSchema.safeParse(input)
   if (!parsedInput.success) {
     let errorContent = formatZodValidationError(tool.name, parsedInput.error)
-
     const schemaHint = buildSchemaNotSentHint(
       tool,
       toolUseContext.messages,
@@ -628,7 +528,6 @@ async function checkPermissionsAndCallTool(
       })
       errorContent += schemaHint
     }
-
     logForDebugging(
       `${tool.name} tool input error: ${errorContent.slice(0, 200)}`,
     )
@@ -643,7 +542,6 @@ async function checkPermissionsAndCallTool(
         messageId as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
       toolName: sanitizeToolNameForAnalytics(tool.name),
       isMcp: tool.isMcp ?? false,
-
       queryChainId: toolUseContext.queryTracking
         ?.chainId as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
       queryDepth: toolUseContext.queryTracking?.depth,
@@ -678,8 +576,6 @@ async function checkPermissionsAndCallTool(
       },
     ]
   }
-
-  // Validate input values. Each tool has its own validation logic
   const isValidCall = await tool.validateInput?.(
     parsedInput.data,
     toolUseContext,
@@ -696,7 +592,6 @@ async function checkPermissionsAndCallTool(
         isValidCall.message as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
       errorCode: isValidCall.errorCode,
       isMcp: tool.isMcp ?? false,
-
       queryChainId: toolUseContext.queryTracking
         ?.chainId as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
       queryDepth: toolUseContext.queryTracking?.depth,
@@ -731,12 +626,6 @@ async function checkPermissionsAndCallTool(
       },
     ]
   }
-  // Speculatively start the bash allow classifier check early so it runs in
-  // parallel with pre-tool hooks, deny/ask classifiers, and permission dialog
-  // setup. The UI indicator (setClassifierChecking) is NOT set here — it's
-  // set in interactiveHandler.ts only when the permission check returns `ask`
-  // with a pendingClassifierCheck. This avoids flashing "classifier running"
-  // for commands that auto-allow via prefix rules.
   if (
     tool.name === BASH_TOOL_NAME &&
     parsedInput.data &&
@@ -750,14 +639,7 @@ async function checkPermissionsAndCallTool(
       toolUseContext.options.isNonInteractiveSession,
     )
   }
-
   const resultingMessages = []
-
-  // Defense-in-depth: strip _simulatedSedEdit from model-provided Bash input.
-  // This field is internal-only — it must only be injected by the permission
-  // system (SedEditPermissionRequest) after user approval. If the model supplies
-  // it, the schema's strictObject should already reject it, but we strip here
-  // as a safeguard against future regressions.
   let processedInput = parsedInput.data
   if (
     tool.name === BASH_TOOL_NAME &&
@@ -771,15 +653,6 @@ async function checkPermissionsAndCallTool(
       }
     processedInput = rest as typeof processedInput
   }
-
-  // Backfill legacy/derived fields on a shallow clone so hooks/canUseTool see
-  // them without affecting tool.call(). SendMessageTool adds fields; file
-  // tools overwrite file_path with expandPath — that mutation must not reach
-  // call() because tool results embed the input path verbatim (e.g. "File
-  // created successfully at: {path}"), and changing it alters the serialized
-  // transcript and VCR fixture hashes. If a hook/permission later returns a
-  // fresh updatedInput, callInput converges on it below — that replacement
-  // is intentional and should reach call().
   let callInput = processedInput
   const backfilledClone =
     tool.backfillObservableInput &&
@@ -791,7 +664,6 @@ async function checkPermissionsAndCallTool(
     tool.backfillObservableInput!(backfilledClone as Record<string, unknown>)
     processedInput = backfilledClone
   }
-
   let shouldPreventContinuation = false
   let stopReason: string | undefined
   let hookPermissionResult: PermissionResult | undefined
@@ -832,8 +704,6 @@ async function checkPermissionsAndCallTool(
         hookPermissionResult = result.hookPermissionResult
         break
       case 'hookUpdatedInput':
-        // Hook provided updatedInput without making a permission decision (passthrough)
-        // Update processedInput so it's used in the normal permission flow
         processedInput = result.updatedInput
         break
       case 'preventContinuation':
@@ -868,9 +738,6 @@ async function checkPermissionsAndCallTool(
       { level: 'info' },
     )
   }
-
-  // Emit PreToolUse summary immediately so it's visible while the tool executes.
-  // Use wall-clock time (not sum of individual durations) since hooks run in parallel.
   if (process.env.USER_TYPE === 'ant' && preToolHookInfos.length > 0) {
     if (preToolHookDurationMs > HOOK_TIMING_DISPLAY_THRESHOLD_MS) {
       resultingMessages.push({
@@ -889,7 +756,6 @@ async function checkPermissionsAndCallTool(
       })
     }
   }
-
   const toolAttributes: Record<string, string | number | boolean> = {}
   if (processedInput && typeof processedInput === 'object') {
     if (tool.name === FILE_READ_TOOL_NAME && 'file_path' in processedInput) {
@@ -905,19 +771,14 @@ async function checkPermissionsAndCallTool(
       toolAttributes.full_command = bashInput.command
     }
   }
-
   startToolSpan(
     tool.name,
     toolAttributes,
     isBetaTracingEnabled() ? jsonStringify(processedInput) : undefined,
   )
   startToolBlockedOnUserSpan()
-
-  // Check whether we have permission to use the tool,
-  // and ask the user for permission if we don't
   const permissionMode = toolUseContext.getAppState().toolPermissionContext.mode
   const permissionStart = Date.now()
-
   const resolved = await resolveHookPermissionDecision(
     hookPermissionResult,
     tool,
@@ -930,10 +791,6 @@ async function checkPermissionsAndCallTool(
   const permissionDecision = resolved.decision
   processedInput = resolved.input
   const permissionDurationMs = Date.now() - permissionStart
-  // In auto mode, canUseTool awaits the classifier (side_query) — if that's
-  // slow the collapsed view shows "Running…" with no (Ns) tick since
-  // bash_progress hasn't started yet. Auto-only: in default mode this timer
-  // includes interactive-dialog wait (user think time), which is just noise.
   if (
     permissionDurationMs >= SLOW_PHASE_LOG_THRESHOLD_MS &&
     permissionMode === 'auto'
@@ -944,11 +801,6 @@ async function checkPermissionsAndCallTool(
       { level: 'info' },
     )
   }
-
-  // Emit tool_decision OTel event and code-edit counter if the interactive
-  // permission path didn't already log it (headless mode bypasses permission
-  // logging, so we need to emit both the generic event and the code-edit
-  // counter here)
   if (
     permissionDecision.behavior !== 'ask' &&
     !toolUseContext.toolDecisions?.has(toolUseID)
@@ -964,8 +816,6 @@ async function checkPermissionsAndCallTool(
       source,
       tool_name: sanitizeToolNameForAnalytics(tool.name),
     })
-
-    // Increment code-edit tool decision counter for headless mode
     if (isCodeEditingTool(tool.name)) {
       void buildCodeEditToolAttributes(
         tool,
@@ -975,8 +825,6 @@ async function checkPermissionsAndCallTool(
       ).then(attributes => getCodeEditToolDecisionCounter()?.add(1, attributes))
     }
   }
-
-  // Add message if permission was granted/denied by PermissionRequest hook
   if (
     permissionDecision.decisionReason?.type === 'hook' &&
     permissionDecision.decisionReason.hookName === 'PermissionRequest' &&
@@ -991,18 +839,15 @@ async function checkPermissionsAndCallTool(
       }),
     })
   }
-
   if (permissionDecision.behavior !== 'allow') {
     logForDebugging(`${tool.name} tool permission denied`)
     const decisionInfo = toolUseContext.toolDecisions?.get(toolUseID)
     endToolBlockedOnUserSpan('reject', decisionInfo?.source || 'unknown')
     endToolSpan()
-
     logEvent('open_code_cli_tool_use_can_use_tool_rejected', {
       messageID:
         messageId as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
       toolName: sanitizeToolNameForAnalytics(tool.name),
-
       queryChainId: toolUseContext.queryTracking
         ?.chainId as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
       queryDepth: toolUseContext.queryTracking?.depth,
@@ -1021,12 +866,9 @@ async function checkPermissionsAndCallTool(
       ...mcpToolDetailsForAnalytics(tool.name, mcpServerType, mcpServerBaseUrl),
     })
     let errorMessage = permissionDecision.message
-    // Only use generic "Execution stopped" message if we don't have a detailed hook message
     if (shouldPreventContinuation && !errorMessage) {
       errorMessage = `Execution stopped by PreToolUse hook${stopReason ? `: ${stopReason}` : ''}`
     }
-
-    // Build top-level content: tool_result (text-only for is_error compatibility) + images alongside
     const messageContent: ContentBlockParam[] = [
       {
         type: 'tool_result',
@@ -1035,8 +877,6 @@ async function checkPermissionsAndCallTool(
         tool_use_id: toolUseID,
       },
     ]
-
-    // Add image blocks at top level (not inside tool_result, which rejects non-text with is_error)
     const rejectContentBlocks =
       permissionDecision.behavior === 'ask'
         ? permissionDecision.contentBlocks
@@ -1044,8 +884,6 @@ async function checkPermissionsAndCallTool(
     if (rejectContentBlocks?.length) {
       messageContent.push(...rejectContentBlocks)
     }
-
-    // Generate sequential imagePasteIds so each image renders with a distinct label
     let rejectImageIds: number[] | undefined
     if (rejectContentBlocks?.length) {
       const imageCount = count(
@@ -1060,7 +898,6 @@ async function checkPermissionsAndCallTool(
         )
       }
     }
-
     resultingMessages.push({
       message: createUserMessage({
         content: messageContent,
@@ -1069,9 +906,6 @@ async function checkPermissionsAndCallTool(
         sourceToolAssistantUUID: assistantMessage.uuid,
       }),
     })
-
-    // Run PermissionDenied hooks for auto mode classifier denials.
-    // If a hook returns {retry: true}, tell the model it may retry.
     if (
       feature('TRANSCRIPT_CLASSIFIER') &&
       permissionDecision.decisionReason?.type === 'classifier' &&
@@ -1099,14 +933,12 @@ async function checkPermissionsAndCallTool(
         })
       }
     }
-
     return resultingMessages
   }
   logEvent('open_code_cli_tool_use_can_use_tool_allowed', {
     messageID:
       messageId as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
     toolName: sanitizeToolNameForAnalytics(tool.name),
-
     queryChainId: toolUseContext.queryTracking
       ?.chainId as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
     queryDepth: toolUseContext.queryTracking?.depth,
@@ -1124,16 +956,9 @@ async function checkPermissionsAndCallTool(
     }),
     ...mcpToolDetailsForAnalytics(tool.name, mcpServerType, mcpServerBaseUrl),
   })
-
-  // Use the updated input from permissions if provided
-  // (Don't overwrite if undefined - processedInput may have been modified by passthrough hooks)
   if (permissionDecision.updatedInput !== undefined) {
     processedInput = permissionDecision.updatedInput
   }
-
-  // Prepare tool parameters for logging in tool_result event.
-  // Gated by OTEL_LOG_TOOL_DETAILS — tool parameters can contain sensitive
-  // content (bash commands, MCP server names, etc.) so they're opt-in only.
   const telemetryToolInput = extractToolInputForTelemetry(processedInput)
   let toolParameters: Record<string, unknown> = {}
   if (isToolDetailsLoggingEnabled()) {
@@ -1141,7 +966,6 @@ async function checkPermissionsAndCallTool(
       const bashInput = processedInput as BashToolInput
       const commandParts = bashInput.command.trim().split(/\s+/)
       const bashCommand = commandParts[0] || ''
-
       toolParameters = {
         bash_command: bashCommand,
         full_command: bashInput.command,
@@ -1156,7 +980,6 @@ async function checkPermissionsAndCallTool(
         }),
       }
     }
-
     const mcpDetails = extractMcpToolDetails(tool.name)
     if (mcpDetails) {
       toolParameters.mcp_server_name = mcpDetails.serverName
@@ -1167,25 +990,14 @@ async function checkPermissionsAndCallTool(
       toolParameters.skill_name = skillName
     }
   }
-
   const decisionInfo = toolUseContext.toolDecisions?.get(toolUseID)
   endToolBlockedOnUserSpan(
     decisionInfo?.decision || 'unknown',
     decisionInfo?.source || 'unknown',
   )
   startToolExecutionSpan()
-
   const startTime = Date.now()
-
   startSessionActivity('tool_exec')
-  // If processedInput still points at the backfill clone, no hook/permission
-  // replaced it — pass the pre-backfill callInput so call() sees the model's
-  // original field values. Otherwise converge on the hook-supplied input.
-  // Permission/hook flows may return a fresh object based on the
-  // backfilled clone (e.g. via inputSchema.parse). If its file_path matches
-  // the backfill-expanded value, restore the model's original so the tool
-  // result string embeds the path the model emitted — keeps transcript/VCR
-  // hashes stable. Other hook modifications flow through unchanged.
   if (
     backfilledClone &&
     processedInput !== callInput &&
@@ -1222,55 +1034,39 @@ async function checkPermissionsAndCallTool(
     )
     const durationMs = Date.now() - startTime
     addToToolDuration(durationMs)
-
-    // Log tool content/output as span event if enabled
     if (result.data && typeof result.data === 'object') {
       const contentAttributes: Record<string, string | number | boolean> = {}
-
-      // Read tool: capture file_path and content
       if (tool.name === FILE_READ_TOOL_NAME && 'content' in result.data) {
         if ('file_path' in processedInput) {
           contentAttributes.file_path = String(processedInput.file_path)
         }
         contentAttributes.content = String(result.data.content)
       }
-
-      // Edit/Write tools: capture file_path and diff
       if (
         (tool.name === FILE_EDIT_TOOL_NAME ||
           tool.name === FILE_WRITE_TOOL_NAME) &&
         'file_path' in processedInput
       ) {
         contentAttributes.file_path = String(processedInput.file_path)
-
-        // For Edit, capture the actual changes made
         if (tool.name === FILE_EDIT_TOOL_NAME && 'diff' in result.data) {
           contentAttributes.diff = String(result.data.diff)
         }
-        // For Write, capture the written content
         if (tool.name === FILE_WRITE_TOOL_NAME && 'content' in processedInput) {
           contentAttributes.content = String(processedInput.content)
         }
       }
-
-      // Bash tool: capture command
       if (tool.name === BASH_TOOL_NAME && 'command' in processedInput) {
         const bashInput = processedInput as BashToolInput
         contentAttributes.bash_command = bashInput.command
-        // Also capture output if available
         if ('output' in result.data) {
           contentAttributes.output = String(result.data.output)
         }
       }
-
       if (Object.keys(contentAttributes).length > 0) {
         addToolContentEvent('tool.output', contentAttributes)
       }
     }
-
-    // Capture structured output from tool result if present
     if (typeof result === 'object' && 'structured_output' in result) {
-      // Store the structured output in an attachment message
       resultingMessages.push({
         message: createAttachmentMessage({
           type: 'structured_output',
@@ -1278,17 +1074,12 @@ async function checkPermissionsAndCallTool(
         }),
       })
     }
-
     endToolExecutionSpan({ success: true })
-    // Pass tool result for new_context logging
     const toolResultStr =
       result.data && typeof result.data === 'object'
         ? jsonStringify(result.data)
         : String(result.data ?? '')
     endToolSpan(toolResultStr)
-
-    // Map the tool result to API format once and cache it. This block is reused
-    // by addToolResult (skipping the remap) and measured here for analytics.
     const mappedToolResultBlock = tool.mapToolResultToToolResultBlockParam(
       result.data,
       toolUseID,
@@ -1299,8 +1090,6 @@ async function checkPermissionsAndCallTool(
       : typeof mappedContent === 'string'
         ? mappedContent.length
         : jsonStringify(mappedContent).length
-
-    // Extract file extension for file-related tools
     let fileExtension: ReturnType<typeof getFileExtensionForAnalytics>
     if (processedInput && typeof processedInput === 'object') {
       if (
@@ -1327,7 +1116,6 @@ async function checkPermissionsAndCallTool(
         )
       }
     }
-
     logEvent('open_code_cli_tool_use_success', {
       messageID:
         messageId as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
@@ -1337,7 +1125,6 @@ async function checkPermissionsAndCallTool(
       preToolHookDurationMs,
       toolResultSizeBytes,
       ...(fileExtension !== undefined && { fileExtension }),
-
       queryChainId: toolUseContext.queryTracking
         ?.chainId as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
       queryDepth: toolUseContext.queryTracking?.depth,
@@ -1355,8 +1142,6 @@ async function checkPermissionsAndCallTool(
       }),
       ...mcpToolDetailsForAnalytics(tool.name, mcpServerType, mcpServerBaseUrl),
     })
-
-    // Enrich tool parameters with git commit ID from successful git commit output
     if (
       isToolDetailsLoggingEnabled() &&
       (tool.name === BASH_TOOL_NAME || tool.name === POWERSHELL_TOOL_NAME) &&
@@ -1372,12 +1157,9 @@ async function checkPermissionsAndCallTool(
         toolParameters.git_commit_id = gitCommitId
       }
     }
-
-    // Log tool result event for OTLP with tool parameters and decision context
     const mcpServerScope = isMcpTool(tool)
       ? getMcpServerScopeFromToolName(tool.name)
       : null
-
     void logOTelEvent('tool_result', {
       tool_name: sanitizeToolNameForAnalytics(tool.name),
       success: 'true',
@@ -1393,19 +1175,14 @@ async function checkPermissionsAndCallTool(
       }),
       ...(mcpServerScope && { mcp_server_scope: mcpServerScope }),
     })
-
-    // Run PostToolUse hooks
     let toolOutput = result.data
     const hookResults = []
     const toolContextModifier = result.contextModifier
     const mcpMeta = result.mcpMeta
-
     async function addToolResult(
       toolUseResult: unknown,
       preMappedBlock?: ToolResultBlockParam,
     ) {
-      // Use the pre-mapped block when available (non-MCP tools where hooks
-      // don't modify the output), otherwise map from scratch.
       const toolResultBlock = preMappedBlock
         ? await processPreMappedToolResultBlock(
             preMappedBlock,
@@ -1413,11 +1190,7 @@ async function checkPermissionsAndCallTool(
             tool.maxResultSizeChars,
           )
         : await processToolResultBlock(tool, toolUseResult, toolUseID)
-
-      // Build content blocks - tool result first, then optional feedback
       const contentBlocks: ContentBlockParam[] = [toolResultBlock]
-      // Add accept feedback if user provided feedback when approving
-      // (acceptFeedback only exists on PermissionAllowDecision, which is guaranteed here)
       if (
         'acceptFeedback' in permissionDecision &&
         permissionDecision.acceptFeedback
@@ -1427,8 +1200,6 @@ async function checkPermissionsAndCallTool(
           text: permissionDecision.acceptFeedback,
         })
       }
-
-      // Add content blocks (e.g., pasted images) from the permission decision
       const allowContentBlocks =
         'contentBlocks' in permissionDecision
           ? permissionDecision.contentBlocks
@@ -1436,8 +1207,6 @@ async function checkPermissionsAndCallTool(
       if (allowContentBlocks?.length) {
         contentBlocks.push(...allowContentBlocks)
       }
-
-      // Generate sequential imagePasteIds so each image renders with a distinct label
       let allowImageIds: number[] | undefined
       if (allowContentBlocks?.length) {
         const imageCount = count(
@@ -1452,7 +1221,6 @@ async function checkPermissionsAndCallTool(
           )
         }
       }
-
       resultingMessages.push({
         message: createUserMessage({
           content: contentBlocks,
@@ -1472,12 +1240,9 @@ async function checkPermissionsAndCallTool(
           : undefined,
       })
     }
-
-    // TOOD(hackyon): refactor so we don't have different experiences for MCP tools
     if (!isMcpTool(tool)) {
       await addToolResult(toolOutput, mappedToolResultBlock)
     }
-
     const postToolHookInfos: StopHookInfo[] = []
     const postToolHookStart = Date.now()
     for await (const hookResult of runPostToolUseHooks(
@@ -1536,13 +1301,9 @@ async function checkPermissionsAndCallTool(
         { level: 'info' },
       )
     }
-
     if (isMcpTool(tool)) {
       await addToolResult(toolOutput)
     }
-
-    // Show PostToolUse hook timing inline below tool result when > 500ms.
-    // Use wall-clock time (not sum of individual durations) since hooks run in parallel.
     if (process.env.USER_TYPE === 'ant' && postToolHookInfos.length > 0) {
       if (postToolHookDurationMs > HOOK_TIMING_DISPLAY_THRESHOLD_MS) {
         resultingMessages.push({
@@ -1561,14 +1322,11 @@ async function checkPermissionsAndCallTool(
         })
       }
     }
-
-    // If the tool provided new messages, add them to the list to return.
     if (result.newMessages && result.newMessages.length > 0) {
       for (const message of result.newMessages) {
         resultingMessages.push({ message })
       }
     }
-    // If hook indicated to prevent continuation after successful execution, yield a stop reason message
     if (shouldPreventContinuation) {
       resultingMessages.push({
         message: createAttachmentMessage({
@@ -1580,8 +1338,6 @@ async function checkPermissionsAndCallTool(
         }),
       })
     }
-
-    // Yield the remaining hook results after the other messages are sent
     for (const hookResult of hookResults) {
       resultingMessages.push(hookResult)
     }
@@ -1589,15 +1345,11 @@ async function checkPermissionsAndCallTool(
   } catch (error) {
     const durationMs = Date.now() - startTime
     addToToolDuration(durationMs)
-
     endToolExecutionSpan({
       success: false,
       error: errorMessage(error),
     })
     endToolSpan()
-
-    // Handle MCP auth errors by updating the client status to 'needs-auth'
-    // This updates the /mcp display to show the server needs re-authorization
     if (error instanceof McpAuthError) {
       toolUseContext.setAppState(prevState => {
         const serverName = error.serverName
@@ -1608,7 +1360,6 @@ async function checkPermissionsAndCallTool(
           return prevState
         }
         const existingClient = prevState.mcp.clients[existingClientIndex]
-        // Only update if client was connected (don't overwrite other states)
         if (!existingClient || existingClient.type !== 'connected') {
           return prevState
         }
@@ -1627,7 +1378,6 @@ async function checkPermissionsAndCallTool(
         }
       })
     }
-
     if (!(error instanceof AbortError)) {
       const errorMsg = errorMessage(error)
       logForDebugging(
@@ -1644,7 +1394,6 @@ async function checkPermissionsAndCallTool(
           error,
         ) as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
         isMcp: tool.isMcp ?? false,
-
         queryChainId: toolUseContext.queryTracking
           ?.chainId as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
         queryDepth: toolUseContext.queryTracking?.depth,
@@ -1666,11 +1415,9 @@ async function checkPermissionsAndCallTool(
           mcpServerBaseUrl,
         ),
       })
-      // Log tool result error event for OTLP with tool parameters and decision context
       const mcpServerScope = isMcpTool(tool)
         ? getMcpServerScopeFromToolName(tool.name)
         : null
-
       void logOTelEvent('tool_result', {
         tool_name: sanitizeToolNameForAnalytics(tool.name),
         use_id: toolUseID,
@@ -1689,11 +1436,7 @@ async function checkPermissionsAndCallTool(
       })
     }
     const content = formatError(error)
-
-    // Determine if this was a user interrupt
     const isInterrupt = error instanceof AbortError
-
-    // Run PostToolUseFailure hooks
     const hookMessages: MessageUpdateLazy<
       AttachmentMessage | ProgressMessage<HookProgress>
     >[] = []
@@ -1711,7 +1454,6 @@ async function checkPermissionsAndCallTool(
     )) {
       hookMessages.push(hookResult)
     }
-
     return [
       {
         message: createUserMessage({
@@ -1737,7 +1479,6 @@ async function checkPermissionsAndCallTool(
     ]
   } finally {
     stopSessionActivity('tool_exec')
-    // Clean up decision info after logging
     if (decisionInfo) {
       toolUseContext.toolDecisions?.delete(toolUseID)
     }

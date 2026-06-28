@@ -16,14 +16,12 @@ import {
   isKairosCronEnabled,
 } from './prompt.js'
 import { renderDeleteResultMessage, renderDeleteToolUseMessage } from './UI.js'
-
 const inputSchema = lazySchema(() =>
   z.strictObject({
     id: z.string().describe('Job ID returned by CronCreate.'),
   }),
 )
 type InputSchema = ReturnType<typeof inputSchema>
-
 const outputSchema = lazySchema(() =>
   z.object({
     id: z.string(),
@@ -31,7 +29,6 @@ const outputSchema = lazySchema(() =>
 )
 type OutputSchema = ReturnType<typeof outputSchema>
 export type DeleteOutput = z.infer<OutputSchema>
-
 export const CronDeleteTool = buildTool({
   name: CRON_DELETE_TOOL_NAME,
   searchHint: 'cancel a scheduled cron job',
@@ -68,7 +65,6 @@ export const CronDeleteTool = buildTool({
         errorCode: 1,
       }
     }
-    // Teammates may only delete their own crons.
     const ctx = getTeammateContext()
     if (ctx && task.agentId !== ctx.agentId) {
       return {

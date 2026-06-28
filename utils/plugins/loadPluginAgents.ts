@@ -31,9 +31,7 @@ import {
 } from './pluginOptionsStorage.js'
 import type { PluginManifest } from './schemas.js'
 import { walkPluginMarkdown } from './walkPluginMarkdown.js'
-
 const VALID_MEMORY_SCOPES: AgentMemoryScope[] = ['user', 'project', 'local']
-
 async function loadAgentsFromDirectory(
   agentsPath: string,
   pluginName: string,
@@ -61,7 +59,6 @@ async function loadAgentsFromDirectory(
   )
   return agents
 }
-
 async function loadAgentFromFile(
   filePath: string,
   pluginName: string,
@@ -81,20 +78,14 @@ async function loadAgentFromFile(
       content,
       filePath,
     )
-
     const baseAgentName =
       (frontmatter.name as string) || basename(filePath).replace(/\.md$/, '')
-
-    // Apply namespace prefixing like we do for commands
     const nameParts = [pluginName, ...namespace, baseAgentName]
     const agentType = nameParts.join(':')
-
-    // Parse agent metadata from frontmatter
     const whenToUse =
       coerceDescriptionToString(frontmatter.description, agentType) ??
       coerceDescriptionToString(frontmatter['when-to-use'], agentType) ??
       `Agent from ${pluginName} plugin`
-
     let tools = parseAgentToolsFromFrontmatter(frontmatter.tools)
     const skills = parseSlashCommandToolsFromFrontmatter(frontmatter.skills)
     const color = frontmatter.color as AgentColorName | undefined
@@ -107,9 +98,6 @@ async function loadAgentFromFile(
     const backgroundRaw = frontmatter.background
     const background =
       backgroundRaw === 'true' || backgroundRaw === true ? true : undefined
-    // Substitute ${OPEN_CODE_CLI_PLUGIN_ROOT} so agents can reference bundled files,
-    // and ${user_config.X} (non-sensitive only) so they can embed configured
-    // usernames, endpoints, etc. Sensitive refs resolve to a placeholder.
     let systemPrompt = substitutePluginVariables(markdownContent.trim(), {
       path: pluginPath,
       source: sourceName,
@@ -121,8 +109,6 @@ async function loadAgentFromFile(
         pluginManifest.userConfig,
       )
     }
-
-    // Parse memory scope
     const memoryRaw = frontmatter.memory as string | undefined
     let memory: AgentMemoryScope | undefined
     if (memoryRaw !== undefined) {
@@ -134,13 +120,9 @@ async function loadAgentFromFile(
         )
       }
     }
-
-    // Parse isolation mode
     const isolationRaw = frontmatter.isolation as string | undefined
     const isolation =
       isolationRaw === 'worktree' ? ('worktree' as const) : undefined
-
-    // Parse effort (string level or integer)
     const effortRaw = frontmatter.effort
     const effort =
       effortRaw !== undefined ? parseEffortValue(effortRaw) : undefined
@@ -149,15 +131,6 @@ async function loadAgentFromFile(
         `Plugin agent file ${filePath} has invalid effort '${effortRaw}'. Valid options: ${EFFORT_LEVELS.join(', ')} or an integer`,
       )
     }
-
-    // permissionMode, hooks, and mcpServers are intentionally NOT parsed for
-    // plugin agents. Plugins are third-party marketplace code; these fields
-    // escalate what the agent can do beyond what the user approved at install
-    // time. For this level of control, define the agent in .open-code-cli/agents/
-    // where the user explicitly wrote the frontmatter. (Note: plugins can
-    // still ship hooks and MCP servers at the manifest level — that's the
-    // install-time trust boundary. Per-agent declarations would let a single
-    // agent file buried in agents/ silently add them.) See PR #22558 review.
     for (const field of ['permissionMode', 'hooks', 'mcpServers'] as const) {
       if (frontmatter[field] !== undefined) {
         logForDebugging(
@@ -166,8 +139,6 @@ async function loadAgentFromFile(
         )
       }
     }
-
-    // Parse maxTurns
     const maxTurnsRaw = frontmatter.maxTurns
     const maxTurns = parsePositiveIntFromFrontmatter(maxTurnsRaw)
     if (maxTurnsRaw !== undefined && maxTurns === undefined) {
@@ -175,14 +146,10 @@ async function loadAgentFromFile(
         `Plugin agent file ${filePath} has invalid maxTurns '${maxTurnsRaw}'. Must be a positive integer.`,
       )
     }
-
-    // Parse disallowedTools
     const disallowedTools =
       frontmatter.disallowedTools !== undefined
         ? parseAgentToolsFromFrontmatter(frontmatter.disallowedTools)
         : undefined
-
-    // If memory is enabled, inject Write/Edit/Read tools for memory access
     if (isAutoMemoryEnabled() && memory && tools !== undefined) {
       const toolSet = new Set(tools)
       for (const tool of [
@@ -195,7 +162,6 @@ async function loadAgentFromFile(
         }
       }
     }
-
     return {
       agentType,
       whenToUse,
@@ -227,26 +193,18 @@ async function loadAgentFromFile(
     return null
   }
 }
-
 export const loadPluginAgents = memoize(
   async (): Promise<AgentDefinition[]> => {
-    // Only load agents from enabled plugins
     const { enabled, errors } = await loadAllPluginsCacheOnly()
-
     if (errors.length > 0) {
       logForDebugging(
         `Plugin loading errors: ${errors.map(e => getPluginErrorMessage(e)).join(', ')}`,
       )
     }
-
-    // Process plugins in parallel; each plugin has its own loadedPaths scope
     const perPluginAgents = await Promise.all(
       enabled.map(async (plugin): Promise<AgentDefinition[]> => {
-        // Track loaded file paths to prevent duplicates within this plugin
         const loadedPaths = new Set<string>()
         const pluginAgents: AgentDefinition[] = []
-
-        // Load agents from default agents directory
         if (plugin.agentsPath) {
           try {
             const agents = await loadAgentsFromDirectory(
@@ -258,7 +216,6 @@ export const loadPluginAgents = memoize(
               loadedPaths,
             )
             pluginAgents.push(...agents)
-
             if (agents.length > 0) {
               logForDebugging(
                 `Loaded ${agents.length} agents from plugin ${plugin.name} default directory`,
@@ -271,20 +228,14 @@ export const loadPluginAgents = memoize(
             )
           }
         }
-
-        // Load agents from additional paths specified in manifest
         if (plugin.agentsPaths) {
-          // Process all agentsPaths in parallel. isDuplicatePath is synchronous
-          // (check-and-add), so concurrent access to loadedPaths is safe.
           const pathResults = await Promise.all(
             plugin.agentsPaths.map(
               async (agentPath): Promise<AgentDefinition[]> => {
                 try {
                   const fs = getFsImplementation()
                   const stats = await fs.stat(agentPath)
-
                   if (stats.isDirectory()) {
-                    // Load all .md files from directory
                     const agents = await loadAgentsFromDirectory(
                       agentPath,
                       plugin.name,
@@ -293,7 +244,6 @@ export const loadPluginAgents = memoize(
                       plugin.manifest,
                       loadedPaths,
                     )
-
                     if (agents.length > 0) {
                       logForDebugging(
                         `Loaded ${agents.length} agents from plugin ${plugin.name} custom path: ${agentPath}`,
@@ -301,7 +251,6 @@ export const loadPluginAgents = memoize(
                     }
                     return agents
                   } else if (stats.isFile() && agentPath.endsWith('.md')) {
-                    // Load single agent file
                     const agent = await loadAgentFromFile(
                       agentPath,
                       plugin.name,
@@ -336,13 +285,11 @@ export const loadPluginAgents = memoize(
         return pluginAgents
       }),
     )
-
     const allAgents = perPluginAgents.flat()
     logForDebugging(`Total plugin agents loaded: ${allAgents.length}`)
     return allAgents
   },
 )
-
 export function clearPluginAgentCache(): void {
   loadPluginAgents.cache?.clear?.()
 }

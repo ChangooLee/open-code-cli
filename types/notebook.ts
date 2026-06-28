@@ -1,19 +1,8 @@
-/**
- * The kind of a Jupyter notebook cell.
- */
 export type NotebookCellType = 'code' | 'markdown' | 'raw'
-
-/**
- * An image extracted from a notebook cell output.
- */
 export interface NotebookOutputImage {
   image_data: string
   media_type: 'image/png' | 'image/jpeg'
 }
-
-/**
- * A raw output entry as stored in the .ipynb file.
- */
 export type NotebookCellOutput =
   | {
       output_type: 'stream'
@@ -37,10 +26,6 @@ export type NotebookCellOutput =
       evalue: string
       traceback: string[]
     }
-
-/**
- * A raw notebook cell as stored in the .ipynb file.
- */
 export interface NotebookCell {
   cell_type: NotebookCellType
   id?: string
@@ -49,10 +34,6 @@ export interface NotebookCell {
   execution_count?: number | null
   outputs?: NotebookCellOutput[]
 }
-
-/**
- * A parsed .ipynb notebook document.
- */
 export interface NotebookContent {
   cells: NotebookCell[]
   metadata: {
@@ -63,19 +44,11 @@ export interface NotebookContent {
   nbformat: number
   nbformat_minor: number
 }
-
-/**
- * A processed output, ready to render into a tool result.
- */
 export interface NotebookCellSourceOutput {
   output_type: string
   text?: string
   image?: NotebookOutputImage
 }
-
-/**
- * A processed notebook cell, ready to render into a tool result.
- */
 export interface NotebookCellSource {
   cellType: NotebookCellType
   source: string

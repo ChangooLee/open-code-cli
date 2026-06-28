@@ -1,8 +1,3 @@
-/**
- * MCP add CLI subcommand
- *
- * Extracted from main.tsx to enable direct testing.
- */
 import { type Command, Option } from '@commander-js/extra-typings'
 import { cliError, cliOk } from '../../cli/exit.js'
 import {
@@ -26,10 +21,6 @@ import {
 } from '../../services/mcp/xaaIdpLogin.js'
 import { parseEnvVars } from '../../utils/envUtils.js'
 import { jsonStringify } from '../../utils/slowOperations.js'
-
-/**
- * Registers the `mcp add` subcommand on the given Commander command.
- */
 export function registerMcpAddCommand(mcp: Command): void {
   mcp
     .command('add <name> <commandOrUrl> [args...]')
@@ -79,11 +70,8 @@ export function registerMcpAddCommand(mcp: Command): void {
       ).hideHelp(!isXaaEnabled()),
     )
     .action(async (name, commandOrUrl, args, options) => {
-      // Commander.js handles -- natively: it consumes -- and everything after becomes args
       const actualCommand = commandOrUrl
       const actualArgs = args
-
-      // If no name is provided, error
       if (!name) {
         cliError(
           'Error: Server name is required.\n' +
@@ -95,12 +83,9 @@ export function registerMcpAddCommand(mcp: Command): void {
             'Usage: open-code-cli mcp add <name> <command> [args...]',
         )
       }
-
       try {
         const scope = ensureConfigScope(options.scope)
         const transport = ensureTransport(options.transport)
-
-        // XAA fail-fast: validate at add-time, not auth-time.
         if (options.xaa && !isXaaEnabled()) {
           cliError(
             'Error: --xaa requires OPEN_CODE_CLI_ENABLE_XAA=1 in your environment (legacy: OPEN_CODE_CLI_ENABLE_XAA=1)',
@@ -120,18 +105,13 @@ export function registerMcpAddCommand(mcp: Command): void {
             cliError(`Error: --xaa requires: ${missing.join(', ')}`)
           }
         }
-
-        // Check if transport was explicitly provided
         const transportExplicit = options.transport !== undefined
-
-        // Check if the command looks like a URL (likely incorrect usage)
         const looksLikeUrl =
           actualCommand.startsWith('http://') ||
           actualCommand.startsWith('https://') ||
           actualCommand.startsWith('localhost') ||
           actualCommand.endsWith('/sse') ||
           actualCommand.endsWith('/mcp')
-
         logEvent('open_code_cli_mcp_add', {
           type: transport as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
           scope:
@@ -143,16 +123,13 @@ export function registerMcpAddCommand(mcp: Command): void {
           transportExplicit: transportExplicit,
           looksLikeUrl: looksLikeUrl,
         })
-
         if (transport === 'sse') {
           if (!actualCommand) {
             cliError('Error: URL is required for SSE transport.')
           }
-
           const headers = options.header
             ? parseHeaders(options.header)
             : undefined
-
           const callbackPort = options.callbackPort
             ? parseInt(options.callbackPort, 10)
             : undefined
@@ -164,12 +141,10 @@ export function registerMcpAddCommand(mcp: Command): void {
                   ...(xaa ? { xaa: true } : {}),
                 }
               : undefined
-
           const clientSecret =
             options.clientSecret && options.clientId
               ? await readClientSecret()
               : undefined
-
           const serverConfig = {
             type: 'sse' as const,
             url: actualCommand,
@@ -177,11 +152,9 @@ export function registerMcpAddCommand(mcp: Command): void {
             oauth,
           }
           await addMcpConfig(name, serverConfig, scope)
-
           if (clientSecret) {
             saveMcpClientSecret(name, serverConfig, clientSecret)
           }
-
           process.stdout.write(
             `Added SSE MCP server ${name} with URL: ${actualCommand} to ${scope} config\n`,
           )
@@ -194,11 +167,9 @@ export function registerMcpAddCommand(mcp: Command): void {
           if (!actualCommand) {
             cliError('Error: URL is required for HTTP transport.')
           }
-
           const headers = options.header
             ? parseHeaders(options.header)
             : undefined
-
           const callbackPort = options.callbackPort
             ? parseInt(options.callbackPort, 10)
             : undefined
@@ -210,12 +181,10 @@ export function registerMcpAddCommand(mcp: Command): void {
                   ...(xaa ? { xaa: true } : {}),
                 }
               : undefined
-
           const clientSecret =
             options.clientSecret && options.clientId
               ? await readClientSecret()
               : undefined
-
           const serverConfig = {
             type: 'http' as const,
             url: actualCommand,
@@ -223,11 +192,9 @@ export function registerMcpAddCommand(mcp: Command): void {
             oauth,
           }
           await addMcpConfig(name, serverConfig, scope)
-
           if (clientSecret) {
             saveMcpClientSecret(name, serverConfig, clientSecret)
           }
-
           process.stdout.write(
             `Added HTTP MCP server ${name} with URL: ${actualCommand} to ${scope} config\n`,
           )
@@ -247,8 +214,6 @@ export function registerMcpAddCommand(mcp: Command): void {
               `Warning: --client-id, --client-secret, --callback-port, and --xaa are only supported for HTTP/SSE transports and will be ignored for stdio.\n`,
             )
           }
-
-          // Warn if this looks like a URL but transport wasn't explicitly specified
           if (!transportExplicit && looksLikeUrl) {
             process.stderr.write(
               `\nWarning: The command "${actualCommand}" looks like a URL, but is being interpreted as a stdio server as --transport was not specified.\n`,
@@ -260,14 +225,12 @@ export function registerMcpAddCommand(mcp: Command): void {
               `If this is an SSE server, use: open-code-cli mcp add --transport sse ${name} ${actualCommand}\n`,
             )
           }
-
           const env = parseEnvVars(options.env)
           await addMcpConfig(
             name,
             { type: 'stdio', command: actualCommand, args: actualArgs, env },
             scope,
           )
-
           process.stdout.write(
             `Added stdio MCP server ${name} with command: ${actualCommand} ${actualArgs.join(' ')} to ${scope} config\n`,
           )

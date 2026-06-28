@@ -13,19 +13,12 @@ import {
 } from './memoryTypes.js'
 import { getAutoMemPath } from './paths.js'
 import { getTeamMemPath } from './teamMemPaths.js'
-
-/**
- * Build the combined prompt when both auto memory and team memory are enabled.
- * Closed four-type taxonomy (user / feedback / project / reference) with
- * per-type <scope> guidance embedded in XML-style <type> blocks.
- */
 export function buildCombinedMemoryPrompt(
   extraGuidelines?: string[],
   skipIndex = false,
 ): string {
   const autoDir = getAutoMemPath()
   const teamDir = getTeamMemPath()
-
   const howToSave = skipIndex
     ? [
         '## How to save memories',
@@ -56,7 +49,6 @@ export function buildCombinedMemoryPrompt(
         '- Update or remove memories that turn out to be wrong or outdated',
         '- Do not write duplicate memories. First check if there is an existing memory you can update before writing a new one.',
       ]
-
   const lines = [
     '# Memory',
     '',
@@ -95,6 +87,5 @@ export function buildCombinedMemoryPrompt(
     '',
     ...buildSearchingPastContextSection(autoDir),
   ]
-
   return lines.join('\n')
 }

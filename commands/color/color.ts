@@ -14,15 +14,12 @@ import {
   saveAgentColor,
 } from '../../utils/sessionStorage.js'
 import { isTeammate } from '../../utils/teammate.js'
-
 const RESET_ALIASES = ['default', 'reset', 'none', 'gray', 'grey'] as const
-
 export async function call(
   onDone: LocalJSXCommandOnDone,
   context: ToolUseContext & LocalJSXCommandContext,
   args: string,
 ): Promise<null> {
-  // Teammates cannot set their own color
   if (isTeammate()) {
     onDone(
       'Cannot set color: This session is a swarm teammate. Teammate colors are assigned by the team leader.',
@@ -30,7 +27,6 @@ export async function call(
     )
     return null
   }
-
   if (!args || args.trim() === '') {
     const colorList = AGENT_COLORS.join(', ')
     onDone(`Please provide a color. Available colors: ${colorList}, default`, {
@@ -38,18 +34,11 @@ export async function call(
     })
     return null
   }
-
   const colorArg = args.trim().toLowerCase()
-
-  // Handle reset to default (gray)
   if (RESET_ALIASES.includes(colorArg as (typeof RESET_ALIASES)[number])) {
     const sessionId = getSessionId() as UUID
     const fullPath = getTranscriptPath()
-
-    // Use "default" sentinel (not empty string) so truthiness guards
-    // in sessionStorage.ts persist the reset across session restarts
     await saveAgentColor(sessionId, 'default', fullPath)
-
     context.setAppState(prev => ({
       ...prev,
       standaloneAgentContext: {
@@ -58,11 +47,9 @@ export async function call(
         color: undefined,
       },
     }))
-
     onDone('Session color reset to default', { display: 'system' })
     return null
   }
-
   if (!AGENT_COLORS.includes(colorArg as AgentColorName)) {
     const colorList = AGENT_COLORS.join(', ')
     onDone(
@@ -71,14 +58,9 @@ export async function call(
     )
     return null
   }
-
   const sessionId = getSessionId() as UUID
   const fullPath = getTranscriptPath()
-
-  // Save to transcript for persistence across sessions
   await saveAgentColor(sessionId, colorArg, fullPath)
-
-  // Update AppState for immediate effect
   context.setAppState(prev => ({
     ...prev,
     standaloneAgentContext: {
@@ -87,7 +69,6 @@ export async function call(
       color: colorArg as AgentColorName,
     },
   }))
-
   onDone(`Session color set to: ${colorArg}`, { display: 'system' })
   return null
 }

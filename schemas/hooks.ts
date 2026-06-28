@@ -1,21 +1,7 @@
-/**
- * Hook Zod schemas extracted to break import cycles.
- *
- * This file contains hook-related schema definitions that were originally
- * in src/utils/settings/types.ts. By extracting them here, we break the
- * circular dependency between settings/types.ts and plugins/schemas.ts.
- *
- * Both files now import from this shared location instead of each other.
- */
-
 import { HOOK_EVENTS, type HookEvent } from 'src/entrypoints/agentSdkTypes.js'
 import { z } from 'zod/v4'
 import { lazySchema } from '../utils/lazySchema.js'
 import { SHELL_TYPES } from '../utils/shell/shellProvider.js'
-
-// Shared schema for the `if` condition field.
-// Uses permission rule syntax (e.g., "Bash(git *)", "Read(*.ts)") to filter hooks
-// before spawning. Evaluated against the hook input's tool_name and tool_input.
 const IfConditionSchema = lazySchema(() =>
   z
     .string()
@@ -25,9 +11,6 @@ const IfConditionSchema = lazySchema(() =>
         'Only runs if the tool call matches the pattern. Avoids spawning hooks for non-matching commands.',
     ),
 )
-
-// Internal factory for individual hook schemas (shared between exported
-// discriminated union members and the HookCommandSchema factory)
 function buildHookSchemas() {
   const BashCommandHookSchema = z.object({
     type: z.literal('command').describe('Shell command hook type'),
@@ -63,7 +46,6 @@ function buildHookSchemas() {
         'If true, hook runs in background and wakes the model on exit code 2 (blocking error). Implies async.',
       ),
   })
-
   const PromptHookSchema = z.object({
     type: z.literal('prompt').describe('LLM prompt hook type'),
     prompt: z
@@ -77,7 +59,6 @@ function buildHookSchemas() {
       .positive()
       .optional()
       .describe('Timeout in seconds for this specific prompt evaluation'),
-    // @[MODEL LAUNCH]: Update the example model ID in the .describe() strings below (prompt + agent hooks).
     model: z
       .string()
       .optional()
@@ -93,7 +74,6 @@ function buildHookSchemas() {
       .optional()
       .describe('If true, hook runs once and is removed after execution'),
   })
-
   const HttpHookSchema = z.object({
     type: z.literal('http').describe('HTTP hook type'),
     url: z.string().url().describe('URL to POST the hook input JSON to'),
@@ -124,17 +104,8 @@ function buildHookSchemas() {
       .optional()
       .describe('If true, hook runs once and is removed after execution'),
   })
-
   const AgentHookSchema = z.object({
     type: z.literal('agent').describe('Agentic verifier hook type'),
-    // DO NOT add .transform() here. This schema is used by parseSettingsFile,
-    // and updateSettingsForSource round-trips the parsed result through
-    // JSON.stringify — a transformed function value is silently dropped,
-    // deleting the user's prompt from settings.json (gh-24920, CC-79). The
-    // transform (from #10594) wrapped the string in `(_msgs) => prompt`
-    // for a programmatic-construction use case in ExitPlanModeV2Tool that
-    // has since been refactored into VerifyPlanExecutionTool, which no
-    // longer constructs AgentHook objects at all.
     prompt: z
       .string()
       .describe(
@@ -161,7 +132,6 @@ function buildHookSchemas() {
       .optional()
       .describe('If true, hook runs once and is removed after execution'),
   })
-
   return {
     BashCommandHookSchema,
     PromptHookSchema,
@@ -169,10 +139,6 @@ function buildHookSchemas() {
     AgentHookSchema,
   }
 }
-
-/**
- * Schema for hook command (excludes function hooks - they can't be persisted)
- */
 export const HookCommandSchema = lazySchema(() => {
   const {
     BashCommandHookSchema,
@@ -187,10 +153,6 @@ export const HookCommandSchema = lazySchema(() => {
     HttpHookSchema,
   ])
 })
-
-/**
- * Schema for matcher configuration with multiple hooks
- */
 export const HookMatcherSchema = lazySchema(() =>
   z.object({
     matcher: z
@@ -202,17 +164,9 @@ export const HookMatcherSchema = lazySchema(() =>
       .describe('List of hooks to execute when the matcher matches'),
   }),
 )
-
-/**
- * Schema for hooks configuration
- * The key is the hook event. The value is an array of matcher configurations.
- * Uses partialRecord since not all hook events need to be defined.
- */
 export const HooksSchema = lazySchema(() =>
   z.partialRecord(z.enum(HOOK_EVENTS), z.array(HookMatcherSchema())),
 )
-
-// Inferred types from schemas
 export type HookCommand = z.infer<ReturnType<typeof HookCommandSchema>>
 export type BashCommandHook = Extract<HookCommand, { type: 'command' }>
 export type PromptHook = Extract<HookCommand, { type: 'prompt' }>

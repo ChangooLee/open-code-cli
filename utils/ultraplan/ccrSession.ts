@@ -1,9 +1,3 @@
-// CCR session polling for /ultraplan. Waits for an approved ExitPlanMode
-// tool_result, then extracts the plan text. Uses pollRemoteSessionEvents
-// (shared with RemoteAgentTask) for pagination + typed SDKMessage[].
-// Plan mode is set via set_permission_mode control_request in
-// teleportToRemote's CreateSession events array.
-
 import type {
   ToolResultBlockParam,
   ToolUseBlock,
@@ -17,12 +11,8 @@ import {
   type PollRemoteSessionResponse,
   pollRemoteSessionEvents,
 } from '../teleport.js'
-
 const POLL_INTERVAL_MS = 3000
-// pollRemoteSessionEvents doesn't retry. A 30min poll makes ~600 calls;
-// at any nonzero 5xx rate one blip would kill the run.
 const MAX_CONSECUTIVE_FAILURES = 5
-
 export type PollFailReason =
   | 'terminated'
   | 'timeout_pending'
@@ -30,7 +20,6 @@ export type PollFailReason =
   | 'extract_marker_missing'
   | 'network_or_unknown'
   | 'stopped'
-
 export class UltraplanPollError extends Error {
   constructor(
     message: string,
@@ -42,11 +31,7 @@ export class UltraplanPollError extends Error {
     this.name = 'UltraplanPollError'
   }
 }
-
-// Sentinel string the browser PlanModal includes in the feedback when the user
-// clicks "teleport back to terminal". Plan text follows on the next line.
 export const ULTRAPLAN_TELEPORT_SENTINEL = '__ULTRAPLAN_TELEPORT_LOCAL__'
-
 export type ScanResult =
   | { kind: 'approved'; plan: string }
   | { kind: 'teleport'; plan: string }
@@ -54,29 +39,7 @@ export type ScanResult =
   | { kind: 'pending' }
   | { kind: 'terminated'; subtype: string }
   | { kind: 'unchanged' }
-
-/**
- * Pill/detail-view state based on the event stream. Transitions:
- *   running → (turn ends, no ExitPlanMode) → needs_input
- *   needs_input → (user replies in browser) → running
- *   running → (ExitPlanMode emitted, no result yet) → plan_ready
- *   plan_ready → (rejected) → running
- *   plan_ready → (approved) → poll resolves, pill removed
- */
 export type UltraplanPhase = 'running' | 'needs_input' | 'plan_ready'
-
-/**
- * Pure stateful classifier for the CCR event stream. Ingests SDKMessage[]
- * batches (as delivered by pollRemoteSessionEvents) and returns the current
- * ExitPlanMode verdict. No I/O, no timers — feed it synthetic or recorded
- * events for unit tests and offline replay.
- *
- * Precedence (approved > terminated > rejected > pending > unchanged):
- * pollRemoteSessionEvents paginates up to 50 pages per call, so one ingest
- * can span seconds of session activity. A batch may contain both an approved
- * tool_result AND a subsequent {type:'result'} (user approved, then remote
- * crashed). The approved plan is real and in threadstore — don't drop it.
- */
 export class ExitPlanModeScanner {
   private exitPlanCalls: string[] = []
   private results = new Map<string, ToolResultBlockParam>()
@@ -84,20 +47,13 @@ export class ExitPlanModeScanner {
   private terminated: { subtype: string } | null = null
   private rescanAfterRejection = false
   everSeenPending = false
-
   get rejectCount(): number {
     return this.rejectedIds.size
   }
-
-  /**
-   * True when an ExitPlanMode tool_use exists with no tool_result yet —
-   * the remote is showing the approval dialog in the browser.
-   */
   get hasPendingPlan(): boolean {
     const id = this.exitPlanCalls.findLast(c => !this.rejectedIds.has(c))
     return id !== undefined && !this.results.has(id)
   }
-
   ingest(newEvents: SDKMessage[]): ScanResult {
     for (const m of newEvents) {
       if (m.type === 'assistant') {
@@ -117,21 +73,11 @@ export class ExitPlanModeScanner {
           }
         }
       } else if (m.type === 'result' && m.subtype !== 'success') {
-        // result(success) fires after EVERY CCR turn
-        // If the remote asks a clarifying question (turn ends without
-        // ExitPlanMode), we must keep polling — the user can reply in
-        // the browser and reach ExitPlanMode in a later turn.
-        // Only error subtypes (error_during_execution, error_max_turns,
-        // etc.) mean the session is actually dead.
         this.terminated = { subtype: m.subtype }
       }
     }
-
-    // Skip-scan when nothing could have moved the target: no new events, no
-    // rejection last tick. A rejection moves the newest-non-rejected target.
     const shouldScan = newEvents.length > 0 || this.rescanAfterRejection
     this.rescanAfterRejection = false
-
     let found:
       | { kind: 'approved'; plan: string }
       | { kind: 'teleport'; plan: string }
@@ -158,10 +104,6 @@ export class ExitPlanModeScanner {
       }
       if (found?.kind === 'approved' || found?.kind === 'teleport') return found
     }
-
-    // Bookkeeping before the terminated check — a batch can contain BOTH a
-    // rejected tool_result and a {type:'result'}; rejectCount must reflect
-    // the rejection even though terminated takes return precedence.
     if (found?.kind === 'rejected') {
       this.rejectedIds.add(found.id)
       this.rescanAfterRejection = true
@@ -179,22 +121,11 @@ export class ExitPlanModeScanner {
     return { kind: 'unchanged' }
   }
 }
-
 export type PollResult = {
   plan: string
   rejectCount: number
-  /** 'local' = user clicked teleport (execute here, archive remote). 'remote' = user approved in-CCR execution (don't archive). */
   executionTarget: 'local' | 'remote'
 }
-
-// Returns the approved plan text and where the user wants it executed.
-// 'approved' scrapes from the "## Approved Plan:" marker (ExitPlanModeV2Tool
-// default branch) — the model writes plan to a file inside CCR and calls
-// ExitPlanMode({allowedPrompts}), so input.plan is never in threadstore.
-// 'teleport' scrapes from the ULTRAPLAN_TELEPORT_SENTINEL in a deny tool_result —
-// browser sends a rejection so the remote stays in plan mode, with the plan
-// text embedded in the feedback. Normal rejections (is_error === true, no
-// sentinel) are tracked and skipped so the user can iterate in the browser.
 export async function pollForApprovedExitPlanMode(
   sessionId: string,
   timeoutMs: number,
@@ -206,7 +137,6 @@ export async function pollForApprovedExitPlanMode(
   let cursor: string | null = null
   let failures = 0
   let lastPhase: UltraplanPhase = 'running'
-
   while (Date.now() < deadline) {
     if (shouldStop?.()) {
       throw new UltraplanPollError(
@@ -218,9 +148,6 @@ export async function pollForApprovedExitPlanMode(
     let newEvents: SDKMessage[]
     let sessionStatus: PollRemoteSessionResponse['sessionStatus']
     try {
-      // Metadata fetch (session_status) is the needs_input signal —
-      // threadstore doesn't persist result(success) turn-end events, so
-      // idle status is the only authoritative "remote is waiting" marker.
       const resp = await pollRemoteSessionEvents(sessionId, cursor)
       newEvents = resp.newEvents
       cursor = resp.lastEventId
@@ -239,7 +166,6 @@ export async function pollForApprovedExitPlanMode(
       await sleep(POLL_INTERVAL_MS)
       continue
     }
-
     let result: ScanResult
     try {
       result = scanner.ingest(newEvents)
@@ -271,15 +197,6 @@ export async function pollForApprovedExitPlanMode(
         scanner.rejectCount,
       )
     }
-    // plan_ready from the event stream wins; otherwise idle session status
-    // means the remote asked a question and is waiting for a browser reply.
-    // requires_action with no pending plan is also needs_input — the remote
-    // may be blocked on a non-ExitPlanMode permission prompt.
-    // CCR briefly flips to 'idle' between tool turns (see STABLE_IDLE_POLLS
-    // in RemoteAgentTask). Only trust idle when no new events arrived —
-    // events flowing means the session is working regardless of the status
-    // snapshot. This also makes needs_input → running snap back on the first
-    // poll that sees the user's reply event, even if session_status lags.
     const quietIdle =
       (sessionStatus === 'idle' || sessionStatus === 'requires_action') &&
       newEvents.length === 0
@@ -295,7 +212,6 @@ export async function pollForApprovedExitPlanMode(
     }
     await sleep(POLL_INTERVAL_MS)
   }
-
   throw new UltraplanPollError(
     scanner.everSeenPending
       ? `no approval after ${timeoutMs / 1000}s`
@@ -304,9 +220,6 @@ export async function pollForApprovedExitPlanMode(
     scanner.rejectCount,
   )
 }
-
-// tool_result content may be string or [{type:'text',text}] depending on
-// threadstore encoding.
 function contentToText(content: ToolResultBlockParam['content']): string {
   return typeof content === 'string'
     ? content
@@ -314,10 +227,6 @@ function contentToText(content: ToolResultBlockParam['content']): string {
       ? content.map(b => ('text' in b ? b.text : '')).join('')
       : ''
 }
-
-// Extracts the plan text after the ULTRAPLAN_TELEPORT_SENTINEL marker.
-// Returns null when the sentinel is absent — callers treat null as a normal
-// user rejection (scanner falls through to { kind: 'rejected' }).
 function extractTeleportPlan(
   content: ToolResultBlockParam['content'],
 ): string | null {
@@ -327,12 +236,8 @@ function extractTeleportPlan(
   if (idx === -1) return null
   return text.slice(idx + marker.length).trimEnd()
 }
-
-// Plan is echoed in tool_result content as "## Approved Plan:\n<text>" or
-// "## Approved Plan (edited by user):\n<text>" (ExitPlanModeV2Tool).
 function extractApprovedPlan(content: ToolResultBlockParam['content']): string {
   const text = contentToText(content)
-  // Try both markers — edited plans use a different label.
   const markers = [
     '## Approved Plan (edited by user):\n',
     '## Approved Plan:\n',

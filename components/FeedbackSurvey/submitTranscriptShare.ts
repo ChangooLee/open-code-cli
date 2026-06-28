@@ -14,18 +14,15 @@ import {
 } from '../../utils/sessionStorage.js'
 import { jsonStringify } from '../../utils/slowOperations.js'
 import { redactSensitiveInfo } from '../Feedback.js'
-
 type TranscriptShareResult = {
   success: boolean
   transcriptId?: string
 }
-
 export type TranscriptShareTrigger =
   | 'bad_feedback_survey'
   | 'good_feedback_survey'
   | 'frustration'
   | 'memory_survey'
-
 export async function submitTranscriptShare(
   messages: Message[],
   trigger: TranscriptShareTrigger,
@@ -33,14 +30,9 @@ export async function submitTranscriptShare(
 ): Promise<TranscriptShareResult> {
   try {
     logForDebugging('Collecting transcript for sharing', { level: 'info' })
-
     const transcript = normalizeMessagesForAPI(messages)
-
-    // Collect subagent transcripts
     const agentIds = extractAgentIdsFromMessages(messages)
     const subagentTranscripts = await loadSubagentTranscripts(agentIds)
-
-    // Read raw JSONL transcript (with size guard to prevent OOM)
     let rawTranscriptJsonl: string | undefined
     try {
       const transcriptPath = getTranscriptPath()
@@ -54,9 +46,7 @@ export async function submitTranscriptShare(
         )
       }
     } catch {
-      // File may not exist
     }
-
     const data = {
       trigger,
       version: MACRO.VERSION,
@@ -68,22 +58,17 @@ export async function submitTranscriptShare(
           : undefined,
       rawTranscriptJsonl,
     }
-
     const content = redactSensitiveInfo(jsonStringify(data))
-
     await checkAndRefreshOAuthTokenIfNeeded()
-
     const authResult = getAuthHeaders()
     if (authResult.error) {
       return { success: false }
     }
-
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'User-Agent': getUserAgent(),
       ...authResult.headers,
     }
-
     const response = await axios.post(
       'https://api.openai.com/v1/open_code_cli_shared_session_transcripts',
       { content, appearance_id: appearanceId },
@@ -92,7 +77,6 @@ export async function submitTranscriptShare(
         timeout: 30000,
       },
     )
-
     if (response.status === 200 || response.status === 201) {
       const result = response.data
       logForDebugging('Transcript shared successfully', { level: 'info' })
@@ -101,7 +85,6 @@ export async function submitTranscriptShare(
         transcriptId: result?.transcript_id,
       }
     }
-
     return { success: false }
   } catch (err) {
     logForDebugging(errorMessage(err), {

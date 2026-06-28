@@ -1,8 +1,6 @@
 import { z } from 'zod/v4'
 import { lazySchema } from '../../utils/lazySchema.js'
 import { semanticBoolean } from '../../utils/semanticBoolean.js'
-
-// The input schema with optional replace_all
 const inputSchema = lazySchema(() =>
   z.strictObject({
     file_path: z.string().describe('The absolute path to the file to modify'),
@@ -18,21 +16,13 @@ const inputSchema = lazySchema(() =>
   }),
 )
 type InputSchema = ReturnType<typeof inputSchema>
-
-// Parsed output — what call() receives. z.output not z.input: with
-// semanticBoolean the input side is unknown (preprocess accepts anything).
 export type FileEditInput = z.output<InputSchema>
-
-// Individual edit without file_path
 export type EditInput = Omit<FileEditInput, 'file_path'>
-
-// Runtime version where replace_all is always defined
 export type FileEdit = {
   old_string: string
   new_string: string
   replace_all: boolean
 }
-
 export const hunkSchema = lazySchema(() =>
   z.object({
     oldStart: z.number(),
@@ -42,7 +32,6 @@ export const hunkSchema = lazySchema(() =>
     lines: z.array(z.string()),
   }),
 )
-
 export const gitDiffSchema = lazySchema(() =>
   z.object({
     filename: z.string(),
@@ -58,8 +47,6 @@ export const gitDiffSchema = lazySchema(() =>
       .describe('GitHub owner/repo when available'),
   }),
 )
-
-// Output schema for FileEditTool
 const outputSchema = lazySchema(() =>
   z.object({
     filePath: z.string().describe('The file path that was edited'),
@@ -79,7 +66,5 @@ const outputSchema = lazySchema(() =>
   }),
 )
 type OutputSchema = ReturnType<typeof outputSchema>
-
 export type FileEditOutput = z.infer<OutputSchema>
-
 export { inputSchema, outputSchema }

@@ -1,6 +1,3 @@
-// Content for the openai-compatible-api bundled skill.
-// Each .md file is inlined as a string at build time via Bun's text loader.
-
 import csharpOpenAiCompatibleApi from './openai-compatible-api/csharp/openai-compatible-api.md'
 import curlExamples from './openai-compatible-api/curl/examples.md'
 import goOpenAiCompatibleApi from './openai-compatible-api/go/openai-compatible-api.md'
@@ -27,12 +24,6 @@ import typescriptOpenAiCompatibleApiFilesApi from './openai-compatible-api/types
 import typescriptOpenAiCompatibleApiReadme from './openai-compatible-api/typescript/openai-compatible-api/README.md'
 import typescriptOpenAiCompatibleApiStreaming from './openai-compatible-api/typescript/openai-compatible-api/streaming.md'
 import typescriptOpenAiCompatibleApiToolUse from './openai-compatible-api/typescript/openai-compatible-api/tool-use.md'
-
-// @[MODEL LAUNCH]: Update the model IDs/names below. These are substituted into {{VAR}}
-// placeholders in the .md files at runtime before the skill prompt is sent.
-// After updating these constants, manually update the two files that still hardcode models:
-//   - openai-compatible-api/SKILL.md (Current Models pricing table)
-//   - openai-compatible-api/shared/models.md (full model catalog with legacy versions and alias mappings)
 export const SKILL_MODEL_VARS = {
   OPUS_ID: 'openai/gpt-4.1',
   OPUS_NAME: 'configured model 4.6',
@@ -40,12 +31,9 @@ export const SKILL_MODEL_VARS = {
   SONNET_NAME: 'Open Code CLI Sonnet 4.6',
   HAIKU_ID: 'openai/gpt-4o-mini',
   HAIKU_NAME: 'Open Code CLI Haiku 4.5',
-  // Previous Sonnet ID — used in "do not append date suffixes" example in SKILL.md.
   PREV_SONNET_ID: 'openai/gpt-4o',
 } satisfies Record<string, string>
-
 export const SKILL_PROMPT: string = skillPrompt
-
 export const SKILL_FILES: Record<string, string> = {
   'csharp/openai-compatible-api.md': csharpOpenAiCompatibleApi,
   'curl/examples.md': curlExamples,

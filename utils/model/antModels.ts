@@ -1,6 +1,5 @@
 import { getFeatureValue_CACHED_MAY_BE_STALE } from 'src/services/analytics/growthbook.js'
 import type { EffortLevel } from '../effort.js'
-
 export type AntModel = {
   alias: string
   model: string
@@ -11,16 +10,13 @@ export type AntModel = {
   contextWindow?: number
   defaultMaxTokens?: number
   upperMaxTokensLimit?: number
-  /** Model defaults to adaptive thinking and rejects `thinking: { type: 'disabled' }`. */
   alwaysOnThinking?: boolean
 }
-
 export type AntModelSwitchCalloutConfig = {
   modelAlias?: string
   description: string
   version: string
 }
-
 export type AntModelOverrideConfig = {
   defaultModel?: string
   defaultModelEffortLevel?: EffortLevel
@@ -28,9 +24,6 @@ export type AntModelOverrideConfig = {
   antModels?: AntModel[]
   switchCallout?: AntModelSwitchCalloutConfig
 }
-
-// @[MODEL LAUNCH]: Update open_code_cli_ant_model_override with new ant-only models
-// @[MODEL LAUNCH]: Add the codename to scripts/excluded-strings.txt to prevent it from leaking to external builds.
 export function getAntModelOverrideConfig(): AntModelOverrideConfig | null {
   if (process.env.USER_TYPE !== 'ant') {
     return null
@@ -40,14 +33,12 @@ export function getAntModelOverrideConfig(): AntModelOverrideConfig | null {
     null,
   )
 }
-
 export function getAntModels(): AntModel[] {
   if (process.env.USER_TYPE !== 'ant') {
     return []
   }
   return getAntModelOverrideConfig()?.antModels ?? []
 }
-
 export function resolveAntModel(
   model: string | undefined,
 ): AntModel | undefined {

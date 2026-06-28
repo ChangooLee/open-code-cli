@@ -1,11 +1,6 @@
-// Tab expansion, inspired by Ghostty's Tabstops.zig
-// Uses 8-column intervals (POSIX default, hardcoded in terminals like Ghostty)
-
 import { stringWidth } from './stringWidth.js'
 import { createTokenizer } from './termio/tokenize.js'
-
 const DEFAULT_TAB_INTERVAL = 8
-
 export function expandTabs(
   text: string,
   interval = DEFAULT_TAB_INTERVAL,
@@ -13,14 +8,11 @@ export function expandTabs(
   if (!text.includes('\t')) {
     return text
   }
-
   const tokenizer = createTokenizer()
   const tokens = tokenizer.feed(text)
   tokens.push(...tokenizer.flush())
-
   let result = ''
   let column = 0
-
   for (const token of tokens) {
     if (token.type === 'sequence') {
       result += token.value
@@ -41,6 +33,5 @@ export function expandTabs(
       }
     }
   }
-
   return result
 }

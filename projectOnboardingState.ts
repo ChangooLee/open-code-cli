@@ -7,7 +7,6 @@ import {
 import { getCwd } from './utils/cwd.js'
 import { isDirEmpty } from './utils/file.js'
 import { getFsImplementation } from './utils/fsOperations.js'
-
 export type Step = {
   key: string
   text: string
@@ -15,13 +14,11 @@ export type Step = {
   isCompletable: boolean
   isEnabled: boolean
 }
-
 export function getSteps(): Step[] {
   const hasOpenCodeMd = getFsImplementation().existsSync(
     join(getCwd(), 'OPEN_CODE.md'),
   )
   const isWorkspaceDirEmpty = isDirEmpty(getCwd())
-
   return [
     {
       key: 'workspace',
@@ -39,16 +36,12 @@ export function getSteps(): Step[] {
     },
   ]
 }
-
 export function isProjectOnboardingComplete(): boolean {
   return getSteps()
     .filter(({ isCompletable, isEnabled }) => isCompletable && isEnabled)
     .every(({ isComplete }) => isComplete)
 }
-
 export function maybeMarkProjectOnboardingComplete(): void {
-  // Short-circuit on cached config — isProjectOnboardingComplete() hits
-  // the filesystem, and REPL.tsx calls this on every prompt submit.
   if (getCurrentProjectConfig().hasCompletedProjectOnboarding) {
     return
   }
@@ -59,11 +52,8 @@ export function maybeMarkProjectOnboardingComplete(): void {
     }))
   }
 }
-
 export const shouldShowProjectOnboarding = memoize((): boolean => {
   const projectConfig = getCurrentProjectConfig()
-  // Short-circuit on cached config before isProjectOnboardingComplete()
-  // hits the filesystem — this runs during first render.
   if (
     projectConfig.hasCompletedProjectOnboarding ||
     projectConfig.projectOnboardingSeenCount >= 4 ||
@@ -71,10 +61,8 @@ export const shouldShowProjectOnboarding = memoize((): boolean => {
   ) {
     return false
   }
-
   return !isProjectOnboardingComplete()
 })
-
 export function incrementProjectOnboardingSeenCount(): void {
   saveCurrentProjectConfig(current => ({
     ...current,

@@ -22,7 +22,6 @@ import type { DeepImmutable } from 'src/types/utils.js'
 import stripAnsi from 'strip-ansi'
 import { createAssistantMessage } from '../messages.js'
 import { getPlan } from '../plans.js'
-
 export function toInternalMessages(
   messages: readonly DeepImmutable<SDKMessage>[],
 ): Message[] {
@@ -49,7 +48,6 @@ export function toInternalMessages(
           } as Message,
         ]
       case 'system':
-        // Handle compact boundary messages
         if (message.subtype === 'compact_boundary') {
           const compactMsg = message
           return [
@@ -72,9 +70,7 @@ export function toInternalMessages(
     }
   })
 }
-
 type SDKCompactMetadata = SDKCompactBoundaryMessage['compact_metadata']
-
 export function toSDKCompactMetadata(
   meta: CompactMetadata,
 ): SDKCompactMetadata {
@@ -91,10 +87,6 @@ export function toSDKCompactMetadata(
     }),
   }
 }
-
-/**
- * Shared SDK→internal compact_metadata converter.
- */
 export function fromSDKCompactMetadata(
   meta: SDKCompactMetadata,
 ): CompactMetadata {
@@ -111,7 +103,6 @@ export function fromSDKCompactMetadata(
     }),
   }
 }
-
 export function toSDKMessages(messages: Message[]): SDKMessage[] {
   return messages.flatMap((message): SDKMessage[] => {
     switch (message.type) {
@@ -136,10 +127,6 @@ export function toSDKMessages(messages: Message[]): SDKMessage[] {
             uuid: message.uuid,
             timestamp: message.timestamp,
             isSynthetic: message.isMeta || message.isVisibleInTranscriptOnly,
-            // Structured tool output (not the string content sent to the
-            // model — the full Output object). Rides the protobuf catchall
-            // so web viewers can read things like BriefTool's file_uuid
-            // without it polluting model context.
             ...(message.toolUseResult !== undefined
               ? { tool_use_result: message.toolUseResult }
               : {}),
@@ -157,10 +144,6 @@ export function toSDKMessages(messages: Message[]): SDKMessage[] {
             },
           ]
         }
-        // Only convert local_command messages that contain actual command
-        // output (stdout/stderr). The same subtype is also used for command
-        // input metadata (e.g. <command-name>...</command-name>) which must
-        // not leak to the RC web UI.
         if (
           message.subtype === 'local_command' &&
           (message.content.includes(`<${LOCAL_COMMAND_STDOUT_TAG}>`) ||
@@ -179,20 +162,6 @@ export function toSDKMessages(messages: Message[]): SDKMessage[] {
     }
   })
 }
-
-/**
- * Converts local command output (e.g. /voice, /cost) to a well-formed
- * SDKAssistantMessage so downstream consumers (mobile apps, session-ingress
- * v1alpha→v1beta converter) can parse it without schema changes.
- *
- * Emitted as assistant instead of the dedicated SDKLocalCommandOutputMessage
- * because the system/local_command_output subtype is unknown to:
- *   - mobile-apps Android SdkMessageTypes.kt (no local_command_output handler)
- *   - api-go session-ingress convertSystemEvent (only init/compact_boundary)
- * See: https://openai-compatible.sentry.io/issues/7266299248/ (Android)
- *
- * Strips ANSI (e.g. chalk.dim() in /cost) then unwraps the XML wrapper tags.
- */
 export function localCommandOutputToSDKAssistantMessage(
   rawContent: string,
   uuid: UUID,
@@ -201,9 +170,6 @@ export function localCommandOutputToSDKAssistantMessage(
     .replace(/<local-command-stdout>([\s\S]*?)<\/local-command-stdout>/, '$1')
     .replace(/<local-command-stderr>([\s\S]*?)<\/local-command-stderr>/, '$1')
     .trim()
-  // createAssistantMessage builds a complete APIAssistantMessage with id, type,
-  // model: SYNTHETIC_MODEL, role, stop_reason, usage — all fields required by
-  // downstream deserializers like Android's SdkAssistantMessage.
   const synthetic = createAssistantMessage({ content: cleanContent })
   return {
     type: 'assistant',
@@ -213,11 +179,6 @@ export function localCommandOutputToSDKAssistantMessage(
     uuid,
   }
 }
-
-/**
- * Maps internal OpenCodeCliLimits to the SDK-facing SDKRateLimitInfo type,
- * stripping internal-only fields like unifiedRateLimitFallbackAvailable.
- */
 export function toSDKRateLimitInfo(
   limits: OpenCodeCliLimits | undefined,
 ): SDKRateLimitInfo | undefined {
@@ -250,13 +211,6 @@ export function toSDKRateLimitInfo(
     }),
   }
 }
-
-/**
- * Normalizes tool inputs in assistant message content for SDK consumption.
- * Specifically injects plan content into ExitPlanModeV2 tool inputs since
- * the V2 tool reads plan from file instead of input, but SDK users expect
- * tool_input.plan to exist.
- */
 function normalizeAssistantMessageForSDK(
   message: AssistantMessage,
 ): AssistantMessage['message'] {
@@ -264,12 +218,10 @@ function normalizeAssistantMessageForSDK(
   if (!Array.isArray(content)) {
     return message.message
   }
-
   const normalizedContent = content.map((block): BetaContentBlock => {
     if (block.type !== 'tool_use') {
       return block
     }
-
     if (block.name === EXIT_PLAN_MODE_V2_TOOL_NAME) {
       const plan = getPlan()
       if (plan) {
@@ -279,10 +231,8 @@ function normalizeAssistantMessageForSDK(
         }
       }
     }
-
     return block
   })
-
   return {
     ...message.message,
     content: normalizedContent,

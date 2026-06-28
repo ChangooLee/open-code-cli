@@ -1,13 +1,5 @@
-/**
- * Random word slug generator for plan IDs
- * Inspired by https://github.com/nas5w/random-word-slugs
- * with Open Code CLI-flavored words
- */
 import { randomBytes } from 'crypto'
-
-// Adjectives for slug generation - whimsical and delightful
 const ADJECTIVES = [
-  // Classic pleasant adjectives
   'abundant',
   'ancient',
   'bright',
@@ -91,7 +83,6 @@ const ADJECTIVES = [
   'zany',
   'zesty',
   'zippy',
-  // Whimsical / magical
   'breezy',
   'bubbly',
   'buzzing',
@@ -152,7 +143,6 @@ const ADJECTIVES = [
   'wobbly',
   'woolly',
   'zazzy',
-  // Programming concepts
   'abstract',
   'adaptive',
   'agile',
@@ -230,10 +220,7 @@ const ADJECTIVES = [
   'vectorized',
   'virtual',
 ] as const
-
-// Nouns for slug generation - whimsical creatures, nature, and fun objects
 const NOUNS = [
-  // Nature & cosmic
   'aurora',
   'avalanche',
   'blossom',
@@ -321,7 +308,6 @@ const NOUNS = [
   'wave',
   'willow',
   'wind',
-  // Cute creatures
   'alpaca',
   'axolotl',
   'badger',
@@ -412,7 +398,6 @@ const NOUNS = [
   'wren',
   'yeti',
   'zebra',
-  // Fun objects & concepts
   'acorn',
   'anchor',
   'balloon',
@@ -528,7 +513,6 @@ const NOUNS = [
   'widget',
   'wreath',
   'zephyr',
-  // Computer scientists
   'abelson',
   'adleman',
   'aho',
@@ -647,8 +631,6 @@ const NOUNS = [
   'wozniak',
   'yao',
 ] as const
-
-// Verbs for the middle word - whimsical action words
 const VERBS = [
   'baking',
   'beaming',
@@ -760,39 +742,20 @@ const VERBS = [
   'yawning',
   'zooming',
 ] as const
-
-/**
- * Generate a cryptographically random integer in the range [0, max)
- */
 function randomInt(max: number): number {
-  // Use crypto.randomBytes for better randomness than Math.random
   const bytes = randomBytes(4)
   const value = bytes.readUInt32BE(0)
   return value % max
 }
-
-/**
- * Pick a random element from an array
- */
 function pickRandom<T>(array: readonly T[]): T {
   return array[randomInt(array.length)]!
 }
-
-/**
- * Generate a random word slug in the format "adjective-verb-noun"
- * Example: "gleaming-brewing-phoenix", "cosmic-pondering-lighthouse"
- */
 export function generateWordSlug(): string {
   const adjective = pickRandom(ADJECTIVES)
   const verb = pickRandom(VERBS)
   const noun = pickRandom(NOUNS)
   return `${adjective}-${verb}-${noun}`
 }
-
-/**
- * Generate a shorter random word slug in the format "adjective-noun"
- * Example: "graceful-unicorn", "cosmic-lighthouse"
- */
 export function generateShortWordSlug(): string {
   const adjective = pickRandom(ADJECTIVES)
   const noun = pickRandom(NOUNS)

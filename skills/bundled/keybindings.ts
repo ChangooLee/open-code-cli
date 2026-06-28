@@ -13,10 +13,6 @@ import {
 } from '../../keybindings/schema.js'
 import { jsonStringify } from '../../utils/slowOperations.js'
 import { registerBundledSkill } from '../bundledSkills.js'
-
-/**
- * Build a markdown table of all contexts.
- */
 function generateContextsTable(): string {
   return markdownTable(
     ['Context', 'Description'],
@@ -26,12 +22,7 @@ function generateContextsTable(): string {
     ]),
   )
 }
-
-/**
- * Build a markdown table of all actions with their default bindings and context.
- */
 function generateActionsTable(): string {
-  // Build a lookup: action -> { keys, context }
   const actionInfo: Record<string, { keys: string[]; context: string }> = {}
   for (const block of DEFAULT_BINDINGS) {
     for (const [key, action] of Object.entries(block.bindings)) {
@@ -43,7 +34,6 @@ function generateActionsTable(): string {
       }
     }
   }
-
   return markdownTable(
     ['Action', 'Default Key(s)', 'Context'],
     KEYBINDING_ACTIONS.map(action => {
@@ -54,10 +44,6 @@ function generateActionsTable(): string {
     }),
   )
 }
-
-/**
- * Infer context from action prefix when not in DEFAULT_BINDINGS.
- */
 function inferContextFromAction(action: string): string {
   const prefix = action.split(':')[0]
   const prefixToContext: Record<string, string> = {
@@ -82,18 +68,12 @@ function inferContextFromAction(action: string): string {
   }
   return prefixToContext[prefix ?? ''] ?? 'Unknown'
 }
-
-/**
- * Build a list of reserved shortcuts.
- */
 function generateReservedShortcuts(): string {
   const lines: string[] = []
-
   lines.push('### Non-rebindable (errors)')
   for (const s of NON_REBINDABLE) {
     lines.push(`- \`${s.key}\` — ${s.reason}`)
   }
-
   lines.push('')
   lines.push('### Terminal reserved (errors/warnings)')
   for (const s of TERMINAL_RESERVED) {
@@ -101,16 +81,13 @@ function generateReservedShortcuts(): string {
       `- \`${s.key}\` — ${s.reason} (${s.severity === 'error' ? 'will not work' : 'may conflict'})`,
     )
   }
-
   lines.push('')
   lines.push('### macOS reserved (errors)')
   for (const s of MACOS_RESERVED) {
     lines.push(`- \`${s.key}\` — ${s.reason}`)
   }
-
   return lines.join('\n')
 }
-
 const FILE_FORMAT_EXAMPLE: KeybindingsSchemaType = {
   $schema: 'https://www.schemastore.org/open-code-cli-keybindings.json',
   $docs: 'https://open-code-cli.dev/docs/keybindings',
@@ -123,14 +100,12 @@ const FILE_FORMAT_EXAMPLE: KeybindingsSchemaType = {
     },
   ],
 }
-
 const UNBIND_EXAMPLE: KeybindingsSchemaType['bindings'][number] = {
   context: 'Chat',
   bindings: {
     'ctrl+s': null,
   },
 }
-
 const REBIND_EXAMPLE: KeybindingsSchemaType['bindings'][number] = {
   context: 'Chat',
   bindings: {
@@ -138,14 +113,12 @@ const REBIND_EXAMPLE: KeybindingsSchemaType['bindings'][number] = {
     'ctrl+e': 'chat:externalEditor',
   },
 }
-
 const CHORD_EXAMPLE: KeybindingsSchemaType['bindings'][number] = {
   context: 'Global',
   bindings: {
     'ctrl+k ctrl+t': 'app:toggleTodos',
   },
 }
-
 const SECTION_INTRO = [
   '# Keybindings Skill',
   '',
@@ -158,7 +131,6 @@ const SECTION_INTRO = [
   '- Use **Edit** tool for modifications to existing files',
   '- Use **Write** tool only if the file does not exist yet',
 ].join('\n')
-
 const SECTION_FILE_FORMAT = [
   '## File Format',
   '',
@@ -168,7 +140,6 @@ const SECTION_FILE_FORMAT = [
   '',
   'Always include the `$schema` and `$docs` fields.',
 ].join('\n')
-
 const SECTION_KEYSTROKE_SYNTAX = [
   '## Keystroke Syntax',
   '',
@@ -184,7 +155,6 @@ const SECTION_KEYSTROKE_SYNTAX = [
   '',
   '**Examples**: `ctrl+shift+p`, `alt+enter`, `ctrl+k ctrl+n`',
 ].join('\n')
-
 const SECTION_UNBINDING = [
   '## Unbinding Default Shortcuts',
   '',
@@ -194,7 +164,6 @@ const SECTION_UNBINDING = [
   jsonStringify(UNBIND_EXAMPLE, null, 2),
   '```',
 ].join('\n')
-
 const SECTION_INTERACTION = [
   '## How User Bindings Interact with Defaults',
   '',
@@ -202,7 +171,6 @@ const SECTION_INTERACTION = [
   '- To **move** a binding to a different key: unbind the old key (`null`) AND add the new binding',
   "- A context only needs to appear in the user's file if they want to change something in that context",
 ].join('\n')
-
 const SECTION_COMMON_PATTERNS = [
   '## Common Patterns',
   '',
@@ -217,7 +185,6 @@ const SECTION_COMMON_PATTERNS = [
   jsonStringify(CHORD_EXAMPLE, null, 2),
   '```',
 ].join('\n')
-
 const SECTION_BEHAVIORAL_RULES = [
   '## Behavioral Rules',
   '',
@@ -227,7 +194,6 @@ const SECTION_BEHAVIORAL_RULES = [
   '4. When adding a new binding for an existing action, the new binding is additive (existing default still works unless explicitly unbound)',
   '5. To fully replace a default binding, unbind the old key AND add the new one',
 ].join('\n')
-
 const SECTION_DOCTOR = [
   '## Validation with /doctor',
   '',
@@ -288,7 +254,6 @@ const SECTION_DOCTOR = [
   '',
   '**Errors** prevent bindings from working and must be fixed. **Warnings** indicate potential conflicts but the binding may still work.',
 ].join('\n')
-
 export function registerKeybindingsSkill(): void {
   registerBundledSkill({
     name: 'keybindings-help',
@@ -298,11 +263,9 @@ export function registerKeybindingsSkill(): void {
     userInvocable: false,
     isEnabled: isKeybindingCustomizationEnabled,
     async getPromptForCommand(args) {
-      // Generate reference tables dynamically from source-of-truth arrays
       const contextsTable = generateContextsTable()
       const actionsTable = generateActionsTable()
       const reservedShortcuts = generateReservedShortcuts()
-
       const sections = [
         SECTION_INTRO,
         SECTION_FILE_FORMAT,
@@ -316,19 +279,13 @@ export function registerKeybindingsSkill(): void {
         `## Available Contexts\n\n${contextsTable}`,
         `## Available Actions\n\n${actionsTable}`,
       ]
-
       if (args) {
         sections.push(`## User Request\n\n${args}`)
       }
-
       return [{ type: 'text', text: sections.join('\n\n') }]
     },
   })
 }
-
-/**
- * Build a markdown table from headers and rows.
- */
 function markdownTable(headers: string[], rows: string[][]): string {
   const separator = headers.map(() => '---')
   return [

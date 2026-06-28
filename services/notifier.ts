@@ -8,24 +8,19 @@ import {
   type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
   logEvent,
 } from './analytics/index.js'
-
 export type NotificationOptions = {
   message: string
   title?: string
   notificationType: string
 }
-
 export async function sendNotification(
   notif: NotificationOptions,
   terminal: TerminalNotification,
 ): Promise<void> {
   const config = getGlobalConfig()
   const channel = config.preferredNotifChannel
-
   await executeNotificationHooks(notif)
-
   const methodUsed = await sendToChannel(channel, notif, terminal)
-
   logEvent('open_code_cli_notification_method_used', {
     configured_channel:
       channel as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
@@ -34,16 +29,13 @@ export async function sendNotification(
     term: env.terminal as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
   })
 }
-
 const DEFAULT_TITLE = 'Open Code CLI'
-
 async function sendToChannel(
   channel: string,
   opts: NotificationOptions,
   terminal: TerminalNotification,
 ): Promise<string> {
   const title = opts.title || DEFAULT_TITLE
-
   try {
     switch (channel) {
       case 'auto':
@@ -73,13 +65,11 @@ async function sendToChannel(
     return 'error'
   }
 }
-
 async function sendAuto(
   opts: NotificationOptions,
   terminal: TerminalNotification,
 ): Promise<string> {
   const title = opts.title || DEFAULT_TITLE
-
   switch (env.terminal) {
     case 'Apple_Terminal': {
       const bellDisabled = await isAppleTerminalBellDisabled()
@@ -102,39 +92,30 @@ async function sendAuto(
       return 'no_method_available'
   }
 }
-
 function generateKittyId(): number {
   return Math.floor(Math.random() * 10000)
 }
-
 async function isAppleTerminalBellDisabled(): Promise<boolean> {
   try {
     if (env.terminal !== 'Apple_Terminal') {
       return false
     }
-
     const osascriptResult = await execFileNoThrow('osascript', [
       '-e',
       'tell application "Terminal" to name of current settings of front window',
     ])
     const currentProfile = osascriptResult.stdout.trim()
-
     if (!currentProfile) {
       return false
     }
-
     const defaultsOutput = await execFileNoThrow('defaults', [
       'export',
       'com.apple.Terminal',
       '-',
     ])
-
     if (defaultsOutput.code !== 0) {
       return false
     }
-
-    // Lazy-load plist (~280KB with xmlbuilder+@xmldom) — only hit on
-    // Apple_Terminal with auto-channel, which is a small fraction of users.
     const plist = await import('plist')
     const parsed: Record<string, unknown> = plist.parse(defaultsOutput.stdout)
     const windowSettings = parsed?.['Window Settings'] as
@@ -143,11 +124,9 @@ async function isAppleTerminalBellDisabled(): Promise<boolean> {
     const profileSettings = windowSettings?.[currentProfile] as
       | Record<string, unknown>
       | undefined
-
     if (!profileSettings) {
       return false
     }
-
     return profileSettings.Bell === false
   } catch (error) {
     logError(error)

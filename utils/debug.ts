@@ -2,7 +2,6 @@ import { appendFile, mkdir, symlink, unlink } from 'fs/promises'
 import memoize from 'lodash-es/memoize.js'
 import { dirname, join } from 'path'
 import { getSessionId } from 'src/bootstrap/state.js'
-
 import { type BufferedWriter, createBufferedWriter } from './bufferedWriter.js'
 import { registerCleanup } from './cleanupRegistry.js'
 import {
@@ -14,9 +13,7 @@ import { getOpenCodeCliConfigHomeDir, isEnvTruthy } from './envUtils.js'
 import { getFsImplementation } from './fsOperations.js'
 import { writeToStderr } from './process.js'
 import { jsonStringify } from './slowOperations.js'
-
 export type DebugLogLevel = 'verbose' | 'debug' | 'info' | 'warn' | 'error'
-
 const LEVEL_ORDER: Record<DebugLogLevel, number> = {
   verbose: 0,
   debug: 1,
@@ -24,13 +21,6 @@ const LEVEL_ORDER: Record<DebugLogLevel, number> = {
   warn: 3,
   error: 4,
 }
-
-/**
- * Minimum log level to include in debug output. Defaults to 'debug', which
- * filters out 'verbose' messages. Set OPEN_CODE_CLI_DEBUG_LOG_LEVEL=verbose to
- * include high-volume diagnostics (e.g. full statusLine command, shell, cwd,
- * stdout/stderr) that would otherwise drown out useful debug output.
- */
 export const getMinDebugLogLevel = memoize((): DebugLogLevel => {
   const raw = process.env.OPEN_CODE_CLI_DEBUG_LOG_LEVEL?.toLowerCase().trim()
   if (raw && Object.hasOwn(LEVEL_ORDER, raw)) {
@@ -38,9 +28,7 @@ export const getMinDebugLogLevel = memoize((): DebugLogLevel => {
   }
   return 'debug'
 })
-
 let runtimeDebugEnabled = false
-
 export const isDebugMode = memoize((): boolean => {
   return (
     runtimeDebugEnabled ||
@@ -49,45 +37,29 @@ export const isDebugMode = memoize((): boolean => {
     process.argv.includes('--debug') ||
     process.argv.includes('-d') ||
     isDebugToStdErr() ||
-    // Also check for --debug=pattern syntax
     process.argv.some(arg => arg.startsWith('--debug=')) ||
-    // --debug-file implicitly enables debug mode
     getDebugFilePath() !== null
   )
 })
-
-/**
- * Enables debug logging mid-session (e.g. via /debug). Non-ants don't write
- * debug logs by default, so this lets them start capturing without restarting
- * with --debug. Returns true if logging was already active.
- */
 export function enableDebugLogging(): boolean {
   const wasActive = isDebugMode() || process.env.USER_TYPE === 'ant'
   runtimeDebugEnabled = true
   isDebugMode.cache.clear?.()
   return wasActive
 }
-
-// Extract and parse debug filter from command line arguments
-// Exported for testing purposes
 export const getDebugFilter = memoize((): DebugFilter | null => {
-  // Look for --debug=pattern in argv
   const debugArg = process.argv.find(arg => arg.startsWith('--debug='))
   if (!debugArg) {
     return null
   }
-
-  // Extract the pattern after the equals sign
   const filterPattern = debugArg.substring('--debug='.length)
   return parseDebugFilter(filterPattern)
 })
-
 export const isDebugToStdErr = memoize((): boolean => {
   return (
     process.argv.includes('--debug-to-stderr') || process.argv.includes('-d2e')
   )
 })
-
 export const getDebugFilePath = memoize((): string | null => {
   for (let i = 0; i < process.argv.length; i++) {
     const arg = process.argv[i]!
@@ -100,18 +72,13 @@ export const getDebugFilePath = memoize((): string | null => {
   }
   return null
 })
-
 function shouldLogDebugMessage(message: string): boolean {
   if (process.env.NODE_ENV === 'test' && !isDebugToStdErr()) {
     return false
   }
-
-  // Non-ants only write debug logs when debug mode is active (via --debug at
-  // startup or /debug mid-session). Ants always log for /share, bug reports.
   if (process.env.USER_TYPE !== 'ant' && !isDebugMode()) {
     return false
   }
-
   if (
     typeof process === 'undefined' ||
     typeof process.versions === 'undefined' ||
@@ -119,11 +86,9 @@ function shouldLogDebugMessage(message: string): boolean {
   ) {
     return false
   }
-
   const filter = getDebugFilter()
   return shouldShowDebugMessage(message, filter)
 }
-
 let hasFormattedOutput = false
 export function setHasFormattedOutput(value: boolean): void {
   hasFormattedOutput = value
@@ -131,12 +96,8 @@ export function setHasFormattedOutput(value: boolean): void {
 export function getHasFormattedOutput(): boolean {
   return hasFormattedOutput
 }
-
 let debugWriter: BufferedWriter | null = null
 let pendingWrite: Promise<void> = Promise.resolve()
-
-// Module-level so .bind captures only its explicit args, not the
-// writeFn closure's parent scope (Jarred, #22257).
 async function appendAsync(
   needMkdir: boolean,
   dir: string,
@@ -149,9 +110,7 @@ async function appendAsync(
   await appendFile(path, content)
   void updateLatestDebugLogSymlink()
 }
-
 function noop(): void {}
-
 function getDebugWriter(): BufferedWriter {
   if (!debugWriter) {
     let ensuredDir: string | null = null
@@ -162,23 +121,16 @@ function getDebugWriter(): BufferedWriter {
         const needMkdir = ensuredDir !== dir
         ensuredDir = dir
         if (isDebugMode()) {
-          // immediateMode: must stay sync. Async writes are lost on direct
-          // process.exit() and keep the event loop alive in beforeExit
-          // handlers (infinite loop with Perfetto tracing). See #22257.
           if (needMkdir) {
             try {
               getFsImplementation().mkdirSync(dir)
             } catch {
-              // Directory already exists
             }
           }
           getFsImplementation().appendFileSync(path, content)
           void updateLatestDebugLogSymlink()
           return
         }
-        // Buffered path (ants without --debug): flushes ~1/sec so chain
-        // depth stays ~1. .bind over a closure so only the bound args are
-        // retained, not this scope.
         pendingWrite = pendingWrite
           .then(appendAsync.bind(null, needMkdir, dir, path, content))
           .catch(noop)
@@ -194,12 +146,10 @@ function getDebugWriter(): BufferedWriter {
   }
   return debugWriter
 }
-
 export async function flushDebugLogs(): Promise<void> {
   debugWriter?.flush()
   await pendingWrite
 }
-
 export function logForDebugging(
   message: string,
   { level }: { level: DebugLogLevel } = {
@@ -212,8 +162,6 @@ export function logForDebugging(
   if (!shouldLogDebugMessage(message)) {
     return
   }
-
-  // Multiline messages break the jsonl output format, so make any multiline messages JSON.
   if (hasFormattedOutput && message.includes('\n')) {
     message = jsonStringify(message)
   }
@@ -223,10 +171,8 @@ export function logForDebugging(
     writeToStderr(output)
     return
   }
-
   getDebugWriter().write(output)
 }
-
 export function getDebugLogPath(): string {
   return (
     getDebugFilePath() ??
@@ -234,32 +180,20 @@ export function getDebugLogPath(): string {
     join(getOpenCodeCliConfigHomeDir(), 'debug', `${getSessionId()}.txt`)
   )
 }
-
-/**
- * Updates the latest debug log symlink to point to the current debug log file.
- * Creates or updates a symlink at ~/.open-code-cli/debug/latest
- */
 const updateLatestDebugLogSymlink = memoize(async (): Promise<void> => {
   try {
     const debugLogPath = getDebugLogPath()
     const debugLogsDir = dirname(debugLogPath)
     const latestSymlinkPath = join(debugLogsDir, 'latest')
-
     await unlink(latestSymlinkPath).catch(() => {})
     await symlink(debugLogPath, latestSymlinkPath)
   } catch {
-    // Silently fail if symlink creation fails
   }
 })
-
-/**
- * Logs errors for Ants only, always visible in production.
- */
 export function logAntError(context: string, error: unknown): void {
   if (process.env.USER_TYPE !== 'ant') {
     return
   }
-
   if (error instanceof Error && error.stack) {
     logForDebugging(`[ANT-ONLY] ${context} stack trace:\n${error.stack}`, {
       level: 'error',

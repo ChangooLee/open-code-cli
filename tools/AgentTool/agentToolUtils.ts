@@ -501,7 +501,15 @@ export async function runAsyncAgentLifecycle({
           stopSummarization = stop
         }
       : undefined
-    for await (const message of makeStream(onCacheSafeParams)) {
+    const asyncStream = makeStream(onCacheSafeParams)
+    let asyncTerminalReason: string | undefined
+    while (true) {
+      const next = await asyncStream.next()
+      if (next.done) {
+        asyncTerminalReason = next.value as string | undefined
+        break
+      }
+      const message = next.value
       agentMessages.push(message)
       rootSetAppState(prev => {
         const t = prev.tasks[taskId]
@@ -539,7 +547,7 @@ export async function runAsyncAgentLifecycle({
       }
     }
     stopSummarization?.()
-    const agentResult = finalizeAgentTool(agentMessages, taskId, metadata)
+    const agentResult = finalizeAgentTool(agentMessages, taskId, metadata, asyncTerminalReason)
     completeAsyncAgent(agentResult, rootSetAppState)
     let finalMessage = extractTextContent(agentResult.content, '\n')
     if (feature('TRANSCRIPT_CLASSIFIER')) {

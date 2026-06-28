@@ -34,16 +34,54 @@ function toolResultText(block: any): string {
 
 export type VerificationGateAction = 'allow' | 'block' | 'fail'
 
-export function evaluateVerificationGate(messages: any[]): {
+export type BackgroundAgentSignals = { edits: number; failed: boolean }
+
+// Background/async subagents never return a tool_result into the parent's
+// message stream (their result is stored as a task), so the marker scan below
+// cannot see them. The caller extracts equivalent signals straight from the
+// completed background task results and passes them in. Reading genuine task
+// results (not arbitrary tool_result text) keeps this spoof-resistant.
+export function extractBackgroundAgentSignals(
+  tasks: Record<string, any> | undefined,
+): BackgroundAgentSignals {
+  let edits = 0
+  let failed = false
+  for (const t of Object.values(tasks ?? {})) {
+    if (
+      (t as any)?.type !== 'local_agent' ||
+      !(t as any)?.isBackgrounded ||
+      ((t as any)?.status !== 'completed' && (t as any)?.status !== 'failed')
+    ) {
+      continue
+    }
+    const content = (t as any)?.result?.content
+    const text = Array.isArray(content)
+      ? content.map((b: any) => (typeof b?.text === 'string' ? b.text : '')).join('\n')
+      : ''
+    const m = text.match(/<subagent_edits>(\d+)<\/subagent_edits>/)
+    if (m) {
+      edits += Number(m[1])
+    }
+    if (text.includes('<subagent_verification_failed/>')) {
+      failed = true
+    }
+  }
+  return { edits, failed }
+}
+
+export function evaluateVerificationGate(
+  messages: any[],
+  backgroundSignals?: BackgroundAgentSignals,
+): {
   action: VerificationGateAction
   editCount: number
 } {
   if (!feature('VERIFY_IMPLEMENTATION_BEFORE_COMPLETION')) {
     return { action: 'allow', editCount: 0 }
   }
-  let editCount = 0
+  let editCount = backgroundSignals?.edits ?? 0
   let directiveCount = 0
-  let subagentFailed = false
+  let subagentFailed = backgroundSignals?.failed ?? false
   // tool_use ids of Agent calls (any subagent), and of the verification
   // subagent specifically. Delegated-work and PASS markers only count when
   // they come back as THAT Agent call's tool_result — so an unrelated Bash

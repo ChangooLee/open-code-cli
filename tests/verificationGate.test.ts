@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import {
   evaluateVerificationGate,
   buildVerificationDirective,
+  extractBackgroundAgentSignals,
 } from '../query/verificationGate.js'
 
 const edits = (n: number) => ({
@@ -113,4 +114,56 @@ test('does NOT honor subagent markers from a non-Agent tool_result (anti-spoof)'
   const r = evaluateVerificationGate(msgs)
   assert.equal(r.editCount, 0)
   assert.equal(r.action, 'allow')
+})
+
+// Background/async subagent signals (extracted from app-state task results)
+// reach the gate even though they never appear as a parent tool_result.
+test('background-agent failure signal forces the gate', () => {
+  assert.equal(
+    evaluateVerificationGate([], { edits: 0, failed: true }).action,
+    'block',
+  )
+})
+
+test('background-agent edit signal counts toward the gate', () => {
+  const r = evaluateVerificationGate([], { edits: 3, failed: false })
+  assert.equal(r.editCount, 3)
+  assert.equal(r.action, 'block')
+})
+
+test('no background signals => no gate from this path', () => {
+  assert.equal(
+    evaluateVerificationGate([], { edits: 0, failed: false }).action,
+    'allow',
+  )
+})
+
+// extractBackgroundAgentSignals reads only completed/failed BACKGROUND
+// local_agent task results (not running, not foreground, not other types).
+test('extractBackgroundAgentSignals pulls markers from background task results', () => {
+  const tasks = {
+    a: {
+      type: 'local_agent',
+      isBackgrounded: true,
+      status: 'completed',
+      result: { content: [{ type: 'text', text: 'done\n<subagent_edits>3</subagent_edits>\n<subagent_verification_failed/>' }] },
+    },
+    b: {
+      type: 'local_agent',
+      isBackgrounded: false,
+      status: 'completed',
+      result: { content: [{ type: 'text', text: '<subagent_edits>5</subagent_edits>' }] },
+    },
+    c: { type: 'local_agent', isBackgrounded: true, status: 'running' },
+    d: { type: 'local_bash', isBackgrounded: true, status: 'completed' },
+  }
+  const s = extractBackgroundAgentSignals(tasks)
+  assert.equal(s.edits, 3) // only task 'a' (background + completed); 'b' is foreground
+  assert.equal(s.failed, true)
+})
+
+test('extractBackgroundAgentSignals handles undefined tasks', () => {
+  const s = extractBackgroundAgentSignals(undefined)
+  assert.equal(s.edits, 0)
+  assert.equal(s.failed, false)
 })

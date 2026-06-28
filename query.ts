@@ -7,6 +7,7 @@ import { resolveEffectiveMaxTurns } from './query/boundedAutonomy.js'
 import {
   evaluateVerificationGate,
   buildVerificationDirective,
+  extractBackgroundAgentSignals,
 } from './query/verificationGate.js'
 import { detectNoProgress } from './query/loopDetection.js'
 import { FallbackTriggeredError } from './services/api/withRetry.js'
@@ -1021,10 +1022,10 @@ async function* queryLoop(
           })
         }
       }
-      const verificationGate = evaluateVerificationGate([
-        ...messagesForQuery,
-        ...assistantMessages,
-      ])
+      const verificationGate = evaluateVerificationGate(
+        [...messagesForQuery, ...assistantMessages],
+        extractBackgroundAgentSignals(toolUseContext.getAppState().tasks),
+      )
       if (verificationGate.action === 'block') {
         state = {
           messages: [

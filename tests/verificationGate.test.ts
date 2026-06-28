@@ -167,3 +167,24 @@ test('extractBackgroundAgentSignals handles undefined tasks', () => {
   assert.equal(s.edits, 0)
   assert.equal(s.failed, false)
 })
+
+// Regression guard: a failed background task from a PRIOR query session
+// (endTime before sinceMs) must NOT keep gating later, unrelated queries.
+test('extractBackgroundAgentSignals ignores tasks terminal before sinceMs', () => {
+  const tasks = {
+    old: {
+      type: 'local_agent',
+      isBackgrounded: true,
+      status: 'failed',
+      endTime: 1000,
+      result: { content: [{ type: 'text', text: '<subagent_verification_failed/>' }] },
+    },
+  }
+  // Query started at 5000: the old task (endTime 1000) is out of scope.
+  assert.deepEqual(extractBackgroundAgentSignals(tasks, 5000), {
+    edits: 0,
+    failed: false,
+  })
+  // A query started at 500 (before the task finished) does see it.
+  assert.equal(extractBackgroundAgentSignals(tasks, 500).failed, true)
+})

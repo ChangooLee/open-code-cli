@@ -43,6 +43,7 @@ export type BackgroundAgentSignals = { edits: number; failed: boolean }
 // results (not arbitrary tool_result text) keeps this spoof-resistant.
 export function extractBackgroundAgentSignals(
   tasks: Record<string, any> | undefined,
+  sinceMs?: number,
 ): BackgroundAgentSignals {
   let edits = 0
   let failed = false
@@ -53,6 +54,15 @@ export function extractBackgroundAgentSignals(
       ((t as any)?.status !== 'completed' && (t as any)?.status !== 'failed')
     ) {
       continue
+    }
+    // Only count work that became terminal during the CURRENT query session.
+    // Without this, a failed background task from a PRIOR turn would re-block
+    // every later (unrelated) query until it evicts.
+    if (sinceMs !== undefined) {
+      const endTime = (t as any)?.endTime
+      if (typeof endTime !== 'number' || endTime < sinceMs) {
+        continue
+      }
     }
     const content = (t as any)?.result?.content
     const text = Array.isArray(content)

@@ -215,6 +215,7 @@ async function* queryLoop(
   } = params
   const deps = params.deps ?? productionDeps()
   const effectiveMaxTurns = resolveEffectiveMaxTurns(maxTurns)
+  const queryStartedAt = Date.now()
   let modelCallCount = 0
   let state: State = {
     messages: params.messages,
@@ -1024,7 +1025,10 @@ async function* queryLoop(
       }
       const verificationGate = evaluateVerificationGate(
         [...messagesForQuery, ...assistantMessages],
-        extractBackgroundAgentSignals(toolUseContext.getAppState().tasks),
+        extractBackgroundAgentSignals(
+          toolUseContext.getAppState().tasks,
+          queryStartedAt,
+        ),
       )
       if (verificationGate.action === 'block') {
         state = {

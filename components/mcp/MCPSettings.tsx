@@ -75,7 +75,7 @@ export function MCPSettings(t0) {
                     const isSSE = client_0.config.type === "sse";
                     const isHTTP = client_0.config.type === "http";
                     const isOpenCodeCliProxy = client_0.config.type === "openCodeCli-proxy";
-                    let isAuthenticated = undefined;
+                    let isAuthenticated: boolean | undefined = undefined;
                     if (isSSE || isHTTP) {
                         const authProvider = new OpenCodeCliAuthProvider(client_0.name, client_0.config as McpSSEServerConfig | McpHTTPServerConfig);
                         const tokens = await authProvider.tokens();

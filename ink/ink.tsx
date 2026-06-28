@@ -194,7 +194,7 @@ export default class Ink {
     noop,
     noop 
     );
-    if ("production" === 'development') {
+    if (("production" as string) === 'development') {
       reconciler.injectIntoDevTools({
         bundleType: 0,
         version: '16.13.1',
@@ -925,7 +925,7 @@ export default class Ink {
     const stderr = process.stderr;
     const originalWrite = stderr.write;
     let reentered = false;
-    const intercept = (chunk: Uint8Array | string, encodingOrCb?: BufferEncoding | ((err?: Error) => void), cb?: (err?: Error) => void): boolean => {
+    const intercept = (chunk: Uint8Array | string, encodingOrCb?: BufferEncoding | ((err?: Error | null) => void), cb?: (err?: Error | null) => void): boolean => {
       const callback = typeof encodingOrCb === 'function' ? encodingOrCb : cb;
       if (reentered) {
         const encoding = typeof encodingOrCb === 'string' ? encodingOrCb : undefined;

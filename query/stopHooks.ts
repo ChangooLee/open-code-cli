@@ -85,7 +85,7 @@ export async function* handleStopHooks(messagesForQuery: Message[], assistantMes
         }
     }
     try {
-        const blockingErrors = [];
+        const blockingErrors: Message[] = [];
         const appState = toolUseContext.getAppState();
         const permissionMode = appState.toolPermissionContext.mode;
         const generator = executeStopHooks(permissionMode, toolUseContext.abortController.signal, undefined, stopHookActive ?? false, toolUseContext.agentId, toolUseContext, [...messagesForQuery, ...assistantMessages], toolUseContext.agentType);
@@ -107,7 +107,7 @@ export async function* handleStopHooks(messagesForQuery: Message[], assistantMes
                         hookInfos.push({
                             command: progressData.command,
                             promptText: progressData.promptText,
-                        });
+                        } as StopHookInfo);
                     }
                 }
                 if (result.message.type === 'attachment') {

@@ -276,8 +276,8 @@ function PromptInput({
   const replBridgeExplicit = useAppState(s => s.replBridgeExplicit);
   const replBridgeReconnecting = useAppState(s => s.replBridgeReconnecting);
   const bridgeFooterVisible = replBridgeConnected && (replBridgeExplicit || replBridgeReconnecting);
-  const hasTungstenSession = useAppState(s => "external" === 'ant' && s.tungstenActiveSession !== undefined);
-  const tmuxFooterVisible = "external" === 'ant' && hasTungstenSession;
+  const hasTungstenSession = useAppState(s => ("external" as string) === 'ant' && s.tungstenActiveSession !== undefined);
+  const tmuxFooterVisible = ("external" as string) === 'ant' && hasTungstenSession;
   const bagelFooterVisible = useAppState(s => false);
   const teamContext = useAppState(s => s.teamContext);
   const queuedCommands = useCommandQueue();
@@ -343,7 +343,7 @@ function PromptInput({
     };
   }), [setAppState]);
   const coordinatorTaskCount = useCoordinatorTaskCount();
-  const hasBgTaskPill = useMemo(() => Object.values(tasks).some(t => isBackgroundTask(t) && !("external" === 'ant' && isPanelAgentTask(t))), [tasks]);
+  const hasBgTaskPill = useMemo(() => Object.values(tasks).some(t => isBackgroundTask(t) && !(("external" as string) === 'ant' && isPanelAgentTask(t))), [tasks]);
   const minCoordinatorIndex = hasBgTaskPill ? -1 : 0;
   useEffect(() => {
     if (coordinatorTaskIndex >= coordinatorTaskCount) {
@@ -392,7 +392,7 @@ function PromptInput({
     }];
   }, [teamContext]);
   const runningTaskCount = useMemo(() => count(Object.values(tasks), t => t.status === 'running'), [tasks]);
-  const tasksFooterVisible = (runningTaskCount > 0 || "external" === 'ant' && coordinatorTaskCount > 0) && !shouldHideTasksFooter(tasks, showSpinnerTree);
+  const tasksFooterVisible = (runningTaskCount > 0 || ("external" as string) === 'ant' && coordinatorTaskCount > 0) && !shouldHideTasksFooter(tasks, showSpinnerTree);
   const teamsFooterVisible = cachedTeams.length > 0;
   const footerItems = useMemo(() => [tasksFooterVisible && 'tasks', tmuxFooterVisible && 'tmux', bagelFooterVisible && 'bagel', teamsFooterVisible && 'teams', bridgeFooterVisible && 'bridge', companionFooterVisible && 'companion'].filter(Boolean) as FooterItem[], [tasksFooterVisible, tmuxFooterVisible, bagelFooterVisible, teamsFooterVisible, bridgeFooterVisible, companionFooterVisible]);
   const rawFooterSelection = useAppState(s => s.footerSelection);
@@ -1393,14 +1393,14 @@ function PromptInput({
   });
   useKeybindings({
     'footer:up': () => {
-      if (tasksSelected && "external" === 'ant' && coordinatorTaskCount > 0 && coordinatorTaskIndex > minCoordinatorIndex) {
+      if (tasksSelected && ("external" as string) === 'ant' && coordinatorTaskCount > 0 && coordinatorTaskIndex > minCoordinatorIndex) {
         setCoordinatorTaskIndex(prev => prev - 1);
         return;
       }
       navigateFooter(-1, true);
     },
     'footer:down': () => {
-      if (tasksSelected && "external" === 'ant' && coordinatorTaskCount > 0) {
+      if (tasksSelected && ("external" as string) === 'ant' && coordinatorTaskCount > 0) {
         if (coordinatorTaskIndex < coordinatorTaskCount - 1) {
           setCoordinatorTaskIndex(prev => prev + 1);
         }
@@ -1461,7 +1461,7 @@ function PromptInput({
           }
           break;
         case 'tmux':
-          if ("external" === 'ant') {
+          if (("external" as string) === 'ant') {
             setAppState(prev => prev.tungstenPanelAutoHidden ? {
               ...prev,
               tungstenPanelAutoHidden: false

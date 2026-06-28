@@ -27,7 +27,7 @@ export function checkMockRateLimitError(
   }
   const headerlessMessage = getMockHeaderless429Message()
   if (headerlessMessage) {
-    return new APIError(
+    return new (APIError as any)(
       429,
       { error: { type: 'rate_limit_error', message: headerlessMessage } },
       headerlessMessage,
@@ -53,7 +53,7 @@ export function checkMockRateLimitError(
     if (fastModeHeaders === null) {
       return null
     }
-    const error = new APIError(
+    const error = new (APIError as any)(
       429,
       { error: { type: 'rate_limit_error', message: 'Rate limit exceeded' } },
       'Rate limit exceeded',
@@ -69,7 +69,7 @@ export function checkMockRateLimitError(
   const shouldThrow429 =
     status === 'rejected' && (!overageStatus || overageStatus === 'rejected')
   if (shouldThrow429) {
-    const error = new APIError(
+    const error = new (APIError as any)(
       429,
       { error: { type: 'rate_limit_error', message: 'Rate limit exceeded' } },
       'Rate limit exceeded',

@@ -246,9 +246,9 @@ export function VirtualMessageList({
       msgType: m.type,
       expanded: false,
       toolName: toolCallOf(m)?.name
-    });
+    } as any);
     const selIdx = selectedIndex ?? -1;
-    const scan = (from: number, dir: 1 | -1, pred: (i: number) => boolean = isVisible) => {
+    const scan = (from: number, dir: 1 | -1, pred: (i: number) => any = isVisible) => {
       for (let i = from; i >= 0 && i < messages.length; i += dir) {
         if (pred(i)) {
           select(messages[i]!);

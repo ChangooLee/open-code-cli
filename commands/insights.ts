@@ -1700,8 +1700,8 @@ function generateHtmlReport(data: AggregatedData, insights: InsightResults): str
     const suggestions = insights.suggestions;
     const suggestionsHtml = suggestions
         ? `
-    ${suggestions.openCodeCliMd_additions &&
-            suggestions.openCodeCliMd_additions.length > 0
+    ${(suggestions as any).openCodeCliMd_additions &&
+            (suggestions as any).openCodeCliMd_additions.length > 0
             ? `
     <h2 id="section-features">Existing CC Features to Try</h2>
     <div class="open-code-cli-md-section">
@@ -1710,7 +1710,7 @@ function generateHtmlReport(data: AggregatedData, insights: InsightResults): str
       <div class="open-code-cli-md-actions">
         <button class="copy-all-btn" onclick="copyAllCheckedOpenCodeMd()">Copy All Checked</button>
       </div>
-      ${suggestions.openCodeCliMd_additions
+      ${(suggestions as any).openCodeCliMd_additions
                 .map((add, i) => `
         <div class="open-code-cli-md-item">
           <input type="checkbox" id="cmd-${i}" class="cmd-checkbox" checked data-text="${escapeHtml(add.prompt_scaffold || add.where || 'Add to OPEN_CODE.md')}\\n\\n${escapeHtml(add.addition)}">

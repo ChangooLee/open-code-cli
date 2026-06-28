@@ -221,7 +221,7 @@ export const WebSearchTool = buildTool({
             },
         });
         const allContentBlocks: BetaContentBlock[] = [];
-        let currentToolUseId = null;
+        let currentToolUseId: any = null;
         let currentToolUseJson = '';
         let progressCounter = 0;
         const toolUseQueries = new Map();

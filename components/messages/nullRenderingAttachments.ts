@@ -35,9 +35,9 @@ const NULL_RENDERING_TYPES = [
   'current_session_memory',
   'compaction_reminder',
   'date_change',
-] as const satisfies readonly Attachment['type'][]
+] as const satisfies readonly string[]
 export type NullRenderingAttachmentType = (typeof NULL_RENDERING_TYPES)[number]
-const NULL_RENDERING_ATTACHMENT_TYPES: ReadonlySet<Attachment['type']> =
+const NULL_RENDERING_ATTACHMENT_TYPES: ReadonlySet<string> =
   new Set(NULL_RENDERING_TYPES)
 export function isNullRenderingAttachment(
   msg: Message | NormalizedMessage,

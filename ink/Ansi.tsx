@@ -19,7 +19,7 @@ type SpanProps = {
   inverse?: boolean;
   hyperlink?: string;
 };
-export const Ansi = React.memo(function Ansi(t0) {
+export const Ansi = React.memo(function Ansi(t0: Props) {
   const $ = _c(12);
   const {
     children,

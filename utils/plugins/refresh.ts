@@ -92,8 +92,8 @@ export async function refreshActivePlugins(
     return (
       sum +
       Object.values(p.hooksConfig).reduce(
-        (s, matchers) =>
-          s + (matchers?.reduce((h, m) => h + m.hooks.length, 0) ?? 0),
+        (s: number, matchers: any) =>
+          s + (matchers?.reduce((h: number, m: any) => h + m.hooks.length, 0) ?? 0),
         0,
       )
     )

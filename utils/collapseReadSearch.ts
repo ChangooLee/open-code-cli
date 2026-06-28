@@ -233,7 +233,7 @@ function getCollapsibleToolInfo(
     const firstContent = msg.messages[0]?.message.content[0]
     const info = getSearchOrReadFromContent(
       firstContent
-        ? { type: 'tool_use', name: msg.toolName, input: firstContent.input }
+        ? { type: 'tool_use', name: msg.toolName, input: (firstContent as any).input }
         : undefined,
       tools,
     )

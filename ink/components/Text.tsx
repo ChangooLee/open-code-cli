@@ -2,6 +2,13 @@ import { c as _c } from "react/compiler-runtime";
 import type { ReactNode } from 'react';
 import React from 'react';
 import type { Color, Styles, TextStyles } from '../styles.js';
+declare module 'react' {
+  namespace JSX {
+    interface IntrinsicElements {
+      'ink-text': any;
+    }
+  }
+}
 type BaseProps = {
   readonly color?: Color;
   readonly backgroundColor?: Color;

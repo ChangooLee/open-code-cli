@@ -356,10 +356,10 @@ async function* queryLoop(
         compactionCacheCreationTokens:
           compactionUsage?.cache_creation_input_tokens ?? 0,
         compactionTotalTokens: compactionUsage
-          ? compactionUsage.input_tokens +
+          ? (compactionUsage.input_tokens ?? 0) +
             (compactionUsage.cache_creation_input_tokens ?? 0) +
             (compactionUsage.cache_read_input_tokens ?? 0) +
-            compactionUsage.output_tokens
+            (compactionUsage.output_tokens ?? 0)
           : 0,
         queryChainId: queryChainIdForAnalytics,
         queryDepth: queryTracking.depth,

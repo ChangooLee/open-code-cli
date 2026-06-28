@@ -70,7 +70,7 @@ export async function call(onDone: LocalJSXCommandOnDone, _context: unknown, arg
       return <MCPToggle action={parts[0]} target={parts.length > 1 ? parts.slice(1).join(' ') : 'all'} onComplete={onDone} />;
     }
   }
-  if ("external" === 'ant') {
+  if (("external" as string) === 'ant') {
     return <PluginSettings onComplete={onDone} args="manage" showMcpRedirectMessage />;
   }
   return <MCPSettings onComplete={onDone} />;

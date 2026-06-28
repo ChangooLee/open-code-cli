@@ -433,7 +433,7 @@ const externalTips: Tip[] = [
   {
     id: 'desktop-shortcut',
     content: async ctx => {
-      const blue = color('suggestion', ctx.theme)
+      const blue = color('suggestion', ctx!.theme)
       return `Continue your session in Open Code CLI Desktop with ${blue('/desktop')}`
     },
     cooldownSessions: 15,
@@ -478,7 +478,7 @@ const externalTips: Tip[] = [
   {
     id: 'frontend-design-plugin',
     content: async ctx => {
-      const blue = color('suggestion', ctx.theme)
+      const blue = color('suggestion', ctx!.theme)
       return `Working with HTML/CSS? Install the frontend-design plugin:\n${blue(`/plugin install frontend-design@${OFFICIAL_MARKETPLACE_NAME}`)}`
     },
     cooldownSessions: 3,
@@ -490,7 +490,7 @@ const externalTips: Tip[] = [
   {
     id: 'vercel-plugin',
     content: async ctx => {
-      const blue = color('suggestion', ctx.theme)
+      const blue = color('suggestion', ctx!.theme)
       return `Working with Vercel? Install the vercel plugin:\n${blue(`/plugin install vercel@${OFFICIAL_MARKETPLACE_NAME}`)}`
     },
     cooldownSessions: 3,
@@ -503,7 +503,7 @@ const externalTips: Tip[] = [
   {
     id: 'effort-high-nudge',
     content: async ctx => {
-      const blue = color('suggestion', ctx.theme)
+      const blue = color('suggestion', ctx!.theme)
       const cmd = blue('/effort high')
       const variant = getFeatureValue_CACHED_MAY_BE_STALE<
         'off' | 'copy_a' | 'copy_b'
@@ -533,7 +533,7 @@ const externalTips: Tip[] = [
   {
     id: 'subagent-fanout-nudge',
     content: async ctx => {
-      const blue = color('suggestion', ctx.theme)
+      const blue = color('suggestion', ctx!.theme)
       const variant = getFeatureValue_CACHED_MAY_BE_STALE<
         'off' | 'copy_a' | 'copy_b'
       >('open_code_cli_tern_alloy', 'off')
@@ -555,7 +555,7 @@ const externalTips: Tip[] = [
   {
     id: 'loop-command-nudge',
     content: async ctx => {
-      const blue = color('suggestion', ctx.theme)
+      const blue = color('suggestion', ctx!.theme)
       const variant = getFeatureValue_CACHED_MAY_BE_STALE<
         'off' | 'copy_a' | 'copy_b'
       >('open_code_cli_timber_lark', 'off')
@@ -578,7 +578,7 @@ const externalTips: Tip[] = [
   {
     id: 'guest-passes',
     content: async ctx => {
-      const openCodeCli = color('open-code-cli', ctx.theme)
+      const openCodeCli = color('open-code-cli', ctx!.theme)
       const reward = getCachedReferrerReward()
       return reward
         ? `Share Open Code CLI and earn ${openCodeCli(formatCreditAmount(reward))} of extra usage · ${openCodeCli('/passes')}`
@@ -597,7 +597,7 @@ const externalTips: Tip[] = [
   {
     id: 'overage-credit',
     content: async ctx => {
-      const openCodeCli = color('open-code-cli', ctx.theme)
+      const openCodeCli = color('open-code-cli', ctx!.theme)
       const info = getCachedOverageCreditGrant()
       const amount = info ? formatGrantAmount(info) : null
       if (!amount) return ''

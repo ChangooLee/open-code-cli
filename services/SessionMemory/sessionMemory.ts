@@ -221,8 +221,8 @@ const extractSessionMemory = sequential(async function (
   const usage = lastMessage ? getTokenUsage(lastMessage) : undefined
   const config = getSessionMemoryConfig()
   logEvent('open_code_cli_session_memory_extraction', {
-    input_tokens: usage?.input_tokens,
-    output_tokens: usage?.output_tokens,
+    input_tokens: usage?.input_tokens as any,
+    output_tokens: usage?.output_tokens as any,
     cache_read_input_tokens: usage?.cache_read_input_tokens ?? undefined,
     cache_creation_input_tokens:
       usage?.cache_creation_input_tokens ?? undefined,

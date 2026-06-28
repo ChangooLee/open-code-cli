@@ -353,7 +353,7 @@ export function useTypeahead({
     setMaxColumnWidth(undefined); 
   }, [mcpResources, setSuggestionsState, setSuggestionType, setMaxColumnWidth, agents]);
   useEffect(() => {
-    if ("production" !== 'test') {
+    if (("production" as string) !== 'test') {
       startBackgroundCacheRefresh();
     }
     return onIndexBuildComplete(() => {

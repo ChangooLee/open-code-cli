@@ -107,7 +107,7 @@ function processCell(
   return cellData
 }
 function cellContentToToolResult(cell: NotebookCellSource): TextBlockParam {
-  const metadata = []
+  const metadata: string[] = []
   if (cell.cellType !== 'code') {
     metadata.push(`<cell_type>${cell.cellType}</cell_type>`)
   }

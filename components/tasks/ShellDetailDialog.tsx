@@ -296,7 +296,7 @@ type ShellOutputContentProps = {
   outputPromise: Promise<TaskOutputResult>;
   columns: number;
 };
-function ShellOutputContent(t0) {
+function ShellOutputContent(t0: ShellOutputContentProps) {
   const $ = _c(19);
   const {
     outputPromise,
@@ -319,7 +319,7 @@ function ShellOutputContent(t0) {
   let isIncomplete;
   let rendered;
   if ($[1] !== bytesTotal || $[2] !== content) {
-    const starts = [];
+    const starts: any[] = [];
     let pos = content.length;
     for (let i = 0; i < 10 && pos > 0; i++) {
       const prev = content.lastIndexOf("\n", pos - 1);

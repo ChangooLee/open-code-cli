@@ -38,7 +38,7 @@ export function isExtractModeActive(): boolean {
 }
 export function getMemoryBaseDir(): string {
     if (getOpenCodeCliEnv('REMOTE_MEMORY_DIR')) {
-        return getOpenCodeCliEnv('REMOTE_MEMORY_DIR');
+        return getOpenCodeCliEnv('REMOTE_MEMORY_DIR')!;
     }
     return getOpenCodeCliConfigHomeDir();
 }

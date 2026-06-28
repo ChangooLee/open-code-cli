@@ -320,4 +320,4 @@ export function areMessageRowPropsEqual(prev: Props, next: Props): boolean {
   if (isStreaming || !isResolved) return false;
   return true;
 }
-export const MessageRow = React.memo(MessageRowImpl, areMessageRowPropsEqual);
+export const MessageRow = React.memo(MessageRowImpl, areMessageRowPropsEqual as any);

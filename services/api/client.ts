@@ -55,7 +55,7 @@ export async function getProviderClient({
     (await getApiKeyFromApiKeyHelper(getIsNonInteractiveSession()))
   return new OpenAICompatibleClient(
     resolveProviderConfig({
-      apiKey: resolvedApiKey,
+      apiKey: resolvedApiKey as string | undefined,
       defaultHeaders,
       fetchOverride: resolvedFetch,
     }),

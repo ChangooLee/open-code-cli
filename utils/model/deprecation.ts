@@ -16,27 +16,18 @@ const DEPRECATED_MODELS: Record<string, DeprecationEntry> = {
   'open-code-cli-3-opus': {
     modelName: 'Open Code CLI 3 Opus',
     retirementDates: {
-      firstParty: 'January 5, 2026',
-      openaiCompatible: 'January 15, 2026',
-      openaiCompatible: 'January 5, 2026',
       openaiCompatible: 'January 5, 2026',
     },
   },
   'open-code-cli-3-7-sonnet': {
     modelName: 'Open Code CLI 3.7 Sonnet',
     retirementDates: {
-      firstParty: 'February 19, 2026',
-      openaiCompatible: 'April 28, 2026',
-      openaiCompatible: 'May 11, 2026',
       openaiCompatible: 'February 19, 2026',
     },
   },
   'open-code-cli-3-5-haiku': {
     modelName: 'Open Code CLI 3.5 Haiku',
     retirementDates: {
-      firstParty: 'February 19, 2026',
-      openaiCompatible: null,
-      openaiCompatible: null,
       openaiCompatible: null,
     },
   },

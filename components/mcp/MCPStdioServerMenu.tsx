@@ -53,7 +53,7 @@ export function MCPStdioServerMenu({
   }, [server.client.type, server.name, toggleMcpServer, onCancel, onComplete]);
   const capitalizedServerName = capitalize(String(server.name));
   const serverCommandsCount = filterMcpPromptsByServer(mcp.commands, server.name).length;
-  const menuOptions = [];
+  const menuOptions: any[] = [];
   if (server.client.type !== 'disabled' && serverToolsCount > 0) {
     menuOptions.push({
       label: 'View tools',

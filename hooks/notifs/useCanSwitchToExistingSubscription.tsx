@@ -7,7 +7,7 @@ import { getGlobalConfig, saveGlobalConfig } from '../../utils/config.js';
 import { useStartupNotification } from './useStartupNotification.js';
 const MAX_SHOW_COUNT = 3;
 export function useCanSwitchToExistingSubscription() {
-  useStartupNotification(_temp2);
+  useStartupNotification(_temp2 as any);
 }
 async function _temp2() {
   if ((getGlobalConfig().subscriptionNoticeCount ?? 0) >= MAX_SHOW_COUNT) {
@@ -39,10 +39,10 @@ async function getExistingOpenCodeCliSubscription(): Promise<'Max' | 'Pro' | nul
   if (!profile) {
     return null;
   }
-  if (profile.account.has_open_code_cli_max) {
+  if ((profile.account as any).has_open_code_cli_max) {
     return 'Max';
   }
-  if (profile.account.has_open_code_cli_pro) {
+  if ((profile.account as any).has_open_code_cli_pro) {
     return 'Pro';
   }
   return null;

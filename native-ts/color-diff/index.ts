@@ -1,7 +1,7 @@
 import { diffArrays } from 'diff'
 import type * as hljsNamespace from 'highlight.js'
 import { basename, extname } from 'path'
-type HLJSApi = typeof hljsNamespace
+type HLJSApi = hljsNamespace.HLJSApi
 let cachedHljs: HLJSApi | null = null
 function hljs(): HLJSApi {
   if (cachedHljs) return cachedHljs

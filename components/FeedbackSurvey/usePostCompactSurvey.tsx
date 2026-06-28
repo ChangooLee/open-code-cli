@@ -41,7 +41,7 @@ export function usePostCompactSurvey(messages, isLoading, t0, t1) {
     enabled: t3
   } = t2;
   const enabled = t3 === undefined ? true : t3;
-  const [gateEnabled, setGateEnabled] = useState(null);
+  const [gateEnabled, setGateEnabled] = useState<boolean | null>(null);
   let t4;
   if ($[2] === Symbol.for("react.memo_cache_sentinel")) {
     t4 = new Set();
@@ -50,7 +50,7 @@ export function usePostCompactSurvey(messages, isLoading, t0, t1) {
     t4 = $[2];
   }
   const seenCompactBoundaries = useRef(t4);
-  const pendingCompactBoundaryUuid = useRef(null);
+  const pendingCompactBoundaryUuid = useRef<any>(null);
   const onOpen = _temp;
   const onSelect = _temp2;
   let t5;

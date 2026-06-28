@@ -50,7 +50,7 @@ export function useLspPluginRecommendation() {
         if (hasShownLspRecommendationThisSession()) {
           return null;
         }
-        const newFiles = [];
+        const newFiles: any[] = [];
         for (const file of trackedFiles) {
           if (!checkedFilesRef.current.has(file)) {
             checkedFilesRef.current.add(file);

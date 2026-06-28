@@ -55,8 +55,8 @@ export function renderToolUseProgressMessage(progressMessagesForMessage: Progres
         <Text dimColor>Running…</Text>
       </MessageResponse>;
   }
-  if (total !== undefined && total > 0) {
-    const ratio = Math.min(1, Math.max(0, progress / total));
+  if (total !== undefined && (total as any) > 0) {
+    const ratio = Math.min(1, Math.max(0, (progress as any) / (total as any)));
     const percentage = Math.round(ratio * 100);
     return <MessageResponse>
         <Box flexDirection="column">

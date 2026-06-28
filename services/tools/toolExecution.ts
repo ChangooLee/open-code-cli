@@ -639,7 +639,7 @@ async function checkPermissionsAndCallTool(
       toolUseContext.options.isNonInteractiveSession,
     )
   }
-  const resultingMessages = []
+  const resultingMessages: any[] = []
   let processedInput = parsedInput.data
   if (
     tool.name === BASH_TOOL_NAME &&
@@ -1176,7 +1176,7 @@ async function checkPermissionsAndCallTool(
       ...(mcpServerScope && { mcp_server_scope: mcpServerScope }),
     })
     let toolOutput = result.data
-    const hookResults = []
+    const hookResults: any[] = []
     const toolContextModifier = result.contextModifier
     const mcpMeta = result.mcpMeta
     async function addToolResult(

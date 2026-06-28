@@ -27,10 +27,10 @@ const INTERNAL_MARKETPLACE_NAME = 'open-code-cli-marketplace';
 const INTERNAL_MARKETPLACE_REPO = 'open-code-cli/open-code-cli-marketplace';
 const OFFICIAL_MARKETPLACE_REPO = 'openai-compatibles/open-code-cli-plugins-official';
 function getMarketplaceName(): string {
-  return "external" === 'ant' ? INTERNAL_MARKETPLACE_NAME : OFFICIAL_MARKETPLACE_NAME;
+  return ("external" as string) === 'ant' ? INTERNAL_MARKETPLACE_NAME : OFFICIAL_MARKETPLACE_NAME;
 }
 function getMarketplaceRepo(): string {
-  return "external" === 'ant' ? INTERNAL_MARKETPLACE_REPO : OFFICIAL_MARKETPLACE_REPO;
+  return ("external" as string) === 'ant' ? INTERNAL_MARKETPLACE_REPO : OFFICIAL_MARKETPLACE_REPO;
 }
 function getPluginId(): string {
   return `thinkback@${getMarketplaceName()}`;
@@ -362,8 +362,8 @@ function ThinkbackFlow(t0) {
   } = t0;
   const [installComplete, setInstallComplete] = useState(false);
   const [installError, setInstallError] = useState(null);
-  const [skillDir, setSkillDir] = useState(null);
-  const [hasGenerated, setHasGenerated] = useState(null);
+  const [skillDir, setSkillDir] = useState<string | null>(null);
+  const [hasGenerated, setHasGenerated] = useState<boolean | null>(null);
   let t1;
   if ($[0] === Symbol.for("react.memo_cache_sentinel")) {
     t1 = function handleReady() {

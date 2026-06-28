@@ -2758,7 +2758,7 @@ export async function findUnresolvedToolUse(toolUseId: string): Promise<Assistan
     try {
         const transcriptPath = getTranscriptPath();
         const { messages } = await loadTranscriptFile(transcriptPath);
-        let toolUseMessage = null;
+        let toolUseMessage: any = null;
         for (const message of messages.values()) {
             if (message.type === 'assistant') {
                 const content = message.message.content;

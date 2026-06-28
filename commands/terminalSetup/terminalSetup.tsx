@@ -90,7 +90,7 @@ export async function setupTerminal(theme: ThemeName): Promise<string> {
     return current;
   });
   maybeMarkProjectOnboardingComplete();
-  if ("external" === 'ant') {
+  if (("external" as string) === 'ant') {
     result += await setupShellCompletion(theme);
   }
   return result;

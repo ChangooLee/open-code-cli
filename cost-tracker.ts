@@ -229,8 +229,8 @@ function addToTotalModelUsage(
     contextWindow: 0,
     maxOutputTokens: 0,
   }
-  modelUsage.inputTokens += usage.input_tokens
-  modelUsage.outputTokens += usage.output_tokens
+  modelUsage.inputTokens += usage.input_tokens!
+  modelUsage.outputTokens += usage.output_tokens!
   modelUsage.cacheReadInputTokens += usage.cache_read_input_tokens ?? 0
   modelUsage.cacheCreationInputTokens += usage.cache_creation_input_tokens ?? 0
   modelUsage.webSearchRequests +=

@@ -144,7 +144,7 @@ async function executeForkedSkill(command: Command & {
                                 type: 'skill_progress',
                                 prompt: skillContent,
                                 agentId,
-                            },
+                            } as any,
                         });
                     }
                 }

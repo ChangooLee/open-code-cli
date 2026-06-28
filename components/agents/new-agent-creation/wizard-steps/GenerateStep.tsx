@@ -57,7 +57,7 @@ export function GenerateStep(): ReactNode {
       whenToUse: '',
       generatedAgent: undefined,
       wasGenerated: false
-    });
+    } as any);
     setPrompt('');
     setError(null);
     goBack();
@@ -77,7 +77,7 @@ export function GenerateStep(): ReactNode {
     updateWizardData({
       generationPrompt: trimmedPrompt,
       isGenerating: true
-    });
+    } as any);
     const controller = createAbortController();
     abortControllerRef.current = controller;
     try {
@@ -89,7 +89,7 @@ export function GenerateStep(): ReactNode {
         generatedAgent: generated,
         isGenerating: false,
         wasGenerated: true
-      });
+      } as any);
       goToStep(6);
     } catch (err) {
       if (err instanceof APIUserAbortError) {
@@ -98,7 +98,7 @@ export function GenerateStep(): ReactNode {
       }
       updateWizardData({
         isGenerating: false
-      });
+      } as any);
     } finally {
       setIsGenerating(false);
       abortControllerRef.current = null;

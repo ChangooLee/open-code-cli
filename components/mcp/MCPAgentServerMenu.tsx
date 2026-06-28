@@ -89,7 +89,7 @@ export function MCPAgentServerMenu({
         </Box>
       </Box>;
   }
-  const menuOptions = [];
+  const menuOptions: { label: string; value: string }[] = [];
   if (agentServer.needsAuth) {
     menuOptions.push({
       label: agentServer.isAuthenticated ? 'Re-authenticate' : 'Authenticate',

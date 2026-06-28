@@ -176,7 +176,7 @@ async function releaseLock(): Promise<void> {
 }
 async function getInstallationPrefix(): Promise<string | null> {
     const isBun = env.isRunningWithBun();
-    let prefixResult = null;
+    let prefixResult: { stdout: string; stderr: string; code: number; error?: string | undefined } | null = null;
     if (isBun) {
         prefixResult = await execFileNoThrowWithCwd('bun', ['pm', 'bin', '-g'], {
             cwd: homedir(),

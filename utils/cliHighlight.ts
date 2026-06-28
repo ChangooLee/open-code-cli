@@ -1,15 +1,15 @@
 import { extname } from 'path'
 export type CliHighlight = {
-  highlight: typeof import('cli-highlight').highlight
-  supportsLanguage: typeof import('cli-highlight').supportsLanguage
+  highlight: any
+  supportsLanguage: any
 }
 let cliHighlightPromise: Promise<CliHighlight | null> | undefined
-let loadedGetLanguage: typeof import('highlight.js').getLanguage | undefined
+let loadedGetLanguage: ((name: string) => any) | undefined
 async function loadCliHighlight(): Promise<CliHighlight | null> {
   try {
     const cliHighlight = await import('cli-highlight')
     const highlightJs = await import('highlight.js')
-    loadedGetLanguage = highlightJs.getLanguage
+    loadedGetLanguage = (highlightJs as any).getLanguage
     return {
       highlight: cliHighlight.highlight,
       supportsLanguage: cliHighlight.supportsLanguage,

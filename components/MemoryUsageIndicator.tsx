@@ -3,7 +3,7 @@ import { useMemoryUsage } from '../hooks/useMemoryUsage.js';
 import { Box, Text } from '../ink.js';
 import { formatFileSize } from '../utils/format.js';
 export function MemoryUsageIndicator(): React.ReactNode {
-  if ("external" !== 'ant') {
+  if (("external" as string) !== 'ant') {
     return null;
   }
   const memoryUsage = useMemoryUsage();

@@ -29,10 +29,10 @@ function getAssistantMessageId(message: Message): string | undefined {
 }
 export function getTokenCountFromUsage(usage: Usage): number {
   return (
-    usage.input_tokens +
+    usage.input_tokens! +
     (usage.cache_creation_input_tokens ?? 0) +
     (usage.cache_read_input_tokens ?? 0) +
-    usage.output_tokens
+    usage.output_tokens!
   )
 }
 export function tokenCountFromLastAPIResponse(messages: Message[]): number {
@@ -67,7 +67,7 @@ export function finalContextTokensFromLastResponse(
         const last = iterations.at(-1)!
         return last.input_tokens + last.output_tokens
       }
-      return usage.input_tokens + usage.output_tokens
+      return usage.input_tokens! + usage.output_tokens!
     }
     i--
   }
@@ -155,10 +155,10 @@ export function tokenCountWithEstimation(messages: readonly Message[]): number {
       }
       return (
         getTokenCountFromUsage(usage) +
-        roughTokenCountEstimationForMessages(messages.slice(i + 1))
+        roughTokenCountEstimationForMessages(messages.slice(i + 1) as any)
       )
     }
     i--
   }
-  return roughTokenCountEstimationForMessages(messages)
+  return roughTokenCountEstimationForMessages(messages as any)
 }

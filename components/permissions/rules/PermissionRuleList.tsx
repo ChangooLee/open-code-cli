@@ -595,7 +595,7 @@ export function PermissionRuleList(t0) {
             }
         }
       })();
-      const options = [];
+      const options: any[] = [];
       if (tab !== "workspace" && tab !== "recent" && !query) {
         options.push({
           label: `Add a new rule${figures.ellipsis}`,
@@ -792,7 +792,7 @@ export function PermissionRuleList(t0) {
   if ($[30] !== changes || $[31] !== onExit || $[32] !== onRetryDenials) {
     t18 = () => {
       const s_1 = denialStateRef.current;
-      const denialsFor = set => Array.from(set).map(idx => s_1.denials[idx]).filter(_temp2);
+      const denialsFor = set => Array.from(set).map(idx => s_1.denials[idx as any]).filter(_temp2);
       const retryDenials = denialsFor(s_1.retry);
       if (retryDenials.length > 0) {
         const commands = retryDenials.map(_temp3);
@@ -949,7 +949,7 @@ export function PermissionRuleList(t0) {
     if ($[56] !== setAppState || $[57] !== toolPermissionContext) {
       t22 = (path_0, remember) => {
         const destination = remember ? "localSettings" : "session";
-        const permissionUpdate = {
+        const permissionUpdate: any = {
           type: "addDirectories" as const,
           directories: [path_0],
           destination

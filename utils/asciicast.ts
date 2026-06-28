@@ -134,7 +134,7 @@ export function installAsciicastRecorder(): void {
         maxBufferBytes: 10 * 1024 * 1024,
     });
     const originalWrite = process.stdout.write.bind(process.stdout) as typeof process.stdout.write;
-    process.stdout.write = function (chunk: string | Uint8Array, encodingOrCb?: BufferEncoding | ((err?: Error) => void), cb?: (err?: Error) => void): boolean {
+    process.stdout.write = function (chunk: string | Uint8Array, encodingOrCb?: BufferEncoding | ((err?: Error | null) => void), cb?: (err?: Error | null) => void): boolean {
         const elapsed = (performance.now() - startTime) / 1000;
         const text = typeof chunk === 'string' ? chunk : Buffer.from(chunk).toString('utf-8');
         writer.write(jsonStringify([elapsed, 'o', text]) + '\n');

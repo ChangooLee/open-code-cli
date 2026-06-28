@@ -26,7 +26,7 @@ type LoadingState = 'loading' | 'updating' | null;
 export function RemoteEnvironmentDialog(t0) {
     const $ = _c(27);
     const { onDone } = t0;
-    const [loadingState, setLoadingState] = useState("loading");
+    const [loadingState, setLoadingState] = useState<string | null>("loading");
     let t1;
     if ($[0] === Symbol.for("react.memo_cache_sentinel")) {
         t1 = [];

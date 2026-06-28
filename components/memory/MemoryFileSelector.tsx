@@ -41,7 +41,7 @@ export function MemoryFileSelector(t0) {
     onSelect,
     onCancel
   } = t0;
-  const existingMemoryFiles = use(getMemoryFiles());
+  const existingMemoryFiles = use(getMemoryFiles()) as any[];
   const userMemoryPath = join(getOpenCodeCliConfigHomeDir(), "OPEN_CODE.md");
   const projectMemoryPath = join(getOriginalCwd(), "OPEN_CODE.md");
   const hasUserMemory = existingMemoryFiles.some(f => f.path === userMemoryPath);
@@ -103,7 +103,7 @@ export function MemoryFileSelector(t0) {
       description
     };
   });
-  const folderOptions = [];
+  const folderOptions: any[] = [];
   const agentDefinitions = useAppState(_temp3);
   if (isAutoMemoryEnabled()) {
     let t1;
@@ -118,12 +118,12 @@ export function MemoryFileSelector(t0) {
       t1 = $[0];
     }
     folderOptions.push(t1);
-    if (feature("TEAMMEM") && teamMemPaths.isTeamMemoryEnabled()) {
+    if (feature("TEAMMEM") && teamMemPaths!.isTeamMemoryEnabled()) {
       let t2;
       if ($[1] === Symbol.for("react.memo_cache_sentinel")) {
         t2 = {
           label: "Open team memory folder",
-          value: `${OPEN_FOLDER_PREFIX}${teamMemPaths.getTeamMemPath()}`,
+          value: `${OPEN_FOLDER_PREFIX}${teamMemPaths!.getTeamMemPath()}`,
           description: ""
         };
         $[1] = t2;

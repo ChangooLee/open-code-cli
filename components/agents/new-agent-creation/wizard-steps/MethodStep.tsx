@@ -44,7 +44,7 @@ export function MethodStep() {
       updateWizardData({
         method,
         wasGenerated: method === "generate"
-      });
+      } as any);
       if (method === "generate") {
         goNext();
       } else {

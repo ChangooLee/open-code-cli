@@ -201,7 +201,7 @@ export function resetCommandQueue(): void {
 }
 const NON_EDITABLE_MODES = new Set<PromptInputMode>([
   'task-notification',
-] satisfies Permutations<Exclude<PromptInputMode, EditablePromptInputMode>>)
+] as any satisfies Permutations<Exclude<PromptInputMode, EditablePromptInputMode>>)
 export function isPromptInputModeEditable(
   mode: PromptInputMode,
 ): mode is EditablePromptInputMode {

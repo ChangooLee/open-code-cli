@@ -6,12 +6,12 @@ import { Text } from '../ink.js';
 import { getGlobalConfig } from '../utils/config.js';
 import { getRainbowColor } from '../utils/thinking.js';
 export function isBuddyTeaserWindow(): boolean {
-  if ("external" === 'ant') return true;
+  if (("external" as string) === 'ant') return true;
   const d = new Date();
   return d.getFullYear() === 2026 && d.getMonth() === 3 && d.getDate() <= 7;
 }
 export function isBuddyLive(): boolean {
-  if ("external" === 'ant') return true;
+  if (("external" as string) === 'ant') return true;
   const d = new Date();
   return d.getFullYear() > 2026 || d.getFullYear() === 2026 && d.getMonth() >= 3;
 }

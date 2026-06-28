@@ -74,7 +74,7 @@ async function getOtlpReaders() {
     const exporterTypes = parseExporterTypes(process.env.OTEL_METRICS_EXPORTER);
     const exportInterval = parseInt(process.env.OTEL_METRIC_EXPORT_INTERVAL ||
         DEFAULT_METRICS_EXPORT_INTERVAL_MS.toString());
-    const exporters = [];
+    const exporters: any[] = [];
     for (const exporterType of exporterTypes) {
         if (exporterType === 'console') {
             const consoleExporter = new ConsoleMetricExporter();
@@ -137,7 +137,7 @@ async function getOtlpLogExporters() {
         process.env.OTEL_EXPORTER_OTLP_PROTOCOL?.trim();
     const endpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
     logForDebugging(`[3P telemetry] getOtlpLogExporters: types=${jsonStringify(exporterTypes)}, protocol=${protocol}, endpoint=${endpoint}`);
-    const exporters = [];
+    const exporters: any[] = [];
     for (const exporterType of exporterTypes) {
         if (exporterType === 'console') {
             exporters.push(new ConsoleLogRecordExporter());
@@ -172,7 +172,7 @@ async function getOtlpLogExporters() {
 }
 async function getOtlpTraceExporters() {
     const exporterTypes = parseExporterTypes(process.env.OTEL_TRACES_EXPORTER);
-    const exporters = [];
+    const exporters: any[] = [];
     for (const exporterType of exporterTypes) {
         if (exporterType === 'console') {
             exporters.push(new ConsoleSpanExporter());
@@ -294,7 +294,7 @@ export async function initializeTelemetry() {
     }
     diag.setLogger(new OpenCodeCliCodeDiagLogger(), DiagLogLevel.ERROR);
     initializePerfettoTracing();
-    const readers = [];
+    const readers: any[] = [];
     const telemetryEnabled = isTelemetryEnabled();
     logForDebugging(`[3P telemetry] isTelemetryEnabled=${telemetryEnabled} (OPEN_CODE_CLI_ENABLE_TELEMETRY=${getOpenCodeCliEnv('ENABLE_TELEMETRY')})`);
     if (telemetryEnabled) {

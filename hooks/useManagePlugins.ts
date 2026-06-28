@@ -134,8 +134,8 @@ export function useManagePlugins({
         return (
           sum +
           Object.values(p.hooksConfig).reduce(
-            (s, matchers) =>
-              s + (matchers?.reduce((h, m) => h + m.hooks.length, 0) ?? 0),
+            (s, matchers: any) =>
+              s + (matchers?.reduce((h: any, m: any) => h + m.hooks.length, 0) ?? 0),
             0,
           )
         )
@@ -143,8 +143,8 @@ export function useManagePlugins({
       return {
         enabled_count: enabled.length,
         disabled_count: disabled.length,
-        inline_count: count(enabled, p => p.source.endsWith('@inline')),
-        marketplace_count: count(enabled, p => !p.source.endsWith('@inline')),
+        inline_count: count(enabled, (p: any) => p.source.endsWith('@inline')),
+        marketplace_count: count(enabled, (p: any) => !p.source.endsWith('@inline')),
         error_count: errors.length,
         skill_count: commands.length,
         agent_count: agents.length,

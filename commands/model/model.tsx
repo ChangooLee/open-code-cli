@@ -58,7 +58,7 @@ function ModelPickerWrapper(t0) {
             if (effort !== undefined) {
                 message = message + ` with ${chalk.bold(effort)} effort`;
             }
-            let wasFastModeToggledOn = undefined;
+            let wasFastModeToggledOn: boolean | undefined = undefined;
             if (isFastModeEnabled()) {
                 clearFastModeCooldown();
                 if (!isFastModeSupportedByModel(model) && isFastMode) {
@@ -191,7 +191,7 @@ function SetModelAndClose({ args, onDone }: {
                 mainLoopModelForSession: null
             }));
             let message = `Set model to ${chalk.bold(renderModelLabel(modelValue))}`;
-            let wasFastModeToggledOn = undefined;
+            let wasFastModeToggledOn: boolean | undefined = undefined;
             if (isFastModeEnabled()) {
                 clearFastModeCooldown();
                 if (!isFastModeSupportedByModel(modelValue) && isFastMode) {

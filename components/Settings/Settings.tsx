@@ -1,4 +1,5 @@
 import { c as _c } from "react/compiler-runtime";
+import { Gates } from '../../utils/internalStubs.js';
 import * as React from 'react';
 import { Suspense, useState } from 'react';
 import { useKeybinding } from '../../keybindings/useKeybinding.js';

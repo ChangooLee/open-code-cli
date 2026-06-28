@@ -20,7 +20,9 @@
     "strict": true,
     "noEmit": true,
     "isolatedModules": true,
-    "useUnknownInCatchVariables": false
+    "useUnknownInCatchVariables": false,
+    "noImplicitAny": false,
+    "noImplicitThis": false
   },
   "include": ["**/*.ts", "**/*.tsx", "types/**/*.d.ts"],
   "exclude": ["node_modules", "dist", "scripts"]

@@ -3,6 +3,13 @@ import type { ReactNode } from 'react';
 import React from 'react';
 import { supportsHyperlinks } from '../supports-hyperlinks.js';
 import Text from './Text.js';
+declare module 'react' {
+  namespace JSX {
+    interface IntrinsicElements {
+      'ink-link': any;
+    }
+  }
+}
 export type Props = {
   readonly children?: ReactNode;
   readonly url: string;

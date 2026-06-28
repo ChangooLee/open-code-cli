@@ -15,7 +15,7 @@ export type AnyZodRawShape = ZodRawShape
 export type InferShape<Schema extends AnyZodRawShape> = z.infer<
   z.ZodObject<Schema>
 >
-export type EffortLevel = 'low' | 'medium' | 'high'
+export type EffortLevel = 'low' | 'medium' | 'high' | 'max'
 export type SdkMcpToolDefinition<Schema extends AnyZodRawShape = AnyZodRawShape> =
   {
     name: string

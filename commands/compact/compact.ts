@@ -135,7 +135,7 @@ async function compactViaReactive(
     context.setStreamMode?.('requesting')
     context.setResponseLength?.(() => 0)
     context.onCompactProgress?.({ type: 'compact_start' })
-    const outcome = await reactive.reactiveCompactOnPromptTooLong(
+    const outcome = await (reactive as any).reactiveCompactOnPromptTooLong(
       messages,
       cacheSafeParams,
       { customInstructions: mergedInstructions, trigger: 'manual' },

@@ -207,7 +207,7 @@ function isBeingDebugged() {
         return hasInspectArg || hasInspectEnv;
     }
 }
-if ("external" !== 'ant' && isBeingDebugged()) {
+if (("external" as string) !== 'ant' && isBeingDebugged()) {
     process.exit(1);
 }
 function logSessionTelemetry(): void {
@@ -266,7 +266,7 @@ function runMigrations(): void {
         if (feature('TRANSCRIPT_CLASSIFIER')) {
             resetAutoModeOptInForDefaultOffer();
         }
-        if ("external" === 'ant') {
+        if (("external" as string) === 'ant') {
             migrateFennecToOpus();
         }
         saveGlobalConfig(prev => prev.migrationVersion === CURRENT_MIGRATION_VERSION ? prev : {
@@ -310,7 +310,7 @@ export function startDeferredPrefetches(): void {
     if (!isBareMode()) {
         void skillChangeDetector.initialize();
     }
-    if ("external" === 'ant') {
+    if (("external" as string) === 'ant') {
         void import('./utils/eventLoopStallDetector.js').then(m => m.startEventLoopStallDetector());
     }
 }
@@ -782,11 +782,11 @@ async function run(): Promise<CommanderCommand> {
         const initOnly = options.initOnly ?? false;
         const maintenance = options.maintenance ?? false;
         const disableSlashCommands = options.disableSlashCommands || false;
-        const tasksOption = "external" === 'ant' && (options as {
+        const tasksOption = ("external" as string) === 'ant' && (options as {
             tasks?: boolean | string;
         }).tasks;
         const taskListId = tasksOption ? typeof tasksOption === 'string' ? tasksOption : DEFAULT_TASKS_MODE_TASK_LIST_ID : undefined;
-        if ("external" === 'ant' && taskListId) {
+        if (("external" as string) === 'ant' && taskListId) {
             setOpenCodeCliEnv('TASK_LIST_ID', taskListId);
         }
         const worktreeOption = isWorktreeModeEnabled() ? (options as {
@@ -1058,14 +1058,14 @@ async function run(): Promise<CommanderCommand> {
                 dynamicMcpConfig = {
                     ...dynamicMcpConfig,
                     ...allowed
-                };
+                } as any;
             }
         }
         const chromeOpts = options as {
             chrome?: boolean;
         };
         setChromeFlagOverride(chromeOpts.chrome);
-        const enableOpenCodeInChrome = shouldEnableOpenCodeInChrome(chromeOpts.chrome) && ("external" === 'ant' || isOpenCodeCliSubscriber());
+        const enableOpenCodeInChrome = shouldEnableOpenCodeInChrome(chromeOpts.chrome) && (("external" as string) === 'ant' || isOpenCodeCliSubscriber());
         const autoEnableOpenCodeInChrome = !enableOpenCodeInChrome && shouldAutoEnableOpenCodeInChrome();
         if (enableOpenCodeInChrome) {
             const platform = getPlatform();
@@ -1219,7 +1219,7 @@ async function run(): Promise<CommanderCommand> {
         });
         let toolPermissionContext = initResult.toolPermissionContext;
         const { warnings, dangerousPermissions, overlyBroadBashPermissions } = initResult;
-        if ("external" === 'ant' && overlyBroadBashPermissions.length > 0) {
+        if (("external" as string) === 'ant' && overlyBroadBashPermissions.length > 0) {
             for (const permission of overlyBroadBashPermissions) {
                 logForDebugging(`Ignoring overly broad shell permission ${permission.ruleDisplay} from ${permission.sourceDisplay}`);
             }
@@ -1349,7 +1349,7 @@ async function run(): Promise<CommanderCommand> {
             cacheSessionTitle(sessionNameArg);
         }
         const explicitModel = options.model || process.env.OPEN_CODE_CLI_MODEL;
-        if ("external" === 'ant' && explicitModel && explicitModel !== 'default' && !hasGrowthBookEnvOverride('open_code_cli_ant_model_override') && getGlobalConfig().cachedGrowthBookFeatures?.['open_code_cli_ant_model_override'] == null) {
+        if (("external" as string) === 'ant' && explicitModel && explicitModel !== 'default' && !hasGrowthBookEnvOverride('open_code_cli_ant_model_override') && getGlobalConfig().cachedGrowthBookFeatures?.['open_code_cli_ant_model_override'] == null) {
             await initializeGrowthBook();
         }
         const userSpecifiedModel = options.model === 'default' ? getDefaultMainLoopModel() : options.model;
@@ -1454,7 +1454,7 @@ async function run(): Promise<CommanderCommand> {
                 }
                 if (customAgent.memory) {
                     logEvent('open_code_cli_agent_memory_loaded', {
-                        ...("external" === 'ant' && {
+                        ...(("external" as string) === 'ant' && {
                             agent_type: customAgent.agentType as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS
                         }),
                         scope: customAgent.memory as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
@@ -1495,7 +1495,7 @@ async function run(): Promise<CommanderCommand> {
             const ctx = getRenderContext(false);
             getFpsMetrics = ctx.getFpsMetrics;
             stats = ctx.stats;
-            if ("external" === 'ant') {
+            if (("external" as string) === 'ant') {
                 installAsciicastRecorder();
             }
             const { createRoot } = await import('./ink.js');
@@ -1524,7 +1524,7 @@ async function run(): Promise<CommanderCommand> {
                     snapshotTimestamp: agentDef.pendingSnapshotUpdate!.snapshotTimestamp
                 });
                 if (choice === 'merge') {
-                    const { buildMergePrompt } = await import('./components/agents/SnapshotUpdateDialog.js');
+                    const { buildMergePrompt } = await import('./components/agents/SnapshotUpdateDialog.js') as any;
                     const mergePrompt = buildMergePrompt(agentDef.agentType, agentDef.memory!);
                     inputPrompt = inputPrompt ? `${mergePrompt}\n\n${inputPrompt}` : mergePrompt;
                 }
@@ -1897,7 +1897,7 @@ async function run(): Promise<CommanderCommand> {
             if (!isBareMode()) {
                 startDeferredPrefetches();
                 void import('./utils/backgroundHousekeeping.js').then(m => m.startBackgroundHousekeeping());
-                if ("external" === 'ant') {
+                if (("external" as string) === 'ant') {
                     void import('./utils/sdkHeapDumpMonitor.js').then(m => m.startSdkMemoryMonitor());
                 }
             }
@@ -2108,7 +2108,7 @@ async function run(): Promise<CommanderCommand> {
             void logStartupTelemetry();
             logSessionTelemetry();
         });
-        const sessionUploaderPromise = "external" === 'ant' ? import('./utils/sessionDataUploader.js') : null;
+        const sessionUploaderPromise = ("external" as string) === 'ant' ? import('./utils/sessionDataUploader.js') : null;
         const uploaderReady = sessionUploaderPromise ? sessionUploaderPromise.then(mod => mod.createSessionTurnUploader()).catch(() => null) : null;
         const sessionConfig = {
             debug: debug || debugToStderr,
@@ -2235,7 +2235,7 @@ async function run(): Promise<CommanderCommand> {
                 if (_pendingSSH.local) {
                     process.stderr.write('Starting local ssh-proxy test session...\n');
                     sshSession = createLocalSSHSession({
-                        cwd: _pendingSSH.cwd,
+                        cwd: _pendingSSH.cwd as string,
                         permissionMode: _pendingSSH.permissionMode,
                         dangerouslySkipPermissions: _pendingSSH.dangerouslySkipPermissions
                     });
@@ -2246,7 +2246,7 @@ async function run(): Promise<CommanderCommand> {
                     let hadProgress = false;
                     sshSession = await createSSHSession({
                         host: _pendingSSH.host,
-                        cwd: _pendingSSH.cwd,
+                        cwd: _pendingSSH.cwd as string,
                         localVersion: MACRO.VERSION,
                         permissionMode: _pendingSSH.permissionMode,
                         dangerouslySkipPermissions: _pendingSSH.dangerouslySkipPermissions,
@@ -2341,8 +2341,8 @@ async function run(): Promise<CommanderCommand> {
             setKairosActive(true);
             setUserMsgOptIn(true);
             setIsRemoteMode(true);
-            const remoteSessionConfig = createRemoteSessionConfig(targetSessionId, getAccessToken, apiCreds.orgUUID, false, true);
-            const infoMessage = createSystemMessage(`Attached to assistant session ${targetSessionId.slice(0, 8)}…`, 'info');
+            const remoteSessionConfig = createRemoteSessionConfig(targetSessionId as string, getAccessToken, apiCreds.orgUUID, false, true);
+            const infoMessage = createSystemMessage(`Attached to assistant session ${targetSessionId!.slice(0, 8)}…`, 'info');
             const assistantInitialState: AppState = {
                 ...initialState,
                 isBriefOnly: true,
@@ -2543,7 +2543,7 @@ async function run(): Promise<CommanderCommand> {
                     }
                 }
             }
-            if ("external" === 'ant') {
+            if (("external" as string) === 'ant') {
                 if (options.resume && typeof options.resume === 'string' && !maybeSessionId) {
                     const { parseCcshareId, loadCcshare } = await import('./utils/ccshareResume.js');
                     const ccshareId = parseCcshareId(options.resume);
@@ -2759,7 +2759,7 @@ async function run(): Promise<CommanderCommand> {
     if (canUserConfigureAdvisor()) {
         program.addOption(new Option('--advisor <model>', 'Enable the server-side advisor tool with the specified model (alias or full ID).').hideHelp());
     }
-    if ("external" === 'ant') {
+    if (("external" as string) === 'ant') {
         program.addOption(new Option('--delegate-permissions', '[ANT-ONLY] Alias for --permission-mode auto.').implies({
             permissionMode: 'auto'
         }));
@@ -3124,13 +3124,13 @@ async function run(): Promise<CommanderCommand> {
         const { update } = await import('src/cli/update.js');
         await update();
     });
-    if ("external" === 'ant') {
+    if (("external" as string) === 'ant') {
         program.command('up').description('[ANT-ONLY] Initialize or upgrade the local dev environment using the "# open-code-cli up" section of the nearest OPEN_CODE.md').action(async () => {
             const { up } = await import('src/cli/up.js');
             await up();
         });
     }
-    if ("external" === 'ant') {
+    if (("external" as string) === 'ant') {
         program.command('rollback [target]').description('[ANT-ONLY] Roll back to a previous release\n\nExamples:\n  open-code-cli rollback                                    Go 1 version back from current\n  open-code-cli rollback 3                                  Go 3 versions back from current\n  open-code-cli rollback 2.0.73-dev.20251217.t190658        Roll back to a specific version').option('-l, --list', 'List recent published versions with ages').option('--dry-run', 'Show what would be installed without installing').option('--safe', 'Roll back to the server-pinned safe version (set by oncall during incidents)').action(async (target?: string, options?: {
             list?: boolean;
             dryRun?: boolean;
@@ -3146,7 +3146,7 @@ async function run(): Promise<CommanderCommand> {
         const { installHandler } = await import('./cli/handlers/util.js');
         await installHandler(target, options);
     });
-    if ("external" === 'ant') {
+    if (("external" as string) === 'ant') {
         const validateLogId = (value: string) => {
             const maybeSessionId = validateUuid(value);
             if (maybeSessionId)
@@ -3170,7 +3170,7 @@ Examples:
             const { exportHandler } = await import('./cli/handlers/ant.js');
             await exportHandler(source, outputFile);
         });
-        if ("external" === 'ant') {
+        if (("external" as string) === 'ant') {
             const taskCmd = program.command('task').description('[ANT-ONLY] Manage task list tasks');
             taskCmd.command('create <subject>').description('Create a new task').option('-d, --description <text>', 'Task description').option('-l, --list <id>', 'Task list ID (defaults to "tasklist")').action(async (subject: string, opts: {
                 description?: string;
@@ -3217,7 +3217,7 @@ Examples:
             output?: string;
         }) => {
             const { completionHandler } = await import('./cli/handlers/ant.js');
-            await completionHandler(shell, opts, program);
+            await completionHandler(shell, opts, program as any);
         });
     }
     profileCheckpoint('run_before_parse');
@@ -3288,7 +3288,7 @@ async function logOpenCodeCliInit({ hasInitialPrompt, hasStdin, verbose, debug, 
                 assistantActivationPath: assistantActivationPath as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS
             }),
             autoUpdatesChannel: (getInitialSettings().autoUpdatesChannel ?? 'latest') as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-            ...("external" === 'ant' ? (() => {
+            ...(("external" as string) === 'ant' ? (() => {
                 const cwd = getCwd();
                 const gitRoot = findGitRoot(cwd);
                 const rp = gitRoot ? relative(gitRoot, cwd) || '.' : undefined;

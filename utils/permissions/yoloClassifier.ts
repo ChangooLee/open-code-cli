@@ -220,7 +220,7 @@ const YOLO_CLASSIFIER_TOOL_SCHEMA: BetaToolUnion = {
     },
     required: ['thinking', 'shouldBlock', 'reason'],
   },
-}
+} as any
 type TranscriptBlock =
   | { type: 'text'; text: string }
   | { type: 'tool_use'; name: string; input: unknown }

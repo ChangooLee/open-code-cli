@@ -1,4 +1,5 @@
 import { c as _c } from "react/compiler-runtime";
+import { GateOverridesWarning, ExperimentEnrollmentNotice } from '../../utils/internalStubs.js';
 import * as React from 'react';
 import { Box, Text, color } from '../../ink.js';
 import { useTerminalSize } from '../../hooks/useTerminalSize.js';

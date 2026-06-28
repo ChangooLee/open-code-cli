@@ -17,7 +17,7 @@ import { isEssentialTrafficOnly } from '../../utils/privacyLevel.js'
 import { getOpenCodeCliUserAgent } from '../../utils/userAgent.js'
 const bootstrapResponseSchema = lazySchema(() =>
   z.object({
-    client_data: z.record(z.unknown()).nullish(),
+    client_data: (z.record as any)(z.unknown()).nullish(),
     additional_model_options: z
       .array(
         z

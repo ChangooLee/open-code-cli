@@ -95,7 +95,7 @@ export class OAuthService {
     private formatTokens(response: OAuthTokenExchangeResponse, subscriptionType: SubscriptionType | null, rateLimitTier: RateLimitTier | null, profile?: OAuthProfileResponse): OAuthTokens {
         return {
             accessToken: response.access_token,
-            refreshToken: response.refresh_token,
+            refreshToken: response.refresh_token as any,
             expiresAt: Date.now() + response.expires_in * 1000,
             scopes: client.parseScopes(response.scope),
             subscriptionType,

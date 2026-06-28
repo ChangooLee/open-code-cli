@@ -105,7 +105,7 @@ export function BrowseMarketplace({ error, setError, result: _result, setResult,
                 const marketplaceInfos: MarketplaceInfo[] = [];
                 for (const { name, config: marketplaceConfig, data: marketplace } of marketplaces_0) {
                     if (marketplace) {
-                        const installedFromThisMarketplace = count(marketplace.plugins, plugin => isPluginInstalled(createPluginId(plugin.name, name)));
+                        const installedFromThisMarketplace = count(marketplace.plugins, (plugin: any) => isPluginInstalled(createPluginId(plugin.name, name)));
                         marketplaceInfos.push({
                             name,
                             totalPlugins: marketplace.plugins.length,

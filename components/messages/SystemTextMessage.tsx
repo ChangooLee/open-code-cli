@@ -1,4 +1,5 @@
 import { c as _c } from "react/compiler-runtime";
+import { HOOK_TIMING_DISPLAY_THRESHOLD_MS } from '../../services/tools/toolExecution.js';
 import { Box, Text, type TextProps } from '../../ink.js';
 import { feature } from 'bun:bundle';
 import * as React from 'react';
@@ -600,7 +601,7 @@ function MemorySavedMessage(t0) {
   } = message;
   let t1;
   if ($[0] !== message) {
-    t1 = feature("TEAMMEM") ? teamMemSaved.teamMemSavedPart(message) : null;
+    t1 = feature("TEAMMEM") ? teamMemSaved!.teamMemSavedPart(message) : null;
     $[0] = message;
     $[1] = t1;
   } else {

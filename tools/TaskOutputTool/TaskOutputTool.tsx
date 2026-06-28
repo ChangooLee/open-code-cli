@@ -139,7 +139,7 @@ export const TaskOutputTool: Tool<InputSchema, TaskOutputToolOutput> = buildTool
     return this.isReadOnly?.(_input) ?? false;
   },
   isEnabled() {
-    return "external" !== 'ant';
+    return ("external" as string) !== 'ant';
   },
   isReadOnly(_input) {
     return true;
@@ -217,7 +217,7 @@ export const TaskOutputTool: Tool<InputSchema, TaskOutputToolOutput> = buildTool
       onProgress({
         toolUseID: `task-output-waiting-${Date.now()}`,
         data: {
-          type: 'waiting_for_task',
+          type: 'waiting_for_task' as any,
           taskDescription: task.description,
           taskType: task.type
         }

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { getSlowOperations } from '../bootstrap/state.js';
 import { Text, useInterval } from '../ink.js';
 function shouldShowDevBar(): boolean {
-  return "production" === 'development' || "external" === 'ant';
+  return ("production" as string) === 'development' || ("external" as string) === 'ant';
 }
 export function DevBar() {
   const $ = _c(5);

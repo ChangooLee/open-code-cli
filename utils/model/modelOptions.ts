@@ -1,4 +1,5 @@
 import { getInitialMainLoopModel } from '../../bootstrap/state.js'
+import { getAntModels } from './antModels.js'
 import {
   isOpenCodeCliSubscriber,
   isMaxSubscriber,

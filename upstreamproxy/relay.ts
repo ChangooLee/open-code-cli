@@ -96,7 +96,7 @@ function startBunRelay(
   wsAuthHeader: string,
 ): UpstreamProxyRelay {
   type BunState = ConnState & { writeBuf: Uint8Array[] }
-  const server = Bun.listen<BunState>({
+  const server = (Bun.listen as any)({
     hostname: '127.0.0.1',
     port: 0,
     socket: {
@@ -252,14 +252,14 @@ function openTunnel(
       headers,
       proxy: getWebSocketProxyUrl(wsUrl),
       tls: getWebSocketTLSOptions() || undefined,
-    })
+    } as any)
   }
   ws.binaryType = 'arraybuffer'
   st.ws = ws
   ws.onopen = () => {
     const head =
       `${connectLine}\r\n` + `Proxy-Authorization: ${authHeader}\r\n` + `\r\n`
-    ws.send(encodeChunk(Buffer.from(head, 'utf8')))
+    ws.send(encodeChunk(Buffer.from(head, 'utf8')) as any)
     st.wsOpen = true
     for (const buf of st.pending) {
       forwardToWs(ws, buf)
@@ -298,14 +298,14 @@ function openTunnel(
 }
 function sendKeepalive(ws: WebSocketLike): void {
   if (ws.readyState === WebSocket.OPEN) {
-    ws.send(encodeChunk(new Uint8Array(0)))
+    ws.send(encodeChunk(new Uint8Array(0)) as any)
   }
 }
 function forwardToWs(ws: WebSocketLike, data: Buffer): void {
   if (ws.readyState !== WebSocket.OPEN) return
   for (let off = 0; off < data.length; off += MAX_CHUNK_BYTES) {
     const slice = data.subarray(off, off + MAX_CHUNK_BYTES)
-    ws.send(encodeChunk(slice))
+    ws.send(encodeChunk(slice) as any)
   }
 }
 function cleanupConn(st: ConnState | undefined): void {

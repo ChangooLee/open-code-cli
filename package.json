@@ -87,6 +87,8 @@
     "zod": "*"
   },
   "devDependencies": {
+    "@types/node": "^22.20.0",
+    "@types/react": "^19.2.17",
     "esbuild": "*",
     "typescript": "^6.0.3"
   }

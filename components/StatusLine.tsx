@@ -90,8 +90,8 @@ function buildStatusLineCommandInput(permissionMode: PermissionMode, exceeds200k
       total_output_tokens: getTotalOutputTokens(),
       context_window_size: contextWindowSize,
       current_usage: currentUsage,
-      used_percentage: contextPercentages.used,
-      remaining_percentage: contextPercentages.remaining
+      used_percentage: contextPercentages.used as number,
+      remaining_percentage: contextPercentages.remaining as number
     },
     exceeds_200k_tokens: exceeds200kTokens,
     ...((rateLimits.five_hour || rateLimits.seven_day) && {

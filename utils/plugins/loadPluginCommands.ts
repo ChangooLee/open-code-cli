@@ -275,7 +275,7 @@ export const getPluginCommands = memoize(async (): Promise<Command[]> => {
                         let commandName: string | undefined;
                         let metadataOverride: CommandMetadata | undefined;
                         if (plugin.commandsMetadata) {
-                            for (const [name, metadata] of Object.entries(plugin.commandsMetadata)) {
+                            for (const [name, metadata] of Object.entries(plugin.commandsMetadata) as [string, CommandMetadata][]) {
                                 if (metadata.source) {
                                     const fullMetadataPath = join(plugin.path, metadata.source);
                                     if (commandPath === fullMetadataPath) {
@@ -330,7 +330,7 @@ export const getPluginCommands = memoize(async (): Promise<Command[]> => {
             }
         }
         if (plugin.commandsMetadata) {
-            for (const [name, metadata] of Object.entries(plugin.commandsMetadata)) {
+            for (const [name, metadata] of Object.entries(plugin.commandsMetadata) as [string, CommandMetadata][]) {
                 if (metadata.content && !metadata.source) {
                     try {
                         const { frontmatter, content: markdownContent } = parseFrontmatter(metadata.content, `<inline:${plugin.name}:${name}>`);

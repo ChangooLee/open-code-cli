@@ -743,7 +743,7 @@ export function classifyAPIError(error: unknown): string {
         return 'provider_model_access';
     }
     if (error instanceof APIError) {
-        const status = error.status;
+        const status = error.status!;
         if (status >= 500)
             return 'server_error';
         if (status >= 400)

@@ -42,7 +42,7 @@ export function QuickOpenDialog(t0) {
   const [results, setResults] = useState(t1);
   const [query, setQuery] = useState("");
   const [focusedPath, setFocusedPath] = useState(undefined);
-  const [preview, setPreview] = useState(null);
+  const [preview, setPreview] = useState<{ path: string; content: string } | null>(null);
   const queryGenRef = useRef(0);
   let t2;
   let t3;

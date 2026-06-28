@@ -202,7 +202,7 @@ function PluginComponentsDisplay({
         const marketplaceData = await getMarketplace(marketplace);
         const pluginEntry = marketplaceData.plugins.find(p => p.name === plugin.name);
         if (pluginEntry) {
-          const commandPathList = [];
+          const commandPathList: any[] = [];
           if (plugin.commandsPath) {
             commandPathList.push(plugin.commandsPath);
           }
@@ -216,7 +216,7 @@ function PluginComponentsDisplay({
               commandList.push(...baseNames);
             }
           }
-          const agentPathList = [];
+          const agentPathList: any[] = [];
           if (plugin.agentsPath) {
             agentPathList.push(plugin.agentsPath);
           }
@@ -230,7 +230,7 @@ function PluginComponentsDisplay({
               agentList.push(...baseNames_0);
             }
           }
-          const skillPathList = [];
+          const skillPathList: any[] = [];
           if (plugin.skillsPath) {
             skillPathList.push(plugin.skillsPath);
           }
@@ -244,14 +244,14 @@ function PluginComponentsDisplay({
               skillList.push(...skillDirNames);
             }
           }
-          const hooksList = [];
+          const hooksList: any[] = [];
           if (plugin.hooksConfig) {
             hooksList.push(Object.keys(plugin.hooksConfig));
           }
           if (pluginEntry.hooks) {
             hooksList.push(pluginEntry.hooks);
           }
-          const mcpServersList = [];
+          const mcpServersList: any[] = [];
           if (plugin.mcpServers) {
             mcpServersList.push(Object.keys(plugin.mcpServers));
           }

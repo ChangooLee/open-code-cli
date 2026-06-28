@@ -86,7 +86,7 @@ export function truncatePath(path: string, maxLength: number): string {
         const truncatedFirst = truncateToWidthNoEllipsis(first, availableForFirst);
         return `${truncatedFirst}${separator}${ellipsis}${separator}${last}`;
     }
-    const middleParts = [];
+    const middleParts: string[] = [];
     for (let i = parts.length - 2; i > 0; i--) {
         const part = parts[i];
         if (part && stringWidth(part) + separatorWidth <= available) {

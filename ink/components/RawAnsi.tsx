@@ -1,5 +1,12 @@
 import { c as _c } from "react/compiler-runtime";
 import React from 'react';
+declare module 'react' {
+  namespace JSX {
+    interface IntrinsicElements {
+      'ink-raw-ansi': any;
+    }
+  }
+}
 type Props = {
   lines: string[];
   width: number;

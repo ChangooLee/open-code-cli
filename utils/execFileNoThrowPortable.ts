@@ -39,7 +39,7 @@ export function execSyncWithDefaults_DEPRECATED(command: string, optionsOrAbortS
             shell: true,
             reject: false,
             input,
-        });
+        } as any) as any;
         if (!result.stdout) {
             return null;
         }

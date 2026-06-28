@@ -36,7 +36,7 @@ async function isCommandAvailable(command: string): Promise<boolean> {
     }
 }
 const detectPackageManagers = memoize(async (): Promise<string[]> => {
-    const packageManagers = [];
+    const packageManagers: string[] = [];
     if (await isCommandAvailable('npm'))
         packageManagers.push('npm');
     if (await isCommandAvailable('yarn'))
@@ -46,7 +46,7 @@ const detectPackageManagers = memoize(async (): Promise<string[]> => {
     return packageManagers;
 });
 const detectRuntimes = memoize(async (): Promise<string[]> => {
-    const runtimes = [];
+    const runtimes: string[] = [];
     if (await isCommandAvailable('bun'))
         runtimes.push('bun');
     if (await isCommandAvailable('deno'))

@@ -371,7 +371,6 @@ export const connectToServer = memoize(async (name: string, serverRef: ScopedMcp
                 'User-Agent': getMCPUserAgent(),
                 ...(serverRef.authToken && {
                     'X-Open-Code-CLI-Ide-Authorization': serverRef.authToken,
-                    'X-Open-Code-CLI-Ide-Authorization': serverRef.authToken,
                 }),
             };
             let wsClient: WsClientLike;
@@ -501,10 +500,10 @@ export const connectToServer = memoize(async (name: string, serverRef: ScopedMcp
             const { createChromeContext } = await import('../../utils/openCodeInChrome/mcpServer.js');
             const { createOpenCodeCliForChromeMcpServer } = await import('@ant/open-code-cli-for-chrome-mcp');
             const { createLinkedTransportPair } = await import('./InProcessTransport.js');
-            const context = createChromeContext(serverRef.env);
+            const context = (createChromeContext as any)(serverRef.env);
             inProcessServer = createOpenCodeCliForChromeMcpServer(context);
             const [clientTransport, serverTransport] = createLinkedTransportPair();
-            await inProcessServer.connect(serverTransport);
+            await inProcessServer!.connect(serverTransport);
             transport = clientTransport;
             logMCPDebug(name, `In-process Chrome MCP server started`);
         }
@@ -515,7 +514,7 @@ export const connectToServer = memoize(async (name: string, serverRef: ScopedMcp
             const { createLinkedTransportPair } = await import('./InProcessTransport.js');
             inProcessServer = await createComputerUseMcpServerForCli();
             const [clientTransport, serverTransport] = createLinkedTransportPair();
-            await inProcessServer.connect(serverTransport);
+            await inProcessServer!.connect(serverTransport);
             transport = clientTransport;
             logMCPDebug(name, `In-process Computer Use MCP server started`);
         }

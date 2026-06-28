@@ -432,8 +432,8 @@ function logAPISuccess({
       : {}),
     messageCount,
     messageTokens,
-    inputTokens: usage.input_tokens,
-    outputTokens: usage.output_tokens,
+    inputTokens: usage.input_tokens as any,
+    outputTokens: usage.output_tokens as any,
     cachedInputTokens: usage.cache_read_input_tokens ?? 0,
     uncachedInputTokens: usage.cache_creation_input_tokens ?? 0,
     durationMs: durationMs,
@@ -609,7 +609,7 @@ export function logAPISuccessAndDuration({
           block.type === 'mcp_tool_use'
         ) {
           const inputLen = jsonStringify(block.input).length
-          const sanitizedName = sanitizeToolNameForAnalytics(block.name)
+          const sanitizedName = sanitizeToolNameForAnalytics(block.name as string)
           toolLengths[sanitizedName] =
             (toolLengths[sanitizedName] ?? 0) + inputLen
           hasToolUse = true

@@ -136,7 +136,7 @@ export async function getErrorLogByIndex(index: number): Promise<LogOption | nul
     return logs[index] || null;
 }
 async function loadLogList(path: string): Promise<LogOption[]> {
-    let files: Awaited<ReturnType<typeof readdir>>;
+    let files: any[];
     try {
         files = await readdir(path, { withFileTypes: true });
     }

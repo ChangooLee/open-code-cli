@@ -488,7 +488,7 @@ export function normalizeMessages(messages: Message[]): NormalizedMessage[] {
                             content: [_],
                             toolUseResult: message.toolUseResult,
                             mcpMeta: message.mcpMeta,
-                            isMeta: message.isMeta,
+                            isMeta: message.isMeta as true | undefined,
                             isVisibleInTranscriptOnly: message.isVisibleInTranscriptOnly,
                             isVirtual: message.isVirtual,
                             timestamp: message.timestamp,
@@ -784,7 +784,7 @@ export function buildMessageLookups(normalizedMessages: NormalizedMessage[], mes
                     }).tool_use_id);
                 }
                 if ((content.type as string) === 'advisor_tool_result') {
-                    const result = content as {
+                    const result = content as unknown as {
                         tool_use_id: string;
                         content: {
                             type: string;
@@ -3012,7 +3012,7 @@ export function createBridgeStatusMessage(url: string, upgradeNudge?: string): S
         subtype: 'bridge_status',
         content: `/remote-control is active. Code in CLI or at ${url}`,
         url,
-        upgradeNudge,
+        upgradeNudge: upgradeNudge as any,
         isMeta: false,
         timestamp: new Date().toISOString(),
         uuid: randomUUID(),
@@ -3123,7 +3123,7 @@ export function createApiMetricsMessage(metrics: {
         timestamp: new Date().toISOString(),
         uuid: randomUUID(),
         isMeta: false,
-    };
+    } as any;
 }
 export function createCommandInputMessage(content: string): SystemLocalCommandMessage {
     return {
@@ -3550,7 +3550,7 @@ export function ensureToolResultPairing(messages: (UserMessage | AssistantMessag
                 type: 'text' as const,
                 text: '[Tool use interrupted]',
                 citations: [],
-            });
+            } as any);
         }
         const assistantMsg = assistantContentChanged
             ? {
@@ -3708,7 +3708,7 @@ export function stripAdvisorBlocks(messages: (UserMessage | AssistantMessage)[])
                 type: 'text' as const,
                 text: '[Advisor response]',
                 citations: [],
-            });
+            } as any);
         }
         return { ...msg, message: { ...msg.message, content: filtered } };
     });

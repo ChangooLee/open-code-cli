@@ -236,9 +236,9 @@ function toOpenAIRequest(params: BetaMessageStreamParams): Record<string, unknow
             }
             : {}),
         ...(params.tool_choice ? { tool_choice: mapToolChoice(params.tool_choice) } : {}),
-        ...(params.output_config?.format && {
+        ...((params.output_config?.format && {
             response_format: params.output_config.format,
-        }),
+        }) as object),
     };
 }
 function systemToMessages(system: BetaMessageStreamParams['system']): OpenAIMessage[] {
@@ -576,7 +576,7 @@ function isToolUseBlock(block: ContentBlockParam): block is ToolUseBlock {
         type?: unknown;
     }).type === 'tool_use';
 }
-function isToolResultBlock(block: ContentBlockParam): block is {
+function isToolResultBlock(block: ContentBlockParam): block is ContentBlockParam & {
     type: 'tool_result';
     tool_use_id: string;
     content?: unknown;

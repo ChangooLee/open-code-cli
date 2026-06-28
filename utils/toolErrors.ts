@@ -78,7 +78,7 @@ export function formatZodValidationError(
       }
     })
   let errorContent = error.message
-  const errorParts = []
+  const errorParts: string[] = []
   if (missingParams.length > 0) {
     const missingParamErrors = missingParams.map(
       param => `The required parameter \`${param}\` is missing`,

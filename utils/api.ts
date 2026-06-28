@@ -159,7 +159,7 @@ export async function toolToAPISchema(
       (getFeatureValue_CACHED_MAY_BE_STALE('open_code_cli_fgts', false) ||
         isEnvTruthy(process.env.OPEN_CODE_CLI_ENABLE_FINE_GRAINED_TOOL_STREAMING))
     ) {
-      base.eager_input_streaming = true
+      base!.eager_input_streaming = true
     }
     cache.set(cacheKey, base)
   }

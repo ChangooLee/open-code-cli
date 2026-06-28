@@ -34,22 +34,7 @@ export function formatDiagnosticsForAttachment(params: PublishDiagnosticsParams)
         logForDebugging(`Failed to convert URI to file path: ${params.uri}. Error: ${err.message}. Using original URI as fallback.`);
         uri = params.uri;
     }
-    const diagnostics = params.diagnostics.map((diag: {
-        message: string;
-        severity?: number;
-        range: {
-            start: {
-                line: number;
-                character: number;
-            };
-            end: {
-                line: number;
-                character: number;
-            };
-        };
-        source?: string;
-        code?: string | number;
-    }) => ({
+    const diagnostics = params.diagnostics.map((diag: any) => ({
         message: diag.message,
         severity: mapLSPSeverity(diag.severity),
         range: {

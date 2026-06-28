@@ -68,14 +68,14 @@ export function getFastModeUnavailableReason(): string | null {
         return reason;
     }
     if (orgStatus.status === 'disabled') {
-        if (orgStatus.reason === 'network_error' ||
-            orgStatus.reason === 'unknown') {
+        if ((orgStatus as any).reason === 'network_error' ||
+            (orgStatus as any).reason === 'unknown') {
             if (isEnvTruthy(process.env.OPEN_CODE_CLI_SKIP_FAST_MODE_NETWORK_ERRORS)) {
                 return null;
             }
         }
         const authType: AuthType = getOpenCodeCliOAuthTokens() !== null ? 'oauth' : 'api-key';
-        const reason = getDisabledReasonMessage(orgStatus.reason, authType);
+        const reason = getDisabledReasonMessage((orgStatus as any).reason, authType);
         logForDebugging(`Fast mode unavailable: ${reason}`);
         return reason;
     }

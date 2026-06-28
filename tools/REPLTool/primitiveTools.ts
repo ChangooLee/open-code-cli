@@ -18,5 +18,5 @@ export function getReplPrimitiveTools(): readonly Tool[] {
     BashTool,
     NotebookEditTool,
     AgentTool,
-  ])
+  ] as readonly Tool[])
 }

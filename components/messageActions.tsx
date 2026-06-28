@@ -13,7 +13,7 @@ export type NavigableOf<T extends NavigableType> = Extract<RenderableMessage, {
   type: T;
 }>;
 export type NavigableMessage = RenderableMessage;
-export function isNavigableMessage(msg: NavigableMessage): boolean {
+export function isNavigableMessage(msg: NavigableMessage): boolean | undefined {
   switch (msg.type) {
     case 'assistant':
       {
@@ -158,7 +158,7 @@ export const MESSAGE_ACTIONS = [action({
   key: 'c',
   label: 'copy',
   types: NAVIGABLE_TYPES,
-  run: (m, c) => c.copy(copyTextOf(m))
+  run: (m, c) => c.copy(copyTextOf(m)!)
 }), action({
   key: 'p',
   label: s => `copy ${PRIMARY_INPUT[s.toolName!]!.label}`,
@@ -381,7 +381,7 @@ export function stripSystemReminders(text: string): string {
   }
   return t;
 }
-export function copyTextOf(msg: NavigableMessage): string {
+export function copyTextOf(msg: NavigableMessage): string | undefined {
   switch (msg.type) {
     case 'user':
       {

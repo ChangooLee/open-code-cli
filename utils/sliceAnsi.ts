@@ -24,7 +24,7 @@ export default function sliceAnsi(
   let include = false
   for (const token of tokens) {
     const width =
-      token.type === 'ansi' ? 0 : token.fullWidth ? 2 : stringWidth(token.value)
+      token.type === 'ansi' ? 0 : (token as any).fullWidth ? 2 : stringWidth((token as any).value)
     if (end !== undefined && position >= end) {
       if (token.type === 'ansi' || width > 0 || !include) break
     }
@@ -41,7 +41,7 @@ export default function sliceAnsi(
         result = ansiCodesToString(activeCodes)
       }
       if (include) {
-        result += token.value
+        result += (token as any).value
       }
       position += width
     }

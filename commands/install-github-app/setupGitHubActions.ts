@@ -147,7 +147,7 @@ export async function setupGitHubActions(repoName: string, apiKeyOrOAuthToken: s
                 throw new Error(`Failed to create branch: ${createBranchResult.stderr}`);
             }
             updateProgress();
-            const workflows = [];
+            const workflows: { path: string; content: string; message: string }[] = [];
             if (selectedWorkflows.includes('open-code-cli')) {
                 workflows.push({
                     path: '.github/workflows/open-code-cli.yml',

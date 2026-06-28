@@ -19,11 +19,11 @@ import { pollForApprovedExitPlanMode, UltraplanPollError } from '../utils/ultrap
 const ULTRAPLAN_TIMEOUT_MS = 30 * 60 * 1000;
 export const CCR_TERMS_URL = 'https://open-code-cli.dev/docs/open-code-cli-on-the-web';
 function getUltraplanModel(): string {
-    return getFeatureValue_CACHED_MAY_BE_STALE('open_code_cli_ultraplan_model', ALL_MODEL_CONFIGS.opus46.firstParty);
+    return getFeatureValue_CACHED_MAY_BE_STALE('open_code_cli_ultraplan_model', (ALL_MODEL_CONFIGS.opus46 as any).firstParty);
 }
 const _rawPrompt = require('../utils/ultraplan/prompt.txt');
 const DEFAULT_INSTRUCTIONS: string = (typeof _rawPrompt === 'string' ? _rawPrompt : _rawPrompt.default).trimEnd();
-const ULTRAPLAN_INSTRUCTIONS: string = "external" === 'ant' && process.env.ULTRAPLAN_PROMPT_FILE ? readFileSync(process.env.ULTRAPLAN_PROMPT_FILE, 'utf8').trimEnd() : DEFAULT_INSTRUCTIONS;
+const ULTRAPLAN_INSTRUCTIONS: string = ("external" as string) === 'ant' && process.env.ULTRAPLAN_PROMPT_FILE ? readFileSync(process.env.ULTRAPLAN_PROMPT_FILE, 'utf8').trimEnd() : DEFAULT_INSTRUCTIONS;
 export function buildUltraplanPrompt(blurb: string, seedPlan?: string): string {
     const parts: string[] = [];
     if (seedPlan) {
@@ -330,7 +330,7 @@ export default {
     name: 'ultraplan',
     description: `~10–30 min · Open Code CLI on the web drafts an advanced plan you can edit and approve. See ${CCR_TERMS_URL}`,
     argumentHint: '<prompt>',
-    isEnabled: () => "external" === 'ant',
+    isEnabled: () => ("external" as string) === 'ant',
     load: () => Promise.resolve({
         call
     })

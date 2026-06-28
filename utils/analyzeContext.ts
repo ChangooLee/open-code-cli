@@ -35,7 +35,7 @@ const MANUAL_COMPACT_BUFFER_NAME = 'Compact buffer';
 export const TOOL_TOKEN_COUNT_OVERHEAD = 500;
 async function countTokensWithFallback(messages: BetaMessageParam[], tools: BetaToolUnion[]): Promise<number | null> {
     try {
-        const result = await countMessagesTokensWithAPI(messages, tools);
+        const result = await countMessagesTokensWithAPI(messages, tools as any);
         if (result !== null) {
             return result;
         }
@@ -46,7 +46,7 @@ async function countTokensWithFallback(messages: BetaMessageParam[], tools: Beta
         logError(err);
     }
     try {
-        const fallbackResult = await countTokensViaHaikuFallback(messages, tools);
+        const fallbackResult = await (countTokensViaHaikuFallback as any)(messages, tools);
         if (fallbackResult === null) {
             logForDebugging(`countTokensWithFallback: haiku fallback also returned null (${tools.length} tools)`);
         }
@@ -192,7 +192,7 @@ async function countSystemTokens(effectiveSystemPrompt: readonly string[]): Prom
         ...effectiveSystemPrompt
             .filter(content => content.length > 0 && content !== SYSTEM_PROMPT_DYNAMIC_BOUNDARY)
             .map(content => ({ name: extractSectionName(content), content })),
-        ...Object.entries(systemContext)
+        ...(Object.entries(systemContext) as [string, string][])
             .filter(([, content]) => content.length > 0)
             .map(([name, content]) => ({ name, content })),
     ];

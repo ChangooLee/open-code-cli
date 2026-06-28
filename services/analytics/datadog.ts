@@ -171,15 +171,15 @@ export async function trackDatadogEvent(eventName: string, properties: {
             userBucket: getUserBucket(),
         };
         if (typeof allData.toolName === 'string' &&
-            allData.toolName.startsWith('mcp__')) {
+            (allData.toolName as string).startsWith('mcp__')) {
             allData.toolName = 'mcp';
         }
         if (process.env.USER_TYPE !== 'ant' && typeof allData.model === 'string') {
-            const shortName = getCanonicalName(allData.model.replace(/\[1m]$/i, ''));
+            const shortName = getCanonicalName((allData.model as string).replace(/\[1m]$/i, ''));
             allData.model = shortName in MODEL_COSTS ? shortName : 'other';
         }
         if (typeof allData.version === 'string') {
-            allData.version = allData.version.replace(/^(\d+\.\d+\.\d+-dev\.\d{8})\.t\d+\.sha[a-f0-9]+$/, '$1');
+            allData.version = (allData.version as string).replace(/^(\d+\.\d+\.\d+-dev\.\d{8})\.t\d+\.sha[a-f0-9]+$/, '$1');
         }
         if (allData.status !== undefined && allData.status !== null) {
             const statusCode = String(allData.status);
@@ -211,7 +211,7 @@ export async function trackDatadogEvent(eventName: string, properties: {
         logBatch.push(log);
         if (logBatch.length >= MAX_BATCH_SIZE) {
             if (flushTimer) {
-                clearTimeout(flushTimer);
+                clearTimeout(flushTimer!);
                 flushTimer = null;
             }
             void flushLogs();

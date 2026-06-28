@@ -572,7 +572,7 @@ async function callInner(file_path: string, fullFilePath: string, resolvedFilePa
             ? createImageMetadataText(data.file.dimensions)
             : null;
         return {
-            data,
+            data: data as any,
             ...(metadataText && {
                 newMessages: [
                     createUserMessage({ content: metadataText, isMeta: true }),

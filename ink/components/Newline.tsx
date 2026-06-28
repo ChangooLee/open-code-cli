@@ -1,5 +1,12 @@
 import { c as _c } from "react/compiler-runtime";
 import React from 'react';
+declare global {
+  namespace JSX {
+    interface IntrinsicElements {
+      'ink-text': any;
+    }
+  }
+}
 export type Props = {
   readonly count?: number;
 };

@@ -116,7 +116,7 @@ export async function detectExtensionInstallationPortable(browserPaths: BrowserP
     }
     const extensionIds = getExtensionIds();
     for (const { browser, path: browserBasePath } of browserPaths) {
-        let browserProfileEntries = [];
+        let browserProfileEntries: any[] = [];
         try {
             browserProfileEntries = await readdir(browserBasePath, {
                 withFileTypes: true,

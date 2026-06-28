@@ -206,7 +206,7 @@ export function truncateHeadForPTLRetry(
     let acc = 0
     dropCount = 0
     for (const g of groups) {
-      acc += roughTokenCountEstimationForMessages(g)
+      acc += roughTokenCountEstimationForMessages(g as any)
       dropCount++
       if (acc >= tokenGap) break
     }
@@ -477,7 +477,7 @@ export async function compactConversation(
       ...summaryMessages,
       ...postCompactFileAttachments,
       ...hookMessages,
-    ])
+    ] as any)
     const compactionUsage = getTokenUsage(summaryResponse)
     const querySourceForEvent =
       recompactionInfo?.querySource ?? context.options.querySource ?? 'unknown'
@@ -506,10 +506,10 @@ export async function compactConversation(
       compactionCacheCreationTokens:
         compactionUsage?.cache_creation_input_tokens ?? 0,
       compactionTotalTokens: compactionUsage
-        ? compactionUsage.input_tokens +
+        ? compactionUsage.input_tokens! +
           (compactionUsage.cache_creation_input_tokens ?? 0) +
           (compactionUsage.cache_read_input_tokens ?? 0) +
-          compactionUsage.output_tokens
+          compactionUsage.output_tokens!
         : 0,
       promptCacheSharingEnabled,
       ...(() => {

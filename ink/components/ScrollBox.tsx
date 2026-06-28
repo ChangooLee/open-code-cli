@@ -7,6 +7,13 @@ import { markCommitStart } from '../reconciler.js';
 import type { Styles } from '../styles.js';
 import '../global.d.ts';
 import Box from './Box.js';
+declare module 'react' {
+  namespace JSX {
+    interface IntrinsicElements {
+      'ink-box': any;
+    }
+  }
+}
 export type ScrollBoxHandle = {
   scrollTo: (y: number) => void;
   scrollBy: (dy: number) => void;

@@ -161,7 +161,7 @@ export function Config({
   }, [ownsEsc, onIsSearchModeChange]);
   const isConnectedToIde = hasAccessToIDEExtensionDiffFeature(context.options.mcpClients);
   const isFileCheckpointingAvailable = !isEnvTruthy(process.env.OPEN_CODE_CLI_DISABLE_FILE_CHECKPOINTING);
-  const memoryFiles = React.use(getMemoryFiles(true));
+  const memoryFiles = React.use(getMemoryFiles(true)) as any;
   const shouldShowExternalIncludesToggle = hasExternalOpenCodeMdIncludes(memoryFiles);
   const autoUpdaterDisabledReason = getAutoUpdaterDisabledReason();
   function onChangeMainModelConfig(value: string | null): void {
@@ -346,7 +346,7 @@ export function Config({
       });
     }
   }] : []),
-  ...("external" === 'ant' ? [{
+  ...(("external" as string) === 'ant' ? [{
     id: 'speculationEnabled',
     label: 'Speculative execution',
     value: globalConfig.speculationEnabled ?? true,

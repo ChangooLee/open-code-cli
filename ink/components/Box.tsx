@@ -8,6 +8,13 @@ import type { FocusEvent } from '../events/focus-event.js';
 import type { KeyboardEvent } from '../events/keyboard-event.js';
 import type { Styles } from '../styles.js';
 import * as warn from '../warn.js';
+declare module 'react' {
+  namespace JSX {
+    interface IntrinsicElements {
+      'ink-box': any;
+    }
+  }
+}
 export type Props = Except<Styles, 'textWrap'> & {
   ref?: Ref<DOMElement>;
   tabIndex?: number;

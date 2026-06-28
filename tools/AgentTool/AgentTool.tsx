@@ -78,7 +78,7 @@ const fullInputSchema = lazySchema(() => {
     mode: permissionModeSchema().optional().describe('Permission mode for spawned teammate (e.g., "plan" to require plan approval).')
   });
   return baseInputSchema().merge(multiAgentInputSchema).extend({
-    isolation: ("external" === 'ant' ? z.enum(['worktree', 'remote']) : z.enum(['worktree'])).optional().describe("external" === 'ant' ? 'Isolation mode. "worktree" creates a temporary git worktree so the agent works on an isolated copy of the repo. "remote" launches the agent in a remote CCR environment (always runs in background).' : 'Isolation mode. "worktree" creates a temporary git worktree so the agent works on an isolated copy of the repo.'),
+    isolation: (("external" as string) === 'ant' ? z.enum(['worktree', 'remote']) : z.enum(['worktree'])).optional().describe(("external" as string) === 'ant' ? 'Isolation mode. "worktree" creates a temporary git worktree so the agent works on an isolated copy of the repo. "remote" launches the agent in a remote CCR environment (always runs in background).' : 'Isolation mode. "worktree" creates a temporary git worktree so the agent works on an isolated copy of the repo.'),
     cwd: z.string().optional().describe('Absolute path to run the agent in. Overrides the working directory for all filesystem and shell operations within this agent. Mutually exclusive with isolation: "worktree".')
   });
 });
@@ -310,7 +310,7 @@ export const AgentTool = buildTool({
       is_fork: isForkPath
     });
     const effectiveIsolation = isolation ?? selectedAgent.isolation;
-    if ("external" === 'ant' && effectiveIsolation === 'remote') {
+    if (("external" as string) === 'ant' && effectiveIsolation === 'remote') {
       const eligibility = await checkRemoteAgentEligibility();
       if (!eligibility.eligible) {
         const reasons = eligibility.errors.map(formatPreconditionError).join('\n');
@@ -385,7 +385,7 @@ export const AgentTool = buildTool({
         });
         if (selectedAgent.memory) {
           logEvent('open_code_cli_agent_memory_loaded', {
-            ...("external" === 'ant' && {
+            ...(("external" as string) === 'ant' && {
               agent_type: selectedAgent.agentType as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS
             }),
             scope: selectedAgent.memory as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
@@ -950,7 +950,7 @@ export const AgentTool = buildTool({
   },
   async checkPermissions(input, context): Promise<PermissionResult> {
     const appState = context.getAppState();
-    if ("external" === 'ant' && appState.toolPermissionContext.mode === 'auto') {
+    if (("external" as string) === 'ant' && appState.toolPermissionContext.mode === 'auto') {
       return {
         behavior: 'passthrough',
         message: 'Agent tool requires permission to spawn sub-agents.'
@@ -1040,7 +1040,7 @@ duration_ms: ${data.totalDurationMs}</usage>`
   renderToolUseRejectedMessage,
   renderToolUseErrorMessage,
   renderGroupedToolUse: renderGroupedAgentToolUse
-} satisfies ToolDef<InputSchema, Output, Progress>);
+} satisfies ToolDef<InputSchema, Output, Progress & any>);
 function resolveTeamName(input: {
   team_name?: string;
 }, appState: {

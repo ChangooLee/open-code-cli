@@ -3,7 +3,7 @@ import { useContext, useEffect, useLayoutEffect } from 'react';
 import instances from '../ink/instances.js';
 import { AppStoreContext, useAppState } from '../state/AppState.js';
 const NON_MODAL_OVERLAYS = new Set(['autocomplete']);
-export function useRegisterOverlay(id, t0) {
+export function useRegisterOverlay(id, t0?) {
   const $ = _c(8);
   const enabled = t0 === undefined ? true : t0;
   const store = useContext(AppStoreContext);

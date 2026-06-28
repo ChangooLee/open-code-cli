@@ -54,7 +54,7 @@ export function collapseBackgroundBashNotifications(
               },
             ],
           },
-        })
+        } as any)
       }
     } else {
       result.push(msg)

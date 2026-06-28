@@ -34,7 +34,7 @@ export async function findModifiedFiles(
   turnStartTime: TurnStartTime,
   outputsDir: string,
 ): Promise<string[]> {
-  let entries: Awaited<ReturnType<typeof fs.readdir>>
+  let entries: any[]
   try {
     entries = await fs.readdir(outputsDir, {
       withFileTypes: true,

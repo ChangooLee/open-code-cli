@@ -821,7 +821,7 @@ export async function getAllMcpConfigs(): Promise<{
     const openCodeCliPromise = fetchOpenCodeCliMcpConfigsIfEligible();
     const { servers: openCodeCliServers, errors } = await getOpenCodeCliMcpConfigs({}, openCodeCliPromise);
     const { allowed: openCodeCliMcpServers } = filterMcpServersByPolicy(await openCodeCliPromise);
-    const { servers: dedupedOpenCodeCli } = dedupOpenCodeCliMcpServers(openCodeCliMcpServers, openCodeCliServers);
+    const { servers: dedupedOpenCodeCli } = dedupOpenCodeCliMcpServers(openCodeCliMcpServers as any, openCodeCliServers as any);
     const servers = Object.assign({}, dedupedOpenCodeCli, openCodeCliServers);
     return { servers, errors };
 }

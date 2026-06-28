@@ -17,7 +17,7 @@ function getLocalAgentMemoryDir(dirName: string): string {
   if (getOpenCodeCliEnv('REMOTE_MEMORY_DIR')) {
     return (
       join(
-        getOpenCodeCliEnv('REMOTE_MEMORY_DIR'),
+        getOpenCodeCliEnv('REMOTE_MEMORY_DIR')!,
         'projects',
         sanitizePath(
           findCanonicalGitRoot(getProjectRoot()) ?? getProjectRoot(),
@@ -58,7 +58,7 @@ export function isAgentMemoryPath(absolutePath: string): boolean {
     if (
       normalizedPath.includes(sep + 'agent-memory-local' + sep) &&
       normalizedPath.startsWith(
-        join(getOpenCodeCliEnv('REMOTE_MEMORY_DIR'), 'projects') + sep,
+        join(getOpenCodeCliEnv('REMOTE_MEMORY_DIR')!, 'projects') + sep,
       )
     ) {
       return true

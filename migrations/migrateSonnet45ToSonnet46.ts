@@ -29,7 +29,7 @@ export function migrateSonnet45ToSonnet46(): void {
   ) {
     return
   }
-  const has1m = model.endsWith('[1m]')
+  const has1m = model!.endsWith('[1m]')
   updateSettingsForSource('userSettings', {
     model: has1m ? 'sonnet[1m]' : 'sonnet',
   })

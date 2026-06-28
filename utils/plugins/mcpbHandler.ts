@@ -211,7 +211,7 @@ export function validateUserConfig(values: UserConfigValues, schema: UserConfigS
     return { valid: errors.length === 0, errors };
 }
 async function generateMcpConfig(manifest: McpbManifest, extractedPath: string, userConfig: UserConfigValues = {}): Promise<McpServerConfig> {
-    const { getMcpConfigForManifest } = await import('@open-code-cli/mcpb');
+    const { getMcpConfigForManifest } = await import('@open-code-cli/mcpb') as any;
     const mcpConfig = await getMcpConfigForManifest({
         manifest,
         extensionPath: extractedPath,

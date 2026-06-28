@@ -328,11 +328,7 @@ export type GlobalConfig = {
     plugin?: string[]
     disabled?: boolean
   }
-  openCodeCliHints?: {
-    plugin?: string[]
-    disabled?: boolean
-  }
-  permissionExplainerEnabled?: boolean 
+  permissionExplainerEnabled?: boolean
   teammateMode?: 'auto' | 'tmux' | 'in-process' 
   teammateDefaultModel?: string | null
   prStatusFooterEnabled?: boolean 

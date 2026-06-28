@@ -256,7 +256,7 @@ function createSpeculationFeedbackMessage(
   if (messages.length === 0 || timeSavedMs === 0) return null
   const toolUses = countToolsInMessages(messages)
   const tokens = boundary?.type === 'complete' ? boundary.outputTokens : null
-  const parts = []
+  const parts: string[] = []
   if (toolUses > 0) {
     parts.push(`Speculated ${toolUses} tool ${toolUses === 1 ? 'use' : 'uses'}`)
   } else {

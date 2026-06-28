@@ -47,7 +47,7 @@ export async function* runPostToolUseHooks<Input extends AnyObject, Output>(tool
                 if (result.message &&
                     !(result.message.type === 'attachment' &&
                         result.message.attachment.type === 'hook_blocking_error')) {
-                    yield { message: result.message };
+                    yield { message: result.message as any };
                 }
                 if (result.blockingError) {
                     yield {
@@ -155,7 +155,7 @@ export async function* runPostToolUseFailureHooks<Input extends AnyObject>(toolU
                 if (result.message &&
                     !(result.message.type === 'attachment' &&
                         result.message.attachment.type === 'hook_blocking_error')) {
-                    yield { message: result.message };
+                    yield { message: result.message as any };
                 }
                 if (result.blockingError) {
                     yield {
@@ -291,7 +291,7 @@ export async function* runPreToolUseHooks(toolUseContext: ToolUseContext, tool: 
         for await (const result of executePreToolHooks(tool.name, toolUseID, processedInput, toolUseContext, appState.toolPermissionContext.mode, toolUseContext.abortController.signal, undefined, toolUseContext.requestPrompt, tool.getToolUseSummary?.(processedInput))) {
             try {
                 if (result.message) {
-                    yield { type: 'message', message: { message: result.message } };
+                    yield { type: 'message', message: { message: result.message as any } };
                 }
                 if (result.blockingError) {
                     const denialMessage = getPreToolHookBlockingMessage(`PreToolUse:${tool.name}`, result.blockingError);

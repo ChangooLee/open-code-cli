@@ -71,7 +71,7 @@ export function AutoRunIssueNotification(t0) {
 }
 export type AutoRunIssueReason = 'feedback_survey_bad' | 'feedback_survey_good';
 export function shouldAutoRunIssue(reason: AutoRunIssueReason): boolean {
-  if ("external" !== 'ant') {
+  if (("external" as string) !== 'ant') {
     return false;
   }
   switch (reason) {
@@ -84,7 +84,7 @@ export function shouldAutoRunIssue(reason: AutoRunIssueReason): boolean {
   }
 }
 export function getAutoRunCommand(reason: AutoRunIssueReason): string {
-  if ("external" === 'ant' && reason === 'feedback_survey_good') {
+  if (("external" as string) === 'ant' && reason === 'feedback_survey_good') {
     return '/good-open-code-cli';
   }
   return '/issue';

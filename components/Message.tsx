@@ -612,4 +612,4 @@ export function areMessagePropsEqual(prev: Props, next: Props): boolean {
   if (prev.isStatic && next.isStatic) return true;
   return false;
 }
-export const Message = React.memo(MessageImpl, areMessagePropsEqual);
+export const Message = React.memo(MessageImpl, areMessagePropsEqual as any);

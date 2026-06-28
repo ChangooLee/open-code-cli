@@ -302,7 +302,7 @@ export function finalizeAgentTool(
     totalDurationMs: Date.now() - startTime,
     totalTokens,
     totalToolUseCount,
-    usage: lastAssistantMessage.message.usage,
+    usage: lastAssistantMessage.message.usage as any,
   }
 }
 export function getLastToolUseName(message: MessageType): string | undefined {

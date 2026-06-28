@@ -9,12 +9,12 @@ function filterReservedShortcuts(blocks: KeybindingBlock[]): KeybindingBlock[] {
         const filteredBindings: Record<string, string | null> = {};
         for (const [key, action] of Object.entries(block.bindings)) {
             if (!reservedKeys.has(normalizeKeyForComparison(key))) {
-                filteredBindings[key] = action;
+                filteredBindings[key] = action as string | null;
             }
         }
         return { context: block.context, bindings: filteredBindings };
     })
-        .filter(block => Object.keys(block.bindings).length > 0);
+        .filter(block => Object.keys(block.bindings).length > 0) as KeybindingBlock[];
 }
 export function generateKeybindingsTemplate(): string {
     const bindings = filterReservedShortcuts(DEFAULT_BINDINGS);

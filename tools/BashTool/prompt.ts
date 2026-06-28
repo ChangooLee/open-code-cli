@@ -160,7 +160,7 @@ function getSimpleSandboxSection(): string {
         }),
         ...(allowUnixSockets && { allowUnixSockets: dedup(allowUnixSockets) }),
     };
-    const restrictionsLines = [];
+    const restrictionsLines: any[] = [];
     if (Object.keys(filesystemConfig).length > 0) {
         restrictionsLines.push(`Filesystem: ${jsonStringify(filesystemConfig)}`);
     }

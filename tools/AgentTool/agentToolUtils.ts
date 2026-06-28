@@ -1,4 +1,5 @@
 import { feature } from 'bun:bundle'
+import { isFileMutatingBashCommand } from '../../query/verificationGate.js'
 import { z } from 'zod/v4'
 import { clearInvokedSkillsForAgent } from '../../bootstrap/state.js'
 import {
@@ -300,6 +301,12 @@ export function finalizeAgentTool(
       if (!Array.isArray(blocks)) continue
       for (const b of blocks) {
         if (b?.type === 'tool_use' && SUBAGENT_EDIT_TOOL_NAMES.has(b.name)) {
+          subagentEditCount++
+        } else if (
+          b?.type === 'tool_use' &&
+          b.name === 'Bash' &&
+          isFileMutatingBashCommand(b?.input?.command)
+        ) {
           subagentEditCount++
         }
       }

@@ -42,6 +42,38 @@ const EDIT_TOOL_NAMES = new Set([
   'NotebookEdit',
   'MultiEdit',
 ])
+
+// A subagent/parent can mutate files via Bash (sed -i, heredoc redirects, tee,
+// cp/mv) and bypass the edit-tool gate entirely. Detect the common
+// file-mutating shapes conservatively — read-only commands (cat/grep/ls,
+// redirects to /dev/* or fds like 2>&1) must NOT match, since a false positive
+// only over-gates (forces an extra verification), never skips one.
+export function isFileMutatingBashCommand(command: unknown): boolean {
+  if (typeof command !== 'string' || command.length === 0) {
+    return false
+  }
+  const c = command
+  if (/\bsed\s+(?:-\S*i\b|--in-place)/.test(c)) {
+    return true
+  }
+  if (/\b(?:cp|mv|install|patch|truncate|dd|ln)\s+\S/.test(c)) {
+    return true
+  }
+  if (/\btee\b/.test(c) && !/\btee\b\s+[^|;&]*\/dev\//.test(c)) {
+    return true
+  }
+  // Output redirection to a real path: `> file` / `>> file`, excluding /dev/*
+  // and fd duplications (>&2, 2>&1).
+  const redir = /(?:^|[^0-9&>])>>?\s*("[^"]+"|'[^']+'|[^\s|;&>]+)/g
+  let m: RegExpExecArray | null
+  while ((m = redir.exec(c)) !== null) {
+    const target = m[1].replace(/^['"]|['"]$/g, '')
+    if (!target.startsWith('/dev/') && !/^&?\d+$/.test(target)) {
+      return true
+    }
+  }
+  return false
+}
 const NONTRIVIAL_EDIT_THRESHOLD = 3
 const MAX_VERIFY_DIRECTIVES = 3
 const DIRECTIVE_MARKER = 'independent verification verdict'
@@ -138,6 +170,11 @@ export function evaluateVerificationGate(
     for (const block of contentBlocks(m)) {
       if (block?.type === 'tool_use') {
         if (EDIT_TOOL_NAMES.has(block.name)) {
+          editCount++
+        } else if (
+          block.name === 'Bash' &&
+          isFileMutatingBashCommand(block?.input?.command)
+        ) {
           editCount++
         }
         if (block.name === AGENT_TOOL_NAME && typeof block.id === 'string') {

@@ -5,6 +5,7 @@ import {
   buildVerificationDirective,
   extractBackgroundAgentSignals,
   awaitInFlightBackgroundChildren,
+  isFileMutatingBashCommand,
 } from '../query/verificationGate.js'
 
 const edits = (n: number) => ({
@@ -228,4 +229,56 @@ test('await-join returns immediately when aborted', async () => {
   const t0 = Date.now()
   await awaitInFlightBackgroundChildren(() => tasks, () => true, 5000, 10)
   assert.ok(Date.now() - t0 < 200)
+})
+
+// --- Bash file-mutation counting (sed -i / redirects / tee bypass the edit tools) ---
+
+const bashCall = (command: string) => ({
+  message: { content: [{ type: 'tool_use', name: 'Bash', input: { command } }] },
+})
+
+test('isFileMutatingBashCommand detects file mutations', () => {
+  for (const cmd of [
+    "sed -i 's/a/b/' file.ts",
+    'sed --in-place s/x/y/ a',
+    'cat tpl > out.txt',
+    'echo log >> run.log',
+    'cat > config.json <<EOF\n{}\nEOF',
+    'tee dest.txt',
+    'cp a.txt b.txt',
+    'mv old new',
+  ]) {
+    assert.equal(isFileMutatingBashCommand(cmd), true, `should mutate: ${cmd}`)
+  }
+})
+
+test('isFileMutatingBashCommand ignores read-only / non-file commands', () => {
+  for (const cmd of [
+    'cat file.txt',
+    'grep -r foo src',
+    'ls -la',
+    'echo hi > /dev/null',
+    'npm run build 2>&1',
+    'some-cmd >&2',
+    'rg pattern',
+    '',
+  ]) {
+    assert.equal(isFileMutatingBashCommand(cmd), false, `should NOT mutate: ${cmd}`)
+  }
+})
+
+test('gate counts file-mutating Bash toward editCount', () => {
+  const msgs = [
+    bashCall("sed -i 's/a/b/' x.ts"),
+    bashCall('cat tpl > y.ts'),
+    bashCall('tee z.ts'),
+  ]
+  const r = evaluateVerificationGate(msgs)
+  assert.equal(r.editCount, 3)
+  assert.equal(r.action, 'block')
+})
+
+test('gate does NOT count read-only Bash', () => {
+  const msgs = [bashCall('cat a'), bashCall('grep x b'), bashCall('ls')]
+  assert.equal(evaluateVerificationGate(msgs).action, 'allow')
 })

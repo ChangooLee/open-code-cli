@@ -22,6 +22,9 @@ import { buildPostCompactMessages } from './services/compact/compact.js'
 const reactiveCompact = feature('REACTIVE_COMPACT')
   ? (require('./services/compact/reactiveCompact.js') as typeof import('./services/compact/reactiveCompact.js'))
   : null
+const reactiveCompactSafe = feature('REACTIVE_COMPACT_SAFE')
+  ? (require('./services/compact/reactiveCompactSafe.js') as typeof import('./services/compact/reactiveCompactSafe.js'))
+  : null
 const contextCollapse = feature('CONTEXT_COLLAPSE')
   ? (require('./services/contextCollapse/index.js') as typeof import('./services/contextCollapse/index.js'))
   : null
@@ -638,12 +641,29 @@ async function* queryLoop(
                 withheld = true
               }
             }
-            if (reactiveCompact?.isWithheldPromptTooLong(message)) {
+            if (feature('REACTIVE_COMPACT_SAFE') && reactiveCompactSafe) {
+              if (
+                reactiveCompactSafe.safeReactiveCall(
+                  () => reactiveCompact?.isWithheldPromptTooLong(message) ?? false,
+                  false,
+                  logError,
+                )
+              ) {
+                withheld = true
+              }
+            } else if (reactiveCompact?.isWithheldPromptTooLong(message)) {
               withheld = true
             }
             if (
               mediaRecoveryEnabled &&
-              reactiveCompact?.isWithheldMediaSizeError(message)
+              (feature('REACTIVE_COMPACT_SAFE') && reactiveCompactSafe
+                ? reactiveCompactSafe.safeReactiveCall(
+                    () =>
+                      reactiveCompact?.isWithheldMediaSizeError(message) ?? false,
+                    false,
+                    logError,
+                  )
+                : reactiveCompact?.isWithheldMediaSizeError(message))
             ) {
               withheld = true
             }
@@ -834,7 +854,13 @@ async function* queryLoop(
         isPromptTooLongMessage(lastMessage)
       const isWithheldMedia =
         mediaRecoveryEnabled &&
-        reactiveCompact?.isWithheldMediaSizeError(lastMessage)
+        (feature('REACTIVE_COMPACT_SAFE') && reactiveCompactSafe
+          ? reactiveCompactSafe.safeReactiveCall(
+              () => reactiveCompact?.isWithheldMediaSizeError(lastMessage) ?? false,
+              false,
+              logError,
+            )
+          : reactiveCompact?.isWithheldMediaSizeError(lastMessage))
       if (isWithheld413) {
         if (
           feature('CONTEXT_COLLAPSE') &&
@@ -867,19 +893,28 @@ async function* queryLoop(
         }
       }
       if ((isWithheld413 || isWithheldMedia) && reactiveCompact) {
-        const compacted = await reactiveCompact.tryReactiveCompact({
-          hasAttempted: hasAttemptedReactiveCompact,
-          querySource,
-          aborted: toolUseContext.abortController.signal.aborted,
-          messages: messagesForQuery,
-          cacheSafeParams: {
-            systemPrompt,
-            userContext,
-            systemContext,
-            toolUseContext,
-            forkContextMessages: messagesForQuery,
-          },
-        })
+        const runTryReactiveCompact = () =>
+          reactiveCompact.tryReactiveCompact({
+            hasAttempted: hasAttemptedReactiveCompact,
+            querySource,
+            aborted: toolUseContext.abortController.signal.aborted,
+            messages: messagesForQuery,
+            cacheSafeParams: {
+              systemPrompt,
+              userContext,
+              systemContext,
+              toolUseContext,
+              forkContextMessages: messagesForQuery,
+            },
+          })
+        const compacted =
+          feature('REACTIVE_COMPACT_SAFE') && reactiveCompactSafe
+            ? await reactiveCompactSafe.safeReactiveCallAsync(
+                runTryReactiveCompact,
+                null,
+                logError,
+              )
+            : await runTryReactiveCompact()
         if (compacted) {
           if (params.taskBudget) {
             const preCompactContext =

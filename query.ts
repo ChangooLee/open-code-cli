@@ -3,6 +3,7 @@ import type {
   ToolUseBlock,
 } from 'src/services/api/openaiCompatible.js'
 import type { CanUseToolFn } from './hooks/useCanUseTool.js'
+import { resolveEffectiveMaxTurns } from './query/boundedAutonomy.js'
 import { FallbackTriggeredError } from './services/api/withRetry.js'
 import {
   calculateTokenWarningState,
@@ -207,6 +208,7 @@ async function* queryLoop(
     skipCacheWrite,
   } = params
   const deps = params.deps ?? productionDeps()
+  const effectiveMaxTurns = resolveEffectiveMaxTurns(maxTurns)
   let state: State = {
     messages: params.messages,
     toolUseContext: params.toolUseContext,
@@ -287,11 +289,15 @@ async function* queryLoop(
     let snipTokensFreed = 0
     if (feature('HISTORY_SNIP')) {
       queryCheckpoint('query_snip_start')
-      const snipResult = snipModule!.snipCompactIfNeeded(messagesForQuery)
-      messagesForQuery = snipResult.messages
-      snipTokensFreed = snipResult.tokensFreed
-      if (snipResult.boundaryMessage) {
-        yield snipResult.boundaryMessage
+      try {
+        const snipResult = snipModule!.snipCompactIfNeeded(messagesForQuery)
+        messagesForQuery = snipResult.messages
+        snipTokensFreed = snipResult.tokensFreed
+        if (snipResult.boundaryMessage) {
+          yield snipResult.boundaryMessage
+        }
+      } catch (err) {
+        logError(err)
       }
       queryCheckpoint('query_snip_end')
     }
@@ -1122,10 +1128,10 @@ async function* queryLoop(
         })
       }
       const nextTurnCountOnAbort = turnCount + 1
-      if (maxTurns && nextTurnCountOnAbort > maxTurns) {
+      if (effectiveMaxTurns && nextTurnCountOnAbort > effectiveMaxTurns) {
         yield createAttachmentMessage({
           type: 'max_turns_reached',
-          maxTurns,
+          maxTurns: effectiveMaxTurns,
           turnCount: nextTurnCountOnAbort,
         })
       }
@@ -1256,10 +1262,10 @@ async function* queryLoop(
         })
       }
     }
-    if (maxTurns && nextTurnCount > maxTurns) {
+    if (effectiveMaxTurns && nextTurnCount > effectiveMaxTurns) {
       yield createAttachmentMessage({
         type: 'max_turns_reached',
-        maxTurns,
+        maxTurns: effectiveMaxTurns,
         turnCount: nextTurnCount,
       })
       return { reason: 'max_turns', turnCount: nextTurnCount }

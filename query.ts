@@ -118,6 +118,9 @@ import {
   resolveSubagentBudget,
 } from './query/tokenBudget.js'
 import { count } from './utils/array.js'
+const wallClockDeadlineModule = feature('WALL_CLOCK_DEADLINE')
+  ? (require('./query/wallClockDeadline.js') as typeof import('./query/wallClockDeadline.js'))
+  : null
 const snipModule = feature('HISTORY_SNIP')
   ? (require('./services/compact/snipCompact.js') as typeof import('./services/compact/snipCompact.js'))
   : null
@@ -236,6 +239,11 @@ async function* queryLoop(
     transition: undefined,
   }
   const budgetTracker = feature('TOKEN_BUDGET') ? createBudgetTracker() : null
+  const wallClockDeadlineMs = feature('WALL_CLOCK_DEADLINE')
+    ? wallClockDeadlineModule!.resolveDeadlineMs(
+        process.env.OPEN_CODE_CLI_WALL_CLOCK_DEADLINE_MS,
+      )
+    : null
   let taskBudgetRemaining: number | undefined = undefined
   const config = buildQueryConfig()
   using pendingMemoryPrefetch = startRelevantMemoryPrefetch(
@@ -254,6 +262,28 @@ async function* queryLoop(
       stopHookActive,
       turnCount,
     } = state
+    if (feature('WALL_CLOCK_DEADLINE')) {
+      const deadline = wallClockDeadlineModule!.checkDeadline(
+        queryStartedAt,
+        wallClockDeadlineMs,
+        Date.now(),
+      )
+      if (deadline.expired) {
+        logForDebugging(
+          `Wall-clock deadline reached: ${deadline.elapsedMs}ms elapsed (limit ${deadline.deadlineMs}ms)`,
+        )
+        logEvent('open_code_cli_wall_clock_deadline_reached', {
+          elapsedMs: deadline.elapsedMs,
+          deadlineMs: deadline.deadlineMs,
+          turnCount,
+        })
+        yield createUserMessage({
+          content: `⚠ Turn stopped: wall-clock deadline of ${deadline.deadlineMs}ms reached (${deadline.elapsedMs}ms elapsed). Stopping before the next model call.`,
+          isMeta: true,
+        })
+        return { reason: 'wall_clock_deadline' }
+      }
+    }
     const pendingSkillPrefetch = skillPrefetch?.startSkillDiscoveryPrefetch(
       null,
       messages,

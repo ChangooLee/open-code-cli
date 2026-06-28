@@ -20,3 +20,4 @@ export type Terminal =
   | { reason: 'hook_stopped' }
   | { reason: 'no_progress' }
   | { reason: 'verification_failed' }
+  | { reason: 'wall_clock_deadline' }

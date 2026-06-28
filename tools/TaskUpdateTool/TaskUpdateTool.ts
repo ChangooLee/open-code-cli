@@ -27,6 +27,7 @@ import {
 } from '../../utils/teammate.js'
 import { writeToMailbox } from '../../utils/teammateMailbox.js'
 import { VERIFICATION_AGENT_TYPE } from '../AgentTool/constants.js'
+import { isVerificationAgentRuntimeEnabled } from '../../utils/verificationAgentEnabled.js'
 import { TASK_UPDATE_TOOL_NAME } from './constants.js'
 import { DESCRIPTION, PROMPT } from './prompt.js'
 const inputSchema = lazySchema(() => {
@@ -294,7 +295,7 @@ export const TaskUpdateTool = buildTool({
     let verificationNudgeNeeded = false
     if (
       feature('VERIFICATION_AGENT') &&
-      getFeatureValue_CACHED_MAY_BE_STALE('open_code_cli_hive_evidence', false) &&
+      isVerificationAgentRuntimeEnabled() &&
       !context.agentId &&
       updates.status === 'completed'
     ) {

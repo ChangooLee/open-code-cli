@@ -80,11 +80,17 @@ import { TaskListTool } from './tools/TaskListTool/TaskListTool.js'
 import uniqBy from 'lodash-es/uniqBy.js'
 import { isToolSearchEnabledOptimistic } from './utils/toolSearch.js'
 import { isTodoV2Enabled } from './utils/tasks.js'
-const VerifyPlanExecutionTool =
-  process.env.OPEN_CODE_CLI_VERIFY_PLAN === 'true'
-    ? require('./tools/VerifyPlanExecutionTool/VerifyPlanExecutionTool.js')
-        .VerifyPlanExecutionTool
-    : null
+const VerifyPlanExecutionTool = (() => {
+  if (process.env.OPEN_CODE_CLI_VERIFY_PLAN !== 'true') {
+    return null
+  }
+  try {
+    return require('./tools/VerifyPlanExecutionTool/VerifyPlanExecutionTool.js')
+      .VerifyPlanExecutionTool
+  } catch {
+    return null
+  }
+})()
 import { SYNTHETIC_OUTPUT_TOOL_NAME } from './tools/SyntheticOutputTool/SyntheticOutputTool.js'
 export {
   ALL_AGENT_DISALLOWED_TOOLS,

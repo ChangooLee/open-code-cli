@@ -7,6 +7,7 @@ import { lazySchema } from '../../utils/lazySchema.js'
 import { isTodoV2Enabled } from '../../utils/tasks.js'
 import { TodoListSchema } from '../../utils/todo/types.js'
 import { VERIFICATION_AGENT_TYPE } from '../AgentTool/constants.js'
+import { isVerificationAgentRuntimeEnabled } from '../../utils/verificationAgentEnabled.js'
 import { TODO_WRITE_TOOL_NAME } from './constants.js'
 import { DESCRIPTION, PROMPT } from './prompt.js'
 const inputSchema = lazySchema(() =>
@@ -66,7 +67,7 @@ export const TodoWriteTool = buildTool({
     let verificationNudgeNeeded = false
     if (
       feature('VERIFICATION_AGENT') &&
-      getFeatureValue_CACHED_MAY_BE_STALE('open_code_cli_hive_evidence', false) &&
+      isVerificationAgentRuntimeEnabled() &&
       !context.agentId &&
       allDone &&
       todos.length >= 3 &&

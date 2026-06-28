@@ -1,0 +1,22 @@
+{
+  "name": "open-code-cli",
+  "version": "0.1.0",
+  "description": "Open Code CLI — an OpenAI-compatible terminal coding agent.",
+  "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ChangooLee/open-code-cli.git"
+  },
+  "homepage": "https://github.com/ChangooLee/open-code-cli",
+  "type": "module",
+  "bin": {
+    "open-code-cli": "./entrypoints/cli.tsx"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "node scripts/build.mjs"
+  }
+}

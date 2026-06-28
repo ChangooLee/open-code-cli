@@ -1,0 +1,36 @@
+import type { LocalJSXCommandOnDone } from '../../types/command.js'
+
+/**
+ * Top-level navigation state for the plugin settings UI. Children receive a
+ * `setViewState` callback typed against this union to drive parent navigation.
+ */
+export type ViewState =
+  | { type: 'menu' }
+  | { type: 'help' }
+  | { type: 'validate'; path?: string }
+  | { type: 'discover-plugins'; targetPlugin?: string }
+  | {
+      type: 'browse-marketplace'
+      targetMarketplace: string
+      targetPlugin?: string
+    }
+  | {
+      type: 'manage-plugins'
+      targetPlugin?: string
+      targetMarketplace?: string
+      action?: 'enable' | 'disable' | 'uninstall'
+    }
+  | {
+      type: 'manage-marketplaces'
+      targetMarketplace?: string
+      action?: 'update' | 'remove'
+    }
+  | { type: 'marketplace-list' }
+  | { type: 'marketplace-menu' }
+  | { type: 'add-marketplace'; initialValue?: string }
+
+export type PluginSettingsProps = {
+  onComplete: LocalJSXCommandOnDone
+  args?: string
+  showMcpRedirectMessage?: boolean
+}

@@ -1,0 +1,74 @@
+import {
+  getModelStrings as getModelStringsState,
+  setModelStrings as setModelStringsState,
+} from 'src/bootstrap/state.js'
+import { getInitialSettings } from '../settings/settings.js'
+import {
+  ALL_MODEL_CONFIGS,
+  CANONICAL_ID_TO_KEY,
+  type CanonicalModelId,
+  type ModelKey,
+  type ModelConfig,
+} from './configs.js'
+
+export type ModelStrings = Record<ModelKey, string>
+
+const MODEL_KEYS = Object.keys(ALL_MODEL_CONFIGS) as ModelKey[]
+
+function getBuiltinModelStrings(): ModelStrings {
+  const out = {} as ModelStrings
+  for (const key of MODEL_KEYS) {
+    out[key] = ALL_MODEL_CONFIGS[key].openaiCompatible
+  }
+  return out
+}
+
+function applyModelOverrides(ms: ModelStrings): ModelStrings {
+  const overrides = getInitialSettings().modelOverrides
+  if (!overrides) return ms
+  const out = { ...ms }
+  for (const [canonicalId, override] of Object.entries(overrides)) {
+    const key = CANONICAL_ID_TO_KEY[canonicalId as CanonicalModelId]
+    if (key && override) out[key] = override
+  }
+  return out
+}
+
+export function resolveOverriddenModel(modelId: string): string {
+  let overrides: Record<string, string> | undefined
+  try {
+    overrides = getInitialSettings().modelOverrides
+  } catch {
+    return modelId
+  }
+  if (!overrides) return modelId
+  for (const [canonicalId, override] of Object.entries(overrides)) {
+    if (override === modelId) return canonicalId
+  }
+  return modelId
+}
+
+function initModelStrings(): void {
+  const ms = getModelStringsState()
+  if (ms !== null) return
+  setModelStringsState(getBuiltinModelStrings())
+}
+
+export function getModelStrings(): ModelStrings {
+  const ms = getModelStringsState()
+  if (ms === null) {
+    initModelStrings()
+    return applyModelOverrides(getBuiltinModelStrings())
+  }
+  return applyModelOverrides(ms)
+}
+
+/**
+ * Ensures model strings have been initialized. For the OpenAI-compatible
+ * provider this is synchronous (built-in strings), but callers (main.tsx,
+ * cli/print.ts) await it to stay forward-compatible with async providers.
+ * Reconstructed from usage: callers only `await` it for its side effect.
+ */
+export async function ensureModelStringsInitialized(): Promise<void> {
+  getModelStrings()
+}

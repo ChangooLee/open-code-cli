@@ -2,6 +2,14 @@ import { feature } from 'bun:bundle'
 
 const IDENTICAL_CALL_THRESHOLD = 5
 
+const detectOscillation: (sigs: string[]) => {
+  stop: boolean
+  toolName?: string
+  count?: number
+} = feature('AGENT_LOOP_DETECTION_OSCILLATION')
+  ? require('./loopOscillation.js').detectOscillation
+  : () => ({ stop: false })
+
 function toolSignatures(messages: any[]): string[] {
   const sigs: string[] = []
   for (const m of messages) {
@@ -44,5 +52,7 @@ export function detectNoProgress(messages: any[]): {
   if (count >= IDENTICAL_CALL_THRESHOLD) {
     return { stop: true, toolName: last.split(':')[0], count }
   }
-  return { stop: false }
+  return feature('AGENT_LOOP_DETECTION_OSCILLATION')
+    ? detectOscillation(sigs)
+    : { stop: false }
 }

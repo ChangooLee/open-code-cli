@@ -94,10 +94,10 @@ async function buildCli(outfile, features) {
   })
 }
 
-function runCli(cliPath, workDir) {
+function runCli(cliPath, workDir, allowedTools) {
   const r = spawnSync(
     'node',
-    [cliPath, '-p', 'write 3 files', '--output-format', 'stream-json', '--verbose', '--allowedTools', 'Write', '--max-turns', '30'],
+    [cliPath, '-p', 'do the task', '--output-format', 'stream-json', '--verbose', '--allowedTools', allowedTools, '--max-turns', '40'],
     {
       cwd: workDir,
       encoding: 'utf8',
@@ -108,13 +108,22 @@ function runCli(cliPath, workDir) {
         OPEN_CODE_CLI_BASE_URL: `http://localhost:${PORT}/v1`,
         OPEN_CODE_CLI_MODEL: 'mock',
       },
-      timeout: 60000,
+      timeout: 90000,
     },
   )
   const out = (r.stdout || '') + (r.stderr || '')
   const line = out.split('\n').find(l => l.includes('"type":"result"'))
   if (!line) throw new Error('no result line in output:\n' + out.slice(-800))
   return JSON.parse(line)
+}
+
+async function startMock(scenario) {
+  const mock = spawn('node', [resolve(root, 'tests/e2e/mockModelServer.mjs')], {
+    env: { ...process.env, MOCK_PORT: String(PORT), MOCK_SCENARIO: scenario },
+    stdio: 'ignore',
+  })
+  await new Promise(r => setTimeout(r, 800))
+  return mock
 }
 
 const tmp = mkdtempSync(join(tmpdir(), 'occ-e2e-'))
@@ -124,12 +133,6 @@ console.error('building flagged + control binaries...')
 await buildCli(cliFlagged, ['VERIFY_IMPLEMENTATION_BEFORE_COMPLETION', 'BOUNDED_AUTONOMY'])
 await buildCli(cliControl, [])
 
-const mock = spawn('node', [resolve(root, 'tests/e2e/mockModelServer.mjs')], {
-  env: { ...process.env, MOCK_PORT: String(PORT), MOCK_SCENARIO: 'verifyfail' },
-  stdio: 'ignore',
-})
-await new Promise(r => setTimeout(r, 800))
-
 let failures = 0
 const check = (name, cond, detail) => {
   if (cond) console.error(`✔ ${name}`)
@@ -138,24 +141,49 @@ const check = (name, cond, detail) => {
     console.error(`✗ ${name} — ${detail}`)
   }
 }
+const wdir = p => mkdtempSync(join(tmpdir(), p))
 
-try {
-  const flagged = runCli(cliFlagged, mkdtempSync(join(tmpdir(), 'occ-e2e-wf-')))
+async function withMock(scenario, fn) {
+  const mock = await startMock(scenario)
+  try {
+    await fn()
+  } finally {
+    mock.kill()
+  }
+}
+
+// Scenario 1 — parent-direct edits (verification on the main loop).
+await withMock('verifyfail', async () => {
+  const flagged = runCli(cliFlagged, wdir('occ-e2e-vf-'), 'Write')
   check(
-    'gate ON: unverified 3-edit task surfaces as a non-success result',
+    'parent-direct: gate ON => unverified 3-edit task is a non-success result',
     flagged.is_error === true,
     `expected is_error=true, got ${JSON.stringify({ is_error: flagged.is_error, subtype: flagged.subtype })}`,
   )
-
-  const control = runCli(cliControl, mkdtempSync(join(tmpdir(), 'occ-e2e-wc-')))
+  const control = runCli(cliControl, wdir('occ-e2e-vc-'), 'Write')
   check(
-    'gate OFF (default build): same task completes successfully',
+    'parent-direct: gate OFF (default) => completes successfully',
     control.is_error === false || control.subtype === 'success',
     `expected success, got ${JSON.stringify({ is_error: control.is_error, subtype: control.subtype })}`,
   )
-} finally {
-  mock.kill()
-}
+})
+
+// Scenario 2 — DELEGATED edits: parent spawns a subagent that does the edits.
+// Proves the verification contract holds across the multi-agent boundary.
+await withMock('nested', async () => {
+  const flagged = runCli(cliFlagged, wdir('occ-e2e-nf-'), 'Agent,Write')
+  check(
+    'delegated: gate ON => subagent edits gate the parent (non-success result)',
+    flagged.is_error === true,
+    `expected is_error=true, got ${JSON.stringify({ is_error: flagged.is_error, subtype: flagged.subtype })}`,
+  )
+  const control = runCli(cliControl, wdir('occ-e2e-nc-'), 'Agent,Write')
+  check(
+    'delegated: gate OFF (default) => completes successfully',
+    control.is_error === false || control.subtype === 'success',
+    `expected success, got ${JSON.stringify({ is_error: control.is_error, subtype: control.subtype })}`,
+  )
+})
 
 if (failures > 0) {
   console.error(`\n${failures} e2e check(s) failed`)

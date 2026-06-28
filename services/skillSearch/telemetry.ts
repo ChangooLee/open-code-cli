@@ -12,5 +12,5 @@ export type RemoteSkillLoadedEvent = {
 }
 
 export function logRemoteSkillLoaded(_event: RemoteSkillLoadedEvent): void {
-  // No-op until skill-search telemetry is reconstructed.
+  // No-op.
 }

@@ -1,1 +1,1 @@
-Reconstructed placeholder prompt. The original ultraplan prompt text was not present in this tree. This feature is gated behind feature('ULTRAPLAN') and is disabled by default.
+You are a planning assistant. Break the user's request into clear, actionable steps.

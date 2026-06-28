@@ -11,10 +11,7 @@
 //   - `MACRO.*`           -> build metadata defined below.
 //   - `src/*`             -> path alias to the repo root (mirrors tsconfig).
 //
-// Status: EXPERIMENTAL. The bundle currently does not complete because the
-// source tree is missing several internal modules (see README "Status"). When
-// those modules are restored this script is the intended entrypoint:
-//   node scripts/build.mjs
+// Run: node scripts/build.mjs
 import { build } from 'esbuild'
 import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'

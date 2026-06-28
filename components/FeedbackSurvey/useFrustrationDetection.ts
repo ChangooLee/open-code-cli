@@ -17,8 +17,7 @@ export interface FrustrationDetectionResult {
 /**
  * Detects user frustration and surfaces a feedback survey.
  *
- * NOTE: full detection behavior is not reconstructed; this returns a closed
- * survey state. The real implementation is only loaded in ant builds.
+ * Returns a closed survey state (detection disabled in this build).
  */
 export function useFrustrationDetection(
   _messages: Message[],

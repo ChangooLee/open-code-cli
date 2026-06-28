@@ -55,6 +55,7 @@ import { getPrompt } from './prompt.js';
 import { runAgent } from './runAgent.js';
 import { renderGroupedAgentToolUse, renderToolResultMessage, renderToolUseErrorMessage, renderToolUseMessage, renderToolUseProgressMessage, renderToolUseRejectedMessage, renderToolUseTag, userFacingName, userFacingNameBackgroundColor } from './UI.js';
 const proactiveModule = feature('PROACTIVE') || feature('KAIROS') ? require('../../proactive/index.js') as typeof import('../../proactive/index.js') : null;
+const subagentDepthCapModule = feature('SUBAGENT_RECURSION_DEPTH_CAP') ? require('../../utils/subagentDepthCap.js') as typeof import('../../utils/subagentDepthCap.js') : null;
 const PROGRESS_THRESHOLD_MS = 2000; 
 const isBackgroundTasksDisabled =
 isEnvTruthy(getOpenCodeCliEnv('DISABLE_BACKGROUND_TASKS'));
@@ -206,6 +207,13 @@ export const AgentTool = buildTool({
     }
     if (isInProcessTeammate() && teamName && run_in_background === true) {
       throw new Error('In-process teammates cannot spawn background agents. Use run_in_background=false for synchronous subagents.');
+    }
+    if (feature('SUBAGENT_RECURSION_DEPTH_CAP') && subagentDepthCapModule) {
+      const maxDepth = subagentDepthCapModule.resolveMaxSubagentDepth(getOpenCodeCliEnv('SUBAGENT_MAX_DEPTH'));
+      const decision = subagentDepthCapModule.checkSubagentDepth(toolUseContext.queryTracking?.depth, maxDepth);
+      if (decision.blocked) {
+        throw new Error(subagentDepthCapModule.formatDepthCapError(decision.currentDepth, decision.maxDepth));
+      }
     }
     if (teamName && name) {
       const agentDef = subagent_type ? toolUseContext.options.agentDefinitions.activeAgents.find(a => a.agentType === subagent_type) : undefined;

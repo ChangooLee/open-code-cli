@@ -69,3 +69,22 @@ test('fails (not allow) after the directive budget is exhausted unverified', () 
   const msgs = [edits(3), directive(), directive(), directive()]
   assert.equal(evaluateVerificationGate(msgs).action, 'fail')
 })
+
+// Parent is NOT blind to subagent edits: edits made inside a subagent are
+// reported via a <subagent_edits> marker in the Agent tool_result and counted.
+test('counts subagent edits reported via the result marker', () => {
+  const subagentResult = {
+    message: {
+      content: [
+        {
+          type: 'tool_result',
+          tool_use_id: 'agent1',
+          content: 'subagent did the work\n<subagent_edits>3</subagent_edits>',
+        },
+      ],
+    },
+  }
+  const r = evaluateVerificationGate([subagentResult])
+  assert.equal(r.editCount, 3)
+  assert.equal(r.action, 'block')
+})

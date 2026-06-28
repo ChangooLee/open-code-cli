@@ -64,6 +64,15 @@ export function evaluateVerificationGate(messages: any[]): {
         ) {
           verifierToolUseIds.add(block.id)
         }
+      } else if (block?.type === 'tool_result') {
+        // Edits made by a subagent are reported back via a marker in the
+        // Agent tool_result so the parent gate is not blind to delegated work.
+        const m = toolResultText(block).match(
+          /<subagent_edits>(\d+)<\/subagent_edits>/,
+        )
+        if (m) {
+          editCount += Number(m[1])
+        }
       } else if (
         block?.type === 'text' &&
         typeof block.text === 'string' &&

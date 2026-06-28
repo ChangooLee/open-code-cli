@@ -286,6 +286,30 @@ export function finalizeAgentTool(
     is_built_in_agent: isBuiltInAgent,
     is_async: isAsync,
   })
+  if (feature('VERIFY_IMPLEMENTATION_BEFORE_COMPLETION')) {
+    const SUBAGENT_EDIT_TOOL_NAMES = new Set([
+      'Edit',
+      'Write',
+      'NotebookEdit',
+      'MultiEdit',
+    ])
+    let subagentEditCount = 0
+    for (const m of agentMessages as any[]) {
+      const blocks = m?.type === 'assistant' ? m?.message?.content : undefined
+      if (!Array.isArray(blocks)) continue
+      for (const b of blocks) {
+        if (b?.type === 'tool_use' && SUBAGENT_EDIT_TOOL_NAMES.has(b.name)) {
+          subagentEditCount++
+        }
+      }
+    }
+    if (subagentEditCount > 0) {
+      content = [
+        ...content,
+        { type: 'text', text: `<subagent_edits>${subagentEditCount}</subagent_edits>` } as any,
+      ]
+    }
+  }
   const lastRequestId = lastAssistantMessage.requestId
   if (lastRequestId) {
     logEvent('open_code_cli_cache_eviction_hint', {

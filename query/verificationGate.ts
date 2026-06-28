@@ -74,7 +74,26 @@ export function isFileMutatingBashCommand(command: unknown): boolean {
   }
   return false
 }
-const NONTRIVIAL_EDIT_THRESHOLD = 3
+export const NONTRIVIAL_EDIT_THRESHOLD = 3
+
+// The number of file modifications at/above which work is treated as
+// "non-trivial" and must be independently verified before completion. Default
+// is NONTRIVIAL_EDIT_THRESHOLD (3). An operator can tune strictness via env
+// (e.g. set to 2 for a stricter gate, or higher to gate only larger changes).
+// Pure + total: any undefined/empty/whitespace/non-numeric/<1 value falls back
+// to the default, and positive values are floored. Never returns < 1, so the
+// gate can never be configured to ignore every edit.
+export function resolveEditThreshold(envValue: string | undefined): number {
+  if (envValue === undefined) return NONTRIVIAL_EDIT_THRESHOLD
+  const trimmed = envValue.trim()
+  if (trimmed === '') return NONTRIVIAL_EDIT_THRESHOLD
+  const parsed = Number(trimmed)
+  if (!Number.isFinite(parsed) || parsed < 1) {
+    return NONTRIVIAL_EDIT_THRESHOLD
+  }
+  return Math.floor(parsed)
+}
+
 const MAX_VERIFY_DIRECTIVES = 3
 const DIRECTIVE_MARKER = 'independent verification verdict'
 
@@ -146,6 +165,7 @@ export function extractBackgroundAgentSignals(
 export function evaluateVerificationGate(
   messages: any[],
   backgroundSignals?: BackgroundAgentSignals,
+  editThreshold?: number,
 ): {
   action: VerificationGateAction
   editCount: number
@@ -220,7 +240,16 @@ export function evaluateVerificationGate(
       }
     }
   }
-  const nonTrivial = editCount >= NONTRIVIAL_EDIT_THRESHOLD || subagentFailed
+  // An explicit threshold (from the configurable-strictness flag) overrides the
+  // default only when it is a finite value >= 1; otherwise the historical
+  // NONTRIVIAL_EDIT_THRESHOLD is used, so every existing caller is unchanged.
+  const threshold =
+    typeof editThreshold === 'number' &&
+    Number.isFinite(editThreshold) &&
+    editThreshold >= 1
+      ? Math.floor(editThreshold)
+      : NONTRIVIAL_EDIT_THRESHOLD
+  const nonTrivial = editCount >= threshold || subagentFailed
   if (!nonTrivial || passVerdict) {
     return { action: 'allow', editCount }
   }

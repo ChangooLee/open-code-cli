@@ -6,6 +6,8 @@ import {
   extractBackgroundAgentSignals,
   awaitInFlightBackgroundChildren,
   isFileMutatingBashCommand,
+  resolveEditThreshold,
+  NONTRIVIAL_EDIT_THRESHOLD,
 } from '../query/verificationGate.js'
 
 const edits = (n: number) => ({
@@ -281,4 +283,73 @@ test('gate counts file-mutating Bash toward editCount', () => {
 test('gate does NOT count read-only Bash', () => {
   const msgs = [bashCall('cat a'), bashCall('grep x b'), bashCall('ls')]
   assert.equal(evaluateVerificationGate(msgs).action, 'allow')
+})
+
+// --- Configurable edit threshold (flag: CONFIGURABLE_EDIT_THRESHOLD) ---
+// resolveEditThreshold is pure; evaluateVerificationGate's optional 3rd param
+// overrides the default 3 only for finite values >= 1.
+
+test('resolveEditThreshold: undefined/empty/whitespace -> default', () => {
+  assert.equal(resolveEditThreshold(undefined), NONTRIVIAL_EDIT_THRESHOLD)
+  assert.equal(resolveEditThreshold(''), NONTRIVIAL_EDIT_THRESHOLD)
+  assert.equal(resolveEditThreshold('   '), NONTRIVIAL_EDIT_THRESHOLD)
+})
+
+test('resolveEditThreshold: non-numeric -> default', () => {
+  assert.equal(resolveEditThreshold('abc'), NONTRIVIAL_EDIT_THRESHOLD)
+  assert.equal(resolveEditThreshold('NaN'), NONTRIVIAL_EDIT_THRESHOLD)
+})
+
+test('resolveEditThreshold: < 1 floors back to default (never ignores edits)', () => {
+  assert.equal(resolveEditThreshold('0'), NONTRIVIAL_EDIT_THRESHOLD)
+  assert.equal(resolveEditThreshold('-5'), NONTRIVIAL_EDIT_THRESHOLD)
+})
+
+test('resolveEditThreshold: valid positive is floored', () => {
+  assert.equal(resolveEditThreshold('2'), 2)
+  assert.equal(resolveEditThreshold('5'), 5)
+  assert.equal(resolveEditThreshold('2.9'), 2)
+})
+
+test('default behavior unchanged when no threshold passed (2 edits allow, 3 block)', () => {
+  assert.equal(evaluateVerificationGate([edits(2)]).action, 'allow')
+  assert.equal(evaluateVerificationGate([edits(3)]).action, 'block')
+})
+
+test('explicit threshold of 1: 1 edit now blocks (stricter)', () => {
+  assert.equal(evaluateVerificationGate([edits(1)], undefined, 1).action, 'block')
+})
+
+test('explicit threshold of 2: 2 edits block but 1 allows', () => {
+  assert.equal(evaluateVerificationGate([edits(2)], undefined, 2).action, 'block')
+  assert.equal(evaluateVerificationGate([edits(1)], undefined, 2).action, 'allow')
+})
+
+test('explicit higher threshold of 5: 3 edits now allow (looser)', () => {
+  assert.equal(evaluateVerificationGate([edits(3)], undefined, 5).action, 'allow')
+  assert.equal(evaluateVerificationGate([edits(5)], undefined, 5).action, 'block')
+})
+
+test('invalid explicit threshold falls back to default 3', () => {
+  // 0, negative, NaN, and Infinity must not be honored as the live threshold.
+  assert.equal(evaluateVerificationGate([edits(3)], undefined, 0).action, 'block')
+  assert.equal(evaluateVerificationGate([edits(2)], undefined, 0).action, 'allow')
+  assert.equal(evaluateVerificationGate([edits(3)], undefined, -1).action, 'block')
+  assert.equal(
+    evaluateVerificationGate([edits(3)], undefined, Number.NaN).action,
+    'block',
+  )
+  assert.equal(
+    evaluateVerificationGate([edits(3)], undefined, Number.POSITIVE_INFINITY)
+      .action,
+    'block',
+  )
+})
+
+test('subagent failure still forces gate regardless of high threshold', () => {
+  // A failed verification is non-trivial independent of edit count/threshold.
+  assert.equal(
+    evaluateVerificationGate([], { edits: 0, failed: true }, 100).action,
+    'block',
+  )
 })

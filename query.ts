@@ -9,6 +9,7 @@ import {
   buildVerificationDirective,
   extractBackgroundAgentSignals,
   awaitInFlightBackgroundChildren,
+  resolveEditThreshold,
   BACKGROUND_JOIN_TIMEOUT_MS,
 } from './query/verificationGate.js'
 import { detectNoProgress } from './query/loopDetection.js'
@@ -1112,6 +1113,11 @@ async function* queryLoop(
           toolUseContext.getAppState().tasks,
           queryStartedAt,
         ),
+        feature('CONFIGURABLE_EDIT_THRESHOLD')
+          ? resolveEditThreshold(
+              process.env.OPEN_CODE_CLI_NONTRIVIAL_EDIT_THRESHOLD,
+            )
+          : undefined,
       )
       if (verificationGate.action === 'block') {
         state = {

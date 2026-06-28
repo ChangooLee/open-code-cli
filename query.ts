@@ -8,6 +8,7 @@ import {
   evaluateVerificationGate,
   buildVerificationDirective,
 } from './query/verificationGate.js'
+import { detectNoProgress } from './query/loopDetection.js'
 import { FallbackTriggeredError } from './services/api/withRetry.js'
 import {
   calculateTokenWarningState,
@@ -1291,6 +1292,18 @@ async function* queryLoop(
           ],
         })
       }
+    }
+    const noProgress = detectNoProgress([
+      ...messagesForQuery,
+      ...assistantMessages,
+      ...toolResults,
+    ])
+    if (noProgress.stop) {
+      yield createUserMessage({
+        content: `⚠ Stopped: the ${noProgress.toolName} tool was called ${noProgress.count} times with identical arguments and no progress.`,
+        isMeta: true,
+      })
+      return { reason: 'no_progress' }
     }
     if (effectiveMaxTurns && nextTurnCount > effectiveMaxTurns) {
       yield createAttachmentMessage({

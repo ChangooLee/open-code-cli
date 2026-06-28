@@ -18,3 +18,4 @@ export type Terminal =
   | { reason: 'aborted_tools' }
   | { reason: 'stop_hook_prevented' }
   | { reason: 'hook_stopped' }
+  | { reason: 'no_progress' }

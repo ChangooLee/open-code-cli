@@ -1,4 +1,5 @@
 import { feature } from 'bun:bundle';
+import { repairToolJson } from './repairToolJson.js';
 import type { BetaUsage as Usage } from 'src/services/api/openaiCompatible.js';
 import type { ContentBlock, ContentBlockParam, RedactedThinkingBlock, RedactedThinkingBlockParam, TextBlockParam, ThinkingBlock, ThinkingBlockParam, ToolResultBlockParam, ToolUseBlock, ToolUseBlockParam, } from 'src/services/api/openaiCompatible.js';
 import { randomUUID, type UUID } from 'crypto';
@@ -1674,7 +1675,13 @@ export function normalizeContentFromAPI(contentBlocks: BetaMessage['content'], t
                 }
                 let normalizedInput: unknown;
                 if (typeof contentBlock.input === 'string') {
-                    const parsed = safeParseJSON(contentBlock.input);
+                    let parsed = safeParseJSON(contentBlock.input);
+                    if (parsed === null && contentBlock.input.length > 0 && feature('STRICT_TOOL_IO')) {
+                        const repaired = repairToolJson(contentBlock.input);
+                        if (repaired !== undefined) {
+                            parsed = repaired;
+                        }
+                    }
                     if (parsed === null && contentBlock.input.length > 0) {
                         logEvent('open_code_cli_tool_input_json_parse_fail', {
                             toolName: sanitizeToolNameForAnalytics(contentBlock.name),

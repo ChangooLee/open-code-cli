@@ -1,4 +1,6 @@
 import { randomUUID } from 'crypto';
+import { feature } from 'bun:bundle';
+import { repairToolJson } from '../../utils/repairToolJson.js';
 import { APIConnectionError, APIConnectionTimeoutError, APIError, APIUserAbortError, type BetaContentBlock, type BetaMessage, type BetaMessageStreamParams, type BetaRawMessageStreamEvent, type BetaStopReason, type ClientOptions, type ContentBlockParam, type MessageParam, type Stream, type ToolUseBlock, } from './providerTypes.js';
 export * from './providerTypes.js';
 type OpenAIMessage = {
@@ -519,6 +521,12 @@ function parseToolArguments(input: string): unknown {
         return JSON.parse(input);
     }
     catch {
+        if (feature('STRICT_TOOL_IO')) {
+            const repaired = repairToolJson(input);
+            if (repaired !== undefined) {
+                return repaired;
+            }
+        }
         return input;
     }
 }

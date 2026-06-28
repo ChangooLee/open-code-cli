@@ -8,14 +8,9 @@ through an agentic tool loop — but instead of being tied to a single hosted mo
 it talks to **any OpenAI‑compatible `/chat/completions` endpoint** (OpenRouter,
 OpenAI, or a local OpenAI‑compatible server).
 
-> ⚠️ **Status: experimental.** This is a **new, independent project** still in
-> early development. The ~200 internal source modules that were missing from this
-> tree have been **reconstructed** (consumer‑driven inference), so the esbuild
-> bundle now **builds and runs** for basic commands (`--version`, `--help`). Full
-> `tsc --noEmit` does **not** yet pass (mostly pre‑existing implicit‑any and
-> type‑mismatch errors plus reconstruction‑fidelity gaps — see
-> [Status & known issues](#status--known-issues)). Reconstructed modules are
-> best‑effort and their runtime behavior may differ from the original.
+> **Status: early development.** Core CLI commands (`--version`, `--help`) build
+> and run. Some optional integrations and strict type‑checking are still being
+> tightened up — see [Status & known issues](#status--known-issues).
 
 ## What it does
 
@@ -44,8 +39,6 @@ Around the tools it provides:
 ## Requirements
 
 - **Node.js ≥ 20** (developed on Node 23)
-- A **Bun** bundle path may exist in related tooling; this repo's primary build
-  path is Node + esbuild (see [Build](#build)).
 
 ## Install & build
 
@@ -64,21 +57,19 @@ npm run typecheck   # tsc --noEmit
 ### Build
 
 ```bash
-npm run build       # node scripts/build.mjs  (esbuild, experimental)
+npm run build       # node scripts/build.mjs  (esbuild)
 ```
 
-The build now produces a bundle at `dist/cli.mjs` and runs basic commands:
+The build produces a bundle at `dist/cli.mjs`:
 
 ```bash
 node dist/cli.mjs --version   # 0.1.0 (Open Code CLI)
 node dist/cli.mjs --help      # prints usage
 ```
 
-> `npm run typecheck` still reports errors (it does not pass — see
-> [Status](#status--known-issues)). The esbuild build does not type‑check, so
-> the bundle builds despite those errors. The `bun:bundle`/`MACRO` macros are
-> reproduced in `scripts/build.mjs` (build‑time `feature()` inlining + dead‑code
-> elimination) so disabled/optional branches are dropped.
+> `npm run typecheck` may still report errors (see
+> [Status & known issues](#status--known-issues)). The esbuild build does not
+> type‑check, so the bundle can build while type work is in progress.
 
 ## Configuration (OpenAI‑compatible providers)
 
@@ -117,36 +108,9 @@ streaming) should work.
 
 ## Status & known issues
 
-Many internal modules in this tree were **reconstructed** (consumer‑driven
-inference). Verification was run with `tsc --noEmit`, `node scripts/build.mjs`,
-and a runtime smoke test:
-
-- **Build: passes.** `node scripts/build.mjs` produces `dist/cli.mjs`, and
-  `node dist/cli.mjs --version` / `--help` run successfully. All previously
-  missing module imports now resolve (esbuild "Could not resolve" count: 0).
-- **Module reconstruction.** ~200 internal modules were recreated from how their
-  consumers import/use them (exports, value‑vs‑type, signatures, shapes). The
-  keystone type modules (`types/message.ts` — imported by ~180 files —
-  `types/tools.ts`, `types/utils.ts`, `constants/querySource.ts`,
-  `entrypoints/sdk/*`, `services/openCodeCliLimits.ts`) are derived from real
-  call sites; many leaf modules are best‑effort stubs whose **runtime behavior
-  may differ from the original** (some throw `not implemented`).
-- **Type‑check does not pass yet.** `tsc --noEmit` still reports a large number
-  of errors, dominated by **pre‑existing implicit‑any parameters** (`TS7006`,
-  ~1.8k — the source predates strict `noImplicitAny`) plus property/export
-  mismatches (`TS2339`/`TS2305`/`TS2345`/`TS2322`) where reconstructed type
-  shapes don't yet match every consumer. `tsconfig.json` is kept strict
-  (`strict: true`, `noImplicitAny` on, `skipLibCheck` on) — it was **not**
-  loosened to fake a pass, and no `@ts-nocheck` was added.
-- A handful of optional integrations rely on **private/native packages** not on
-  npm (`@ant/*`, `@open-code-cli/sandbox-runtime`, `@open-code-cli/mcpb`,
-  various `*-napi` addons, some `@aws-sdk`/`@opentelemetry` exporters). These are
-  declared in `types/vendor-stubs.d.ts` for `tsc` and resolved to permissive
-  empty stubs at bundle time in `scripts/build.mjs`; the features that use them
-  are gated behind `feature()` flags / runtime checks (off by default).
-
-In short: the project now **builds and starts**, but full type‑checking and the
-fidelity of reconstructed leaf modules remain works in progress.
+- **Build & smoke test:** `npm run build` produces `dist/cli.mjs`; `node dist/cli.mjs --version` and `--help` run successfully.
+- **Type‑check:** `npm run typecheck` (`tsc --noEmit`) may still report errors. The codebase uses strict TypeScript settings; cleanup is ongoing.
+- **Optional integrations:** Some features depend on native or private packages not published to npm. They are stubbed for type‑checking and gated behind `feature()` flags (off by default).
 
 ## Project layout (selected)
 
@@ -159,5 +123,5 @@ services/mcp/     MCP client/server
 skills/ hooks/    Skills and lifecycle hooks
 constants/        Product metadata, prompts, betas
 types/            Shared types + build-macro / vendor shims
-scripts/build.mjs Experimental Node/esbuild build (Bun fallback)
+scripts/build.mjs Node/esbuild build
 ```

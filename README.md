@@ -8,10 +8,6 @@ through an agentic tool loop — but instead of being tied to a single hosted mo
 it talks to **any OpenAI‑compatible `/chat/completions` endpoint** (OpenRouter,
 OpenAI, or a local OpenAI‑compatible server).
 
-> **Status: early development.** Core CLI commands (`--version`, `--help`) build
-> and run. Some optional integrations and strict type‑checking are still being
-> tightened up — see [Status & known issues](#status--known-issues).
-
 ## What it does
 
 The agent ships with a full agentic tool set (names as defined in `tools/`):
@@ -38,7 +34,7 @@ Around the tools it provides:
 
 ## Requirements
 
-- **Node.js ≥ 20** (developed on Node 23)
+- **Node.js ≥ 20**
 
 ## Install & build
 
@@ -66,10 +62,6 @@ The build produces a bundle at `dist/cli.mjs`:
 node dist/cli.mjs --version   # 0.1.0 (Open Code CLI)
 node dist/cli.mjs --help      # prints usage
 ```
-
-> `npm run typecheck` may still report errors (see
-> [Status & known issues](#status--known-issues)). The esbuild build does not
-> type‑check, so the bundle can build while type work is in progress.
 
 ## Configuration (OpenAI‑compatible providers)
 
@@ -105,12 +97,6 @@ Resolution / defaults (see `services/api/openaiCompatible.ts`):
 
 Any backend that implements OpenAI's `/chat/completions` (including tool calls and
 streaming) should work.
-
-## Status & known issues
-
-- **Build & smoke test:** `npm run build` produces `dist/cli.mjs`; `node dist/cli.mjs --version` and `--help` run successfully.
-- **Type‑check:** `npm run typecheck` (`tsc --noEmit`) may still report errors. The codebase uses strict TypeScript settings; cleanup is ongoing.
-- **Optional integrations:** Some features depend on native or private packages not published to npm. They are stubbed for type‑checking and gated behind `feature()` flags (off by default).
 
 ## Project layout (selected)
 

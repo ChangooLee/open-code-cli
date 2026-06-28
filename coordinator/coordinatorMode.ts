@@ -14,6 +14,7 @@ import { SYNTHETIC_OUTPUT_TOOL_NAME } from '../tools/SyntheticOutputTool/Synthet
 import { TASK_STOP_TOOL_NAME } from '../tools/TaskStopTool/prompt.js'
 import { TEAM_CREATE_TOOL_NAME } from '../tools/TeamCreateTool/constants.js'
 import { TEAM_DELETE_TOOL_NAME } from '../tools/TeamDeleteTool/constants.js'
+import { WAIT_FOR_AGENTS_TOOL_NAME } from '../tools/WaitForAgentsTool/constants.js'
 import {
   deleteOpenCodeCliEnv,
   getOpenCodeCliEnv,
@@ -87,7 +88,7 @@ export function getCoordinatorSystemPrompt(): string {
   const workerCapabilities = isEnvTruthy(getOpenCodeCliEnv('SIMPLE'))
     ? 'Workers have access to Bash, Read, and Edit tools, plus MCP tools from configured MCP servers.'
     : 'Workers have access to standard tools, MCP tools from configured MCP servers, and project skills via the Skill tool. Delegate skill invocations (e.g. /commit, /verify) to workers.'
-  return `You are an AI assistant that orchestrates software engineering tasks across multiple workers.
+  const basePrompt = `You are an AI assistant that orchestrates software engineering tasks across multiple workers.
 ## 1. Your Role
 You are a **coordinator**. Your job is to:
 - Help the user achieve their goal
@@ -256,4 +257,15 @@ User:
   How's it going?
 You:
   Fix for the new test is in progress. Still waiting to hear back about the test suite.`
+  if (feature('COORDINATOR_WAIT_FOR_AGENTS_HINT') && feature('ASYNC_AGENT_JOIN')) {
+    const { buildWaitForAgentsHint, insertWaitForAgentsHint } =
+      require('./waitForAgentsHint.js') as typeof import('./waitForAgentsHint.js')
+    const hint = buildWaitForAgentsHint(
+      true,
+      WAIT_FOR_AGENTS_TOOL_NAME,
+      AGENT_TOOL_NAME,
+    )
+    return insertWaitForAgentsHint(basePrompt, hint, '## 4. Task Workflow')
+  }
+  return basePrompt
 }

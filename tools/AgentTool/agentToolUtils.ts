@@ -1,5 +1,5 @@
 import { feature } from 'bun:bundle'
-import { isFileMutatingBashCommand } from '../../query/verificationGate.js'
+import { appendSubagentMarkers } from './subagentMarkers.js'
 import { z } from 'zod/v4'
 import { clearInvokedSkillsForAgent } from '../../bootstrap/state.js'
 import {
@@ -289,40 +289,7 @@ export function finalizeAgentTool(
     is_async: isAsync,
   })
   if (feature('VERIFY_IMPLEMENTATION_BEFORE_COMPLETION')) {
-    const SUBAGENT_EDIT_TOOL_NAMES = new Set([
-      'Edit',
-      'Write',
-      'NotebookEdit',
-      'MultiEdit',
-    ])
-    let subagentEditCount = 0
-    for (const m of agentMessages as any[]) {
-      const blocks = m?.type === 'assistant' ? m?.message?.content : undefined
-      if (!Array.isArray(blocks)) continue
-      for (const b of blocks) {
-        if (b?.type === 'tool_use' && SUBAGENT_EDIT_TOOL_NAMES.has(b.name)) {
-          subagentEditCount++
-        } else if (
-          b?.type === 'tool_use' &&
-          b.name === 'Bash' &&
-          isFileMutatingBashCommand(b?.input?.command)
-        ) {
-          subagentEditCount++
-        }
-      }
-    }
-    if (subagentEditCount > 0) {
-      content = [
-        ...content,
-        { type: 'text', text: `<subagent_edits>${subagentEditCount}</subagent_edits>` } as any,
-      ]
-    }
-    if (terminalReason === 'verification_failed' || terminalReason === 'no_progress') {
-      content = [
-        ...content,
-        { type: 'text', text: '<subagent_verification_failed/>' } as any,
-      ]
-    }
+    content = appendSubagentMarkers(content, agentMessages, terminalReason)
   }
   const lastRequestId = lastAssistantMessage.requestId
   if (lastRequestId) {

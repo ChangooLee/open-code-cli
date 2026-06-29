@@ -1,0 +1,8 @@
+{
+  "name": "sum-array",
+  "description": "Implement a function to spec so an existing test passes.",
+  "prompt": "sum.js has an unimplemented sum(arr) function that currently returns 0. Implement it so it returns the sum of all numbers in the array, then make sure `node sum.test.js` passes.",
+  "allowedTools": "Read,Edit,Write,Bash",
+  "maxTurns": 15,
+  "check": "node sum.test.js"
+}

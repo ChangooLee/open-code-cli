@@ -1,0 +1,25 @@
+import {
+  ColorDiff,
+  ColorFile,
+  getSyntaxTheme as nativeGetSyntaxTheme,
+  type SyntaxTheme,
+} from 'color-diff-napi'
+import { isEnvDefinedFalsy } from '../../utils/envUtils.js'
+export type ColorModuleUnavailableReason = 'env'
+export function getColorModuleUnavailableReason(): ColorModuleUnavailableReason | null {
+  if (isEnvDefinedFalsy(process.env.OPEN_CODE_CLI_SYNTAX_HIGHLIGHT)) {
+    return 'env'
+  }
+  return null
+}
+export function expectColorDiff(): typeof ColorDiff | null {
+  return getColorModuleUnavailableReason() === null ? ColorDiff : null
+}
+export function expectColorFile(): typeof ColorFile | null {
+  return getColorModuleUnavailableReason() === null ? ColorFile : null
+}
+export function getSyntaxTheme(themeName: string): SyntaxTheme | null {
+  return getColorModuleUnavailableReason() === null
+    ? nativeGetSyntaxTheme(themeName)
+    : null
+}

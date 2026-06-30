@@ -1,0 +1,43 @@
+import { join } from 'path'
+import type { z } from 'zod/v4'
+import { getAdditionalDirectoriesForOpenCodeMd } from '../../bootstrap/state.js'
+import { parseSettingsFile } from '../settings/settings.js'
+import type {
+  ExtraKnownMarketplaceSchema,
+  SettingsJson,
+} from '../settings/types.js'
+type ExtraKnownMarketplace = z.infer<
+  ReturnType<typeof ExtraKnownMarketplaceSchema>
+>
+const SETTINGS_FILES = ['settings.json', 'local.settings.json'] as const
+export function getAddDirEnabledPlugins(): NonNullable<
+  SettingsJson['enabledPlugins']
+> {
+  const result: NonNullable<SettingsJson['enabledPlugins']> = {}
+  for (const dir of getAdditionalDirectoriesForOpenCodeMd()) {
+    for (const file of SETTINGS_FILES) {
+      const { settings } = parseSettingsFile(join(dir, '.open-code-cli', file))
+      if (!settings?.enabledPlugins) {
+        continue
+      }
+      Object.assign(result, settings.enabledPlugins)
+    }
+  }
+  return result
+}
+export function getAddDirExtraMarketplaces(): Record<
+  string,
+  ExtraKnownMarketplace
+> {
+  const result: Record<string, ExtraKnownMarketplace> = {}
+  for (const dir of getAdditionalDirectoriesForOpenCodeMd()) {
+    for (const file of SETTINGS_FILES) {
+      const { settings } = parseSettingsFile(join(dir, '.open-code-cli', file))
+      if (!settings?.extraKnownMarketplaces) {
+        continue
+      }
+      Object.assign(result, settings.extraKnownMarketplaces)
+    }
+  }
+  return result
+}

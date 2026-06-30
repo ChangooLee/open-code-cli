@@ -1,0 +1,26 @@
+import { feature } from 'bun:bundle'
+export const OPEN_CODE_CLI_20250219_HEADER = 'open-code-cli-20250219'
+export const INTERLEAVED_THINKING_HEADER = 'interleaved-thinking-2025-05-14'
+export const CONTEXT_1M_HEADER = 'context-1m-2025-08-07'
+export const CONTEXT_MANAGEMENT_HEADER = 'context-management-2025-06-27'
+export const STRUCTURED_OUTPUTS_HEADER = 'structured-outputs-2025-12-15'
+export const WEB_SEARCH_HEADER = 'web-search-2025-03-05'
+export const CAPABILITY_SEARCH_HEADER_1P = 'advanced-tool-use-2025-11-20'
+export const CAPABILITY_SEARCH_HEADER_3P = 'tool-search-tool-2025-10-19'
+export const EFFORT_HEADER = 'effort-2025-11-24'
+export const TASK_BUDGETS_HEADER = 'task-budgets-2026-03-13'
+export const PROMPT_CACHING_SCOPE_HEADER = 'prompt-caching-scope-2026-01-05'
+export const FAST_MODE_HEADER = 'fast-mode-2026-02-01'
+export const REDACT_THINKING_HEADER = 'redact-thinking-2026-02-12'
+export const TOKEN_EFFICIENT_TOOLS_HEADER = 'token-efficient-tools-2026-03-28'
+export const SUMMARIZE_CONNECTOR_TEXT_HEADER = feature('CONNECTOR_TEXT')
+  ? 'summarize-connector-text-2026-03-13'
+  : ''
+export const AFK_MODE_HEADER = feature('TRANSCRIPT_CLASSIFIER')
+  ? 'afk-mode-2026-01-31'
+  : ''
+export const CLI_INTERNAL_HEADER =
+  process.env.USER_TYPE === 'ant' ? 'cli-internal-2026-02-09' : ''
+export const ADVISOR_HEADER = 'advisor-tool-2026-03-01'
+export const CACHE_EDITING_HEADER =
+  process.env.USER_TYPE === 'ant' ? 'cache-editing-2026-01-15' : ''

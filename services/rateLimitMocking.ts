@@ -1,0 +1,90 @@
+import { APIError } from 'src/services/api/chatCompletions.js'
+import {
+  applyMockHeaders,
+  checkMockFastModeRateLimit,
+  getMockHeaderless429Message,
+  getMockHeaders,
+  isMockFastModeRateLimitScenario,
+  shouldProcessMockLimits,
+} from './mockRateLimits.js'
+export function processRateLimitHeaders(
+  headers: globalThis.Headers,
+): globalThis.Headers {
+  if (shouldProcessMockLimits()) {
+    return applyMockHeaders(headers)
+  }
+  return headers
+}
+export function shouldProcessRateLimits(isSubscriber: boolean): boolean {
+  return isSubscriber || shouldProcessMockLimits()
+}
+export function checkMockRateLimitError(
+  currentModel: string,
+  isFastModeActive?: boolean,
+): APIError | null {
+  if (!shouldProcessMockLimits()) {
+    return null
+  }
+  const headerlessMessage = getMockHeaderless429Message()
+  if (headerlessMessage) {
+    return new (APIError as any)(
+      429,
+      { error: { type: 'rate_limit_error', message: headerlessMessage } },
+      headerlessMessage,
+      new globalThis.Headers(),
+    )
+  }
+  const mockHeaders = getMockHeaders()
+  if (!mockHeaders) {
+    return null
+  }
+  const status = mockHeaders['openai-compatible-ratelimit-unified-status']
+  const overageStatus =
+    mockHeaders['openai-compatible-ratelimit-unified-overage-status']
+  const rateLimitType =
+    mockHeaders['openai-compatible-ratelimit-unified-representative-claim']
+  const isProLimit = rateLimitType === 'seven_day_pro'
+  const isUsingPro = currentModel.includes('pro')
+  if (isProLimit && !isUsingPro) {
+    return null
+  }
+  if (isMockFastModeRateLimitScenario()) {
+    const fastModeHeaders = checkMockFastModeRateLimit(isFastModeActive)
+    if (fastModeHeaders === null) {
+      return null
+    }
+    const error = new (APIError as any)(
+      429,
+      { error: { type: 'rate_limit_error', message: 'Rate limit exceeded' } },
+      'Rate limit exceeded',
+      new globalThis.Headers(
+        Object.entries(fastModeHeaders).filter(([_, v]) => v !== undefined) as [
+          string,
+          string,
+        ][],
+      ),
+    )
+    return error
+  }
+  const shouldThrow429 =
+    status === 'rejected' && (!overageStatus || overageStatus === 'rejected')
+  if (shouldThrow429) {
+    const error = new (APIError as any)(
+      429,
+      { error: { type: 'rate_limit_error', message: 'Rate limit exceeded' } },
+      'Rate limit exceeded',
+      new globalThis.Headers(
+        Object.entries(mockHeaders).filter(([_, v]) => v !== undefined) as [
+          string,
+          string,
+        ][],
+      ),
+    )
+    return error
+  }
+  return null
+}
+export function isMockRateLimitError(error: APIError): boolean {
+  return shouldProcessMockLimits() && error.status === 429
+}
+export { shouldProcessMockLimits }

@@ -1,0 +1,2083 @@
+import type { MessageContentBlock, ContentBlockParam, ImageBlockParam, JSONOutputFormat, AgentMessage, MessageDeltaUsage, MessageStreamParams, OutputConfig, AgentStreamEvent, RequestDocumentBlock, StopReason, ToolChoiceAuto, ToolChoiceTool, ToolResultBlockParam, ToolUnion, TokenUsage, MessageParam as MessageParam, } from './providerTypes.js';
+import type { TextBlockParam, Stream } from './providerTypes.js';
+import { randomUUID } from 'crypto';
+import { getAPIProvider } from 'src/utils/model/providers.js';
+import { getAttributionHeader, getCLISyspromptPrefix, } from '../../constants/system.js';
+import { getEmptyToolPermissionContext, type QueryChainTracking, type Tool, type ToolPermissionContext, type Tools, toolMatchesName, } from '../../Tool.js';
+import type { AgentDefinition } from '../../tools/AgentTool/loadAgentsDir.js';
+import { type ConnectorTextBlock, type ConnectorTextDelta, isConnectorTextBlock, } from '../../types/connectorText.js';
+import type { AssistantMessage, Message, StreamEvent, SystemAPIErrorMessage, UserMessage, } from '../../types/message.js';
+import { type CacheScope, logAPIPrefix, splitSysPromptPrefix, toolToAPISchema, } from '../../utils/api.js';
+import { getOauthAccountInfo } from '../../utils/auth.js';
+import { getOrCreateUserID } from '../../utils/config.js';
+import { CAPPED_DEFAULT_MAX_TOKENS, getModelMaxOutputTokens, getLongContextExpTreatmentEnabled, } from '../../utils/context.js';
+import { resolveAppliedEffort } from '../../utils/effort.js';
+import { getOpenCodeCliEnv, isEnvTruthy } from '../../utils/envUtils.js';
+import { errorMessage } from '../../utils/errors.js';
+import { computeFingerprintFromMessages } from '../../utils/fingerprint.js';
+import { captureAPIRequest, logError } from '../../utils/log.js';
+import { createAssistantAPIErrorMessage, createUserMessage, ensureToolResultPairing, normalizeContentFromAPI, normalizeMessagesForAPI, stripAdvisorBlocks, stripCallerFieldFromAssistantMessage, stripToolReferenceBlocksFromUserMessage, } from '../../utils/messages.js';
+import { getDefaultProModel, getDefaultStandardModel, getSmallFastModel, isNonCustomProModel, } from '../../utils/model/model.js';
+import { asSystemPrompt, type SystemPrompt, } from '../../utils/systemPromptType.js';
+import { tokenCountFromLastAPIResponse } from '../../utils/tokens.js';
+import { getDynamicConfig_BLOCKS_ON_INIT } from '../analytics/featureFlags.js';
+import { currentLimits, extractQuotaStatusFromError, extractQuotaStatusFromHeaders, } from '../openCodeCliLimits.js';
+import { getAPIContextManagement } from '../compact/apiMicrocompact.js';
+const autoModeStateModule = feature('TRANSCRIPT_CLASSIFIER')
+    ? (require('../../utils/permissions/autoModeState.js') as typeof import('../../utils/permissions/autoModeState.js'))
+    : null;
+import { feature } from 'bun:bundle';
+import { APIConnectionTimeoutError, APIError, APIUserAbortError, type ClientOptions, } from './providerTypes.js';
+import { getAfkModeHeaderLatched, getCacheEditingHeaderLatched, getFastModeHeaderLatched, getLastApiCompletionTimestamp, getPromptCache1hAllowlist, getPromptCache1hEligible, getSessionId, getThinkingClearLatched, setAfkModeHeaderLatched, setCacheEditingHeaderLatched, setFastModeHeaderLatched, setLastMainRequestId, setPromptCache1hAllowlist, setPromptCache1hEligible, setThinkingClearLatched, } from 'src/bootstrap/state.js';
+import { AFK_MODE_HEADER, CONTEXT_1M_HEADER, CONTEXT_MANAGEMENT_HEADER, EFFORT_HEADER, FAST_MODE_HEADER, PROMPT_CACHING_SCOPE_HEADER, REDACT_THINKING_HEADER, STRUCTURED_OUTPUTS_HEADER, TASK_BUDGETS_HEADER, } from 'src/constants/apiHeaders.js';
+import type { QuerySource } from 'src/constants/querySource.js';
+import type { Notification } from 'src/context/notifications.js';
+import { addToTotalSessionCost } from 'src/cost-tracker.js';
+import { getFeatureValue_CACHED_MAY_BE_STALE } from 'src/services/analytics/featureFlags.js';
+import type { AgentId } from 'src/types/ids.js';
+import { ADVISOR_TOOL_INSTRUCTIONS, getExperimentAdvisorModels, isAdvisorEnabled, isValidAdvisorModel, modelSupportsAdvisor, } from 'src/utils/advisor.js';
+import { getAgentContext } from 'src/utils/agentContext.js';
+import { isOpenCodeCliSubscriber } from 'src/utils/auth.js';
+import { getCapabilitySearchApiHeader, modelSupportsStructuredOutputs, shouldIncludeFirstPartyOnlyApiHeaders, shouldUseGlobalCacheScope, } from 'src/utils/modelApiHeaders.js';
+import { OPEN_CODE_IN_CHROME_MCP_SERVER_NAME } from 'src/utils/openCodeInChrome/common.js';
+import { CHROME_TOOL_SEARCH_INSTRUCTIONS } from 'src/utils/openCodeInChrome/prompt.js';
+import { getMaxThinkingTokensForModel } from 'src/utils/context.js';
+import { logForDebugging } from 'src/utils/debug.js';
+import { logForDiagnosticsNoPII } from 'src/utils/diagLogs.js';
+import { type EffortLevel, type EffortValue, modelSupportsEffort, } from 'src/utils/effort.js';
+import { isFastModeAvailable, isFastModeCooldown, isFastModeEnabled, isFastModeSupportedByModel, } from 'src/utils/fastMode.js';
+import { returnValue } from 'src/utils/generators.js';
+import { headlessProfilerCheckpoint } from 'src/utils/headlessProfiler.js';
+import { isMcpInstructionsDeltaEnabled } from 'src/utils/mcpInstructionsDelta.js';
+import { calculateUSDCost } from 'src/utils/modelCost.js';
+import { endQueryProfile, queryCheckpoint } from 'src/utils/queryProfiler.js';
+import { modelSupportsAdaptiveThinking, modelSupportsThinking, type ThinkingConfig, } from 'src/utils/thinking.js';
+import { extractDiscoveredToolNames, isDeferredToolsDeltaEnabled, isCapabilitySearchEnabled, } from 'src/utils/capabilitySearch.js';
+import { API_MAX_MEDIA_PER_REQUEST } from '../../constants/apiLimits.js';
+import { ADVISOR_HEADER } from '../../constants/apiHeaders.js';
+import { formatDeferredToolLine, isDeferredTool, TOOL_SEARCH_TOOL_NAME, } from '../../tools/CapabilitySearchTool/prompt.js';
+import { count } from '../../utils/array.js';
+import { insertBlockAfterToolResults } from '../../utils/contentArray.js';
+import { validateBoundedIntEnvVar } from '../../utils/envValidation.js';
+import { safeParseJSON } from '../../utils/json.js';
+import { normalizeModelStringForAPI, parseUserSpecifiedModel, } from '../../utils/model/model.js';
+import { startSessionActivity, stopSessionActivity, } from '../../utils/sessionActivity.js';
+import { jsonStringify } from '../../utils/slowOperations.js';
+import { isPreviewTracingEnabled, type LLMRequestNewContext, startLLMRequestSpan, } from '../../utils/telemetry/sessionTracing.js';
+import { type AnalyticsScalarMetadata, logEvent, } from '../analytics/index.js';
+import { consumePendingCacheEdits, getPinnedCacheEdits, markToolsSentToAPIState, pinCacheEdits, } from '../compact/microCompact.js';
+import { getInitializationStatus } from '../lsp/manager.js';
+import { isToolFromMcpServer } from '../mcp/utils.js';
+import { withStreamingVCR, withVCR } from '../vcr.js';
+import { CLIENT_REQUEST_ID_HEADER, getProviderClient } from './client.js';
+import { API_ERROR_MESSAGE_PREFIX, CUSTOM_OFF_SWITCH_MESSAGE, getAssistantMessageFromError, getErrorMessageIfRefusal, } from './errors.js';
+import { EMPTY_USAGE, type GlobalCacheStrategy, logAPIError, logAPIQuery, logAPISuccessAndDuration, type NonNullableUsage, } from './logging.js';
+import { CACHE_TTL_1HOUR_MS, checkResponseForCacheInvalidation, recordPromptState, } from './promptCacheInvalidation.js';
+import { CannotRetryError, FallbackTriggeredError, is529Error, type RetryContext, withRetry, } from './withRetry.js';
+type JsonValue = string | number | boolean | null | JsonObject | JsonArray;
+type JsonObject = {
+    [key: string]: JsonValue;
+};
+type JsonArray = JsonValue[];
+export function getExtraBodyParams(betaHeaders?: string[]): JsonObject {
+    const extraBodyStr = getOpenCodeCliEnv('EXTRA_BODY');
+    let result: JsonObject = {};
+    if (extraBodyStr) {
+        try {
+            const parsed = safeParseJSON(extraBodyStr);
+            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+                result = { ...(parsed as JsonObject) };
+            }
+            else {
+                logForDebugging(`OPEN_CODE_CLI_EXTRA_BODY env var must be a JSON object, but was given ${extraBodyStr}`, { level: 'error' });
+            }
+        }
+        catch (error) {
+            logForDebugging(`Error parsing OPEN_CODE_CLI_EXTRA_BODY: ${errorMessage(error)}`, { level: 'error' });
+        }
+    }
+    if (feature('ANTI_DISTILLATION_CC')
+        ? getOpenCodeCliEnv('LAUNCH_MODE') === 'cli' &&
+            shouldIncludeFirstPartyOnlyApiHeaders() &&
+            getFeatureValue_CACHED_MAY_BE_STALE('open_code_cli_anti_distill_fake_tool_injection', false)
+        : false) {
+        result.anti_distillation = ['fake_tools'];
+    }
+    if (betaHeaders && betaHeaders.length > 0) {
+        if (result['open_code_cli_beta'] &&
+            Array.isArray(result['open_code_cli_beta'])) {
+            const existingHeaders = result['open_code_cli_beta'] as string[];
+            const newHeaders = betaHeaders.filter(header => !existingHeaders.includes(header));
+            result['open_code_cli_beta'] = [...existingHeaders, ...newHeaders];
+        }
+        else {
+            result['open_code_cli_beta'] = betaHeaders;
+        }
+    }
+    return result;
+}
+export function getPromptCachingEnabled(model: string): boolean {
+    if (isEnvTruthy(process.env.DISABLE_PROMPT_CACHING))
+        return false;
+    if (isEnvTruthy(process.env.DISABLE_PROMPT_CACHING_FAST)) {
+        const smallFastModel = getSmallFastModel();
+        if (model === smallFastModel)
+            return false;
+    }
+    if (isEnvTruthy(process.env.DISABLE_PROMPT_CACHING_STANDARD)) {
+        const defaultSonnet = getDefaultStandardModel();
+        if (model === defaultSonnet)
+            return false;
+    }
+    if (isEnvTruthy(process.env.DISABLE_PROMPT_CACHING_PRO)) {
+        const defaultOpus = getDefaultProModel();
+        if (model === defaultOpus)
+            return false;
+    }
+    return true;
+}
+export function getCacheControl({ scope, querySource, }: {
+    scope?: CacheScope;
+    querySource?: QuerySource;
+} = {}): {
+    type: 'ephemeral';
+    ttl?: '1h';
+    scope?: CacheScope;
+} {
+    return {
+        type: 'ephemeral',
+        ...(should1hCacheTTL(querySource) && { ttl: '1h' }),
+        ...(scope === 'global' && { scope }),
+    };
+}
+function should1hCacheTTL(querySource?: QuerySource): boolean {
+    let userEligible = getPromptCache1hEligible();
+    if (userEligible === null) {
+        userEligible =
+            process.env.USER_TYPE === 'ant' ||
+                (isOpenCodeCliSubscriber() && !currentLimits.isUsingOverage);
+        setPromptCache1hEligible(userEligible);
+    }
+    if (!userEligible)
+        return false;
+    let allowlist = getPromptCache1hAllowlist();
+    if (allowlist === null) {
+        const config = getFeatureValue_CACHED_MAY_BE_STALE<{
+            allowlist?: string[];
+        }>('open_code_cli_prompt_cache_1h_config', {});
+        allowlist = config.allowlist ?? [];
+        setPromptCache1hAllowlist(allowlist);
+    }
+    return (querySource !== undefined &&
+        allowlist.some(pattern => pattern.endsWith('*')
+            ? querySource.startsWith(pattern.slice(0, -1))
+            : querySource === pattern));
+}
+function configureEffortParams(effortValue: EffortValue | undefined, outputConfig: OutputConfig, extraBodyParams: Record<string, unknown>, apiHeaders: string[], model: string): void {
+    if (!modelSupportsEffort(model) || 'effort' in outputConfig) {
+        return;
+    }
+    if (effortValue === undefined) {
+        apiHeaders.push(EFFORT_HEADER);
+    }
+    else if (typeof effortValue === 'string') {
+        outputConfig.effort = effortValue;
+        apiHeaders.push(EFFORT_HEADER);
+    }
+    else if (process.env.USER_TYPE === 'ant') {
+        const existingInternal = (extraBodyParams['open_code_cli_internal'] as Record<string, unknown>) || {};
+        extraBodyParams['open_code_cli_internal'] = {
+            ...existingInternal,
+            effort_override: effortValue,
+        };
+    }
+}
+type TaskBudgetParam = {
+    type: 'tokens';
+    total: number;
+    remaining?: number;
+};
+export function configureTaskBudgetParams(taskBudget: Options['taskBudget'], outputConfig: OutputConfig & {
+    task_budget?: TaskBudgetParam;
+}, apiHeaders: string[]): void {
+    if (!taskBudget ||
+        'task_budget' in outputConfig ||
+        !shouldIncludeFirstPartyOnlyApiHeaders()) {
+        return;
+    }
+    outputConfig.task_budget = {
+        type: 'tokens',
+        total: taskBudget.total,
+        ...(taskBudget.remaining !== undefined && {
+            remaining: taskBudget.remaining,
+        }),
+    };
+    if (!apiHeaders.includes(TASK_BUDGETS_HEADER)) {
+        apiHeaders.push(TASK_BUDGETS_HEADER);
+    }
+}
+export function getAPIMetadata() {
+    let extra: JsonObject = {};
+    const extraStr = process.env.OPEN_CODE_CLI_EXTRA_METADATA ??
+        process.env.OPEN_CODE_CLI_EXTRA_METADATA;
+    if (extraStr) {
+        const parsed = safeParseJSON(extraStr, false);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+            extra = parsed as JsonObject;
+        }
+        else {
+            logForDebugging(`OPEN_CODE_CLI_EXTRA_METADATA env var must be a JSON object, but was given ${extraStr} (legacy: OPEN_CODE_CLI_EXTRA_METADATA)`, { level: 'error' });
+        }
+    }
+    return {
+        user_id: jsonStringify({
+            ...extra,
+            device_id: getOrCreateUserID(),
+            account_uuid: getOauthAccountInfo()?.accountUuid ?? '',
+            session_id: getSessionId(),
+        }),
+    };
+}
+export async function verifyApiKey(apiKey: string, isNonInteractiveSession: boolean): Promise<boolean> {
+    if (isNonInteractiveSession) {
+        return true;
+    }
+    try {
+        const model = getSmallFastModel();
+        return await returnValue(withRetry(() => getProviderClient({
+            apiKey,
+            maxRetries: 3,
+            model,
+            source: 'verify_api_key',
+        }), async (chatCompletionsClient) => {
+            const messages: MessageParam[] = [{ role: 'user', content: 'test' }];
+            await chatCompletionsClient.messages.create({
+                model,
+                max_tokens: 1,
+                messages,
+                temperature: 1,
+                metadata: getAPIMetadata(),
+                ...getExtraBodyParams(),
+            });
+            return true;
+        }, { maxRetries: 2, model, thinkingConfig: { type: 'disabled' } }));
+    }
+    catch (errorFromRetry) {
+        let error = errorFromRetry;
+        if (errorFromRetry instanceof CannotRetryError) {
+            error = errorFromRetry.originalError;
+        }
+        logError(error);
+        if (error instanceof APIError && error.status === 401) {
+            return false;
+        }
+        if (error instanceof Error && error.message.includes('Invalid API key')) {
+            return false;
+        }
+        throw error;
+    }
+}
+export function userMessageToMessageParam(message: UserMessage, addCache = false, enablePromptCaching: boolean, querySource?: QuerySource): MessageParam {
+    if (addCache) {
+        if (typeof message.message.content === 'string') {
+            return {
+                role: 'user',
+                content: [
+                    {
+                        type: 'text',
+                        text: message.message.content,
+                        ...(enablePromptCaching && {
+                            cache_control: getCacheControl({ querySource }),
+                        }),
+                    },
+                ],
+            };
+        }
+        else {
+            return {
+                role: 'user',
+                content: message.message.content.map((_, i) => ({
+                    ..._,
+                    ...(i === message.message.content.length - 1
+                        ? enablePromptCaching
+                            ? { cache_control: getCacheControl({ querySource }) }
+                            : {}
+                        : {}),
+                })),
+            };
+        }
+    }
+    return {
+        role: 'user',
+        content: Array.isArray(message.message.content)
+            ? [...message.message.content]
+            : message.message.content,
+    };
+}
+export function assistantMessageToMessageParam(message: AssistantMessage, addCache = false, enablePromptCaching: boolean, querySource?: QuerySource): MessageParam {
+    if (addCache) {
+        if (typeof message.message.content === 'string') {
+            return {
+                role: 'assistant',
+                content: [
+                    {
+                        type: 'text',
+                        text: message.message.content,
+                        ...(enablePromptCaching && {
+                            cache_control: getCacheControl({ querySource }),
+                        }),
+                    },
+                ],
+            };
+        }
+        else {
+            return {
+                role: 'assistant',
+                content: message.message.content.map((_, i) => ({
+                    ..._,
+                    ...(i === message.message.content.length - 1 &&
+                        _.type !== 'thinking' &&
+                        _.type !== 'redacted_thinking' &&
+                        (feature('CONNECTOR_TEXT') ? !isConnectorTextBlock(_) : true)
+                        ? enablePromptCaching
+                            ? { cache_control: getCacheControl({ querySource }) }
+                            : {}
+                        : {}),
+                })),
+            };
+        }
+    }
+    return {
+        role: 'assistant',
+        content: message.message.content,
+    };
+}
+export type Options = {
+    getToolPermissionContext: () => Promise<ToolPermissionContext>;
+    model: string;
+    toolChoice?: ToolChoiceTool | ToolChoiceAuto | undefined;
+    isNonInteractiveSession: boolean;
+    extraToolSchemas?: ToolUnion[];
+    maxOutputTokensOverride?: number;
+    fallbackModel?: string;
+    onStreamingFallback?: () => void;
+    querySource: QuerySource;
+    agents: AgentDefinition[];
+    allowedAgentTypes?: string[];
+    hasAppendSystemPrompt: boolean;
+    fetchOverride?: ClientOptions['fetch'];
+    enablePromptCaching?: boolean;
+    skipCacheWrite?: boolean;
+    temperatureOverride?: number;
+    effortValue?: EffortValue;
+    mcpTools: Tools;
+    hasPendingMcpServers?: boolean;
+    queryTracking?: QueryChainTracking;
+    agentId?: AgentId;
+    outputFormat?: JSONOutputFormat;
+    fastMode?: boolean;
+    advisorModel?: string;
+    addNotification?: (notif: Notification) => void;
+    taskBudget?: {
+        total: number;
+        remaining?: number;
+    };
+};
+export async function queryModelWithoutStreaming({ messages, systemPrompt, thinkingConfig, tools, signal, options, }: {
+    messages: Message[];
+    systemPrompt: SystemPrompt;
+    thinkingConfig: ThinkingConfig;
+    tools: Tools;
+    signal: AbortSignal;
+    options: Options;
+}): Promise<AssistantMessage> {
+    let assistantMessage: AssistantMessage | undefined;
+    for await (const message of withStreamingVCR(messages, async function* () {
+        yield* queryModel(messages, systemPrompt, thinkingConfig, tools, signal, options);
+    })) {
+        if (message.type === 'assistant') {
+            assistantMessage = message;
+        }
+    }
+    if (!assistantMessage) {
+        if (signal.aborted) {
+            throw new APIUserAbortError();
+        }
+        throw new Error('No assistant message found');
+    }
+    return assistantMessage;
+}
+export async function* queryModelWithStreaming({ messages, systemPrompt, thinkingConfig, tools, signal, options, }: {
+    messages: Message[];
+    systemPrompt: SystemPrompt;
+    thinkingConfig: ThinkingConfig;
+    tools: Tools;
+    signal: AbortSignal;
+    options: Options;
+}): AsyncGenerator<StreamEvent | AssistantMessage | SystemAPIErrorMessage, void> {
+    return yield* withStreamingVCR(messages, async function* () {
+        yield* queryModel(messages, systemPrompt, thinkingConfig, tools, signal, options);
+    });
+}
+function shouldDeferLspTool(tool: Tool): boolean {
+    if (!('isLsp' in tool) || !tool.isLsp) {
+        return false;
+    }
+    const status = getInitializationStatus();
+    return status.status === 'pending' || status.status === 'not-started';
+}
+function getNonstreamingFallbackTimeoutMs(): number {
+    const override = parseInt(process.env.API_TIMEOUT_MS || '', 10);
+    if (override)
+        return override;
+    return isEnvTruthy(getOpenCodeCliEnv('REMOTE')) ? 120000 : 300000;
+}
+export async function* executeNonStreamingRequest(clientOptions: {
+    model: string;
+    fetchOverride?: Options['fetchOverride'];
+    source: string;
+}, retryOptions: {
+    model: string;
+    fallbackModel?: string;
+    thinkingConfig: ThinkingConfig;
+    fastMode?: boolean;
+    signal: AbortSignal;
+    initialConsecutive529Errors?: number;
+    querySource?: QuerySource;
+}, paramsFromContext: (context: RetryContext) => MessageStreamParams, onAttempt: (attempt: number, start: number, maxOutputTokens: number) => void, captureRequest: (params: MessageStreamParams) => void, originatingRequestId?: string | null): AsyncGenerator<SystemAPIErrorMessage, AgentMessage> {
+    const fallbackTimeoutMs = getNonstreamingFallbackTimeoutMs();
+    const generator = withRetry(() => getProviderClient({
+        maxRetries: 0,
+        model: clientOptions.model,
+        fetchOverride: clientOptions.fetchOverride,
+        source: clientOptions.source,
+    }), async (chatCompletionsClient, attempt, context) => {
+        const start = Date.now();
+        const retryParams = paramsFromContext(context);
+        captureRequest(retryParams);
+        onAttempt(attempt, start, retryParams.max_tokens);
+        const adjustedParams = adjustParamsForNonStreaming(retryParams, MAX_NON_STREAMING_TOKENS);
+        try {
+            return await chatCompletionsClient.messages.create({
+                ...adjustedParams,
+                model: normalizeModelStringForAPI(adjustedParams.model),
+            }, {
+                signal: retryOptions.signal,
+                timeout: fallbackTimeoutMs,
+            });
+        }
+        catch (err) {
+            if (err instanceof APIUserAbortError)
+                throw err;
+            logForDiagnosticsNoPII('error', 'cli_nonstreaming_fallback_error');
+            logEvent('open_code_cli_nonstreaming_fallback_error', {
+                model: clientOptions.model as AnalyticsScalarMetadata,
+                error: err instanceof Error
+                    ? (err.name as AnalyticsScalarMetadata)
+                    : ('unknown' as AnalyticsScalarMetadata),
+                attempt,
+                timeout_ms: fallbackTimeoutMs,
+                request_id: (originatingRequestId ??
+                    'unknown') as AnalyticsScalarMetadata,
+            });
+            throw err;
+        }
+    }, {
+        model: retryOptions.model,
+        fallbackModel: retryOptions.fallbackModel,
+        thinkingConfig: retryOptions.thinkingConfig,
+        ...(isFastModeEnabled() && { fastMode: retryOptions.fastMode }),
+        signal: retryOptions.signal,
+        initialConsecutive529Errors: retryOptions.initialConsecutive529Errors,
+        querySource: retryOptions.querySource,
+    });
+    let e;
+    do {
+        e = await generator.next();
+        if (!e.done && e.value.type === 'system') {
+            yield e.value;
+        }
+    } while (!e.done);
+    return e.value as AgentMessage;
+}
+function getPreviousRequestIdFromMessages(messages: Message[]): string | undefined {
+    for (let i = messages.length - 1; i >= 0; i--) {
+        const msg = messages[i]!;
+        if (msg.type === 'assistant' && msg.requestId) {
+            return msg.requestId;
+        }
+    }
+    return undefined;
+}
+function isMedia(block: ContentBlockParam): block is ImageBlockParam | RequestDocumentBlock {
+    return block.type === 'image' || block.type === 'document';
+}
+function isToolResult(block: ContentBlockParam): block is ToolResultBlockParam {
+    return block.type === 'tool_result';
+}
+export function stripExcessMediaItems(messages: (UserMessage | AssistantMessage)[], limit: number): (UserMessage | AssistantMessage)[] {
+    let toRemove = 0;
+    for (const msg of messages) {
+        if (!Array.isArray(msg.message.content))
+            continue;
+        for (const block of msg.message.content) {
+            if (isMedia(block))
+                toRemove++;
+            if (isToolResult(block) && Array.isArray(block.content)) {
+                for (const nested of block.content) {
+                    if (isMedia(nested))
+                        toRemove++;
+                }
+            }
+        }
+    }
+    toRemove -= limit;
+    if (toRemove <= 0)
+        return messages;
+    return messages.map(msg => {
+        if (toRemove <= 0)
+            return msg;
+        const content = msg.message.content;
+        if (!Array.isArray(content))
+            return msg;
+        const before = toRemove;
+        const stripped = content
+            .map(block => {
+            if (toRemove <= 0 ||
+                !isToolResult(block) ||
+                !Array.isArray(block.content))
+                return block;
+            const filtered = block.content.filter(n => {
+                if (toRemove > 0 && isMedia(n)) {
+                    toRemove--;
+                    return false;
+                }
+                return true;
+            });
+            return filtered.length === block.content.length
+                ? block
+                : { ...block, content: filtered };
+        })
+            .filter(block => {
+            if (toRemove > 0 && isMedia(block)) {
+                toRemove--;
+                return false;
+            }
+            return true;
+        });
+        return before === toRemove
+            ? msg
+            : {
+                ...msg,
+                message: { ...msg.message, content: stripped },
+            };
+    }) as (UserMessage | AssistantMessage)[];
+}
+async function* queryModel(messages: Message[], systemPrompt: SystemPrompt, thinkingConfig: ThinkingConfig, tools: Tools, signal: AbortSignal, options: Options): AsyncGenerator<StreamEvent | AssistantMessage | SystemAPIErrorMessage, void> {
+    if (!isOpenCodeCliSubscriber() &&
+        isNonCustomProModel(options.model) &&
+        (await getDynamicConfig_BLOCKS_ON_INIT<{
+            activated: boolean;
+        }>('open-code-cli-off-switch', {
+            activated: false,
+        })).activated) {
+        logEvent('open_code_cli_off_switch_query', {});
+        yield getAssistantMessageFromError(new Error(CUSTOM_OFF_SWITCH_MESSAGE), options.model);
+        return;
+    }
+    const previousRequestId = getPreviousRequestIdFromMessages(messages);
+    const resolvedModel = false &&
+        options.model.includes('application-inference-profile')
+        ? ((await String(options.model)) ??
+            options.model)
+        : options.model;
+    queryCheckpoint('query_tool_schema_build_start');
+    const isAgenticQuery = options.querySource.startsWith('repl_main_thread') ||
+        options.querySource.startsWith('agent:') ||
+        options.querySource === 'sdk' ||
+        options.querySource === 'hook_agent' ||
+        options.querySource === 'verification_agent';
+    const apiHeaders: string[] = [];
+    if (isAdvisorEnabled()) {
+        apiHeaders.push(ADVISOR_HEADER);
+    }
+    let advisorModel: string | undefined;
+    if (isAgenticQuery && isAdvisorEnabled()) {
+        let advisorOption = options.advisorModel;
+        const advisorExperiment = getExperimentAdvisorModels();
+        if (advisorExperiment !== undefined) {
+            if (normalizeModelStringForAPI(advisorExperiment.baseModel) ===
+                normalizeModelStringForAPI(options.model)) {
+                advisorOption = advisorExperiment.advisorModel;
+            }
+        }
+        if (advisorOption) {
+            const normalizedAdvisorModel = normalizeModelStringForAPI(parseUserSpecifiedModel(advisorOption));
+            if (!modelSupportsAdvisor(options.model)) {
+                logForDebugging(`[AdvisorTool] Skipping advisor - base model ${options.model} does not support advisor`);
+            }
+            else if (!isValidAdvisorModel(normalizedAdvisorModel)) {
+                logForDebugging(`[AdvisorTool] Skipping advisor - ${normalizedAdvisorModel} is not a valid advisor model`);
+            }
+            else {
+                advisorModel = normalizedAdvisorModel;
+                logForDebugging(`[AdvisorTool] Server-side tool enabled with ${advisorModel} as the advisor model`);
+            }
+        }
+    }
+    let useCapabilitySearch = await isCapabilitySearchEnabled(options.model, tools, options.getToolPermissionContext, options.agents, 'query');
+    const deferredToolNames = new Set<string>();
+    if (useCapabilitySearch) {
+        for (const t of tools) {
+            if (isDeferredTool(t))
+                deferredToolNames.add(t.name);
+        }
+    }
+    if (useCapabilitySearch &&
+        deferredToolNames.size === 0 &&
+        !options.hasPendingMcpServers) {
+        logForDebugging('Tool search disabled: no deferred tools available to search');
+        useCapabilitySearch = false;
+    }
+    let filteredTools: Tools;
+    if (useCapabilitySearch) {
+        const discoveredToolNames = extractDiscoveredToolNames(messages);
+        filteredTools = tools.filter(tool => {
+            if (!deferredToolNames.has(tool.name))
+                return true;
+            if (toolMatchesName(tool, TOOL_SEARCH_TOOL_NAME))
+                return true;
+            return discoveredToolNames.has(tool.name);
+        });
+    }
+    else {
+        filteredTools = tools.filter(t => !toolMatchesName(t, TOOL_SEARCH_TOOL_NAME));
+    }
+    const capabilitySearchHeader = useCapabilitySearch ? getCapabilitySearchApiHeader() : null;
+    if (capabilitySearchHeader && true) {
+        if (!apiHeaders.includes(capabilitySearchHeader)) {
+            apiHeaders.push(capabilitySearchHeader);
+        }
+    }
+    let cachedMCEnabled = false;
+    let cacheEditingBetaHeader = '';
+    if (feature('CACHED_MICROCOMPACT')) {
+        const { isCachedMicrocompactEnabled, isModelSupportedForCacheEditing, getCachedMCConfig, } = await import('../compact/cachedMicrocompact.js');
+        const apiHeaders = await import('src/constants/apiHeaders.js');
+        cacheEditingBetaHeader = apiHeadersModule.CACHE_EDITING_HEADER;
+        const featureEnabled = isCachedMicrocompactEnabled();
+        const modelSupported = isModelSupportedForCacheEditing(options.model);
+        cachedMCEnabled = featureEnabled && modelSupported;
+        const config = getCachedMCConfig();
+        logForDebugging(`Cached MC gate: enabled=${featureEnabled} modelSupported=${modelSupported} model=${options.model} supportedModels=${jsonStringify(config.supportedModels)}`);
+    }
+    const useGlobalCacheFeature = shouldUseGlobalCacheScope();
+    const willDefer = (t: Tool) => useCapabilitySearch && (deferredToolNames.has(t.name) || shouldDeferLspTool(t));
+    const needsToolBasedCacheMarker = useGlobalCacheFeature &&
+        filteredTools.some(t => t.isMcp === true && !willDefer(t));
+    if (useGlobalCacheFeature &&
+        !apiHeaders.includes(PROMPT_CACHING_SCOPE_HEADER)) {
+        apiHeaders.push(PROMPT_CACHING_SCOPE_HEADER);
+    }
+    const globalCacheStrategy: GlobalCacheStrategy = useGlobalCacheFeature
+        ? needsToolBasedCacheMarker
+            ? 'none'
+            : 'system_prompt'
+        : 'none';
+    const toolSchemas = await Promise.all(filteredTools.map(tool => toolToAPISchema(tool, {
+        getToolPermissionContext: options.getToolPermissionContext,
+        tools,
+        agents: options.agents,
+        allowedAgentTypes: options.allowedAgentTypes,
+        model: options.model,
+        deferLoading: willDefer(tool),
+    })));
+    if (useCapabilitySearch) {
+        const includedDeferredTools = count(filteredTools, t => deferredToolNames.has(t.name));
+        logForDebugging(`Dynamic tool loading: ${includedDeferredTools}/${deferredToolNames.size} deferred tools included`);
+    }
+    queryCheckpoint('query_tool_schema_build_end');
+    logEvent('open_code_cli_api_before_normalize', {
+        preNormalizedMessageCount: messages.length,
+    });
+    queryCheckpoint('query_message_normalization_start');
+    let messagesForAPI = normalizeMessagesForAPI(messages, filteredTools);
+    queryCheckpoint('query_message_normalization_end');
+    if (!useCapabilitySearch) {
+        messagesForAPI = messagesForAPI.map(msg => {
+            switch (msg.type) {
+                case 'user':
+                    return stripToolReferenceBlocksFromUserMessage(msg);
+                case 'assistant':
+                    return stripCallerFieldFromAssistantMessage(msg);
+                default:
+                    return msg;
+            }
+        });
+    }
+    messagesForAPI = ensureToolResultPairing(messagesForAPI);
+    if (!apiHeaders.includes(ADVISOR_HEADER)) {
+        messagesForAPI = stripAdvisorBlocks(messagesForAPI);
+    }
+    messagesForAPI = stripExcessMediaItems(messagesForAPI, API_MAX_MEDIA_PER_REQUEST);
+    logEvent('open_code_cli_api_after_normalize', {
+        postNormalizedMessageCount: messagesForAPI.length,
+    });
+    const fingerprint = computeFingerprintFromMessages(messagesForAPI);
+    if (useCapabilitySearch && !isDeferredToolsDeltaEnabled()) {
+        const deferredToolList = tools
+            .filter(t => deferredToolNames.has(t.name))
+            .map(formatDeferredToolLine)
+            .sort()
+            .join('\n');
+        if (deferredToolList) {
+            messagesForAPI = [
+                createUserMessage({
+                    content: `<available-deferred-tools>\n${deferredToolList}\n</available-deferred-tools>`,
+                    isMeta: true,
+                }),
+                ...messagesForAPI,
+            ];
+        }
+    }
+    const hasChromeTools = filteredTools.some(t => isToolFromMcpServer(t.name, OPEN_CODE_IN_CHROME_MCP_SERVER_NAME));
+    const injectChromeHere = useCapabilitySearch && hasChromeTools && !isMcpInstructionsDeltaEnabled();
+    systemPrompt = asSystemPrompt([
+        getAttributionHeader(fingerprint),
+        getCLISyspromptPrefix({
+            isNonInteractive: options.isNonInteractiveSession,
+            hasAppendSystemPrompt: options.hasAppendSystemPrompt,
+        }),
+        ...systemPrompt,
+        ...(advisorModel ? [ADVISOR_TOOL_INSTRUCTIONS] : []),
+        ...(injectChromeHere ? [CHROME_TOOL_SEARCH_INSTRUCTIONS] : []),
+    ].filter(Boolean));
+    logAPIPrefix(systemPrompt);
+    const enablePromptCaching = options.enablePromptCaching ?? getPromptCachingEnabled(options.model);
+    const system = buildSystemPromptBlocks(systemPrompt, enablePromptCaching, {
+        skipGlobalCacheForSystemPrompt: needsToolBasedCacheMarker,
+        querySource: options.querySource,
+    });
+    const useApiHeaders = false;
+    const extraToolSchemas = [...(options.extraToolSchemas ?? [])];
+    if (advisorModel) {
+        extraToolSchemas.push({
+            type: 'advisor_20260301',
+            name: 'advisor',
+            model: advisorModel,
+        } as unknown as ToolUnion);
+    }
+    const allTools = [...toolSchemas, ...extraToolSchemas];
+    const isFastMode = isFastModeEnabled() &&
+        isFastModeAvailable() &&
+        !isFastModeCooldown() &&
+        isFastModeSupportedByModel(options.model) &&
+        !!options.fastMode;
+    let afkHeaderLatched = getAfkModeHeaderLatched() === true;
+    if (feature('TRANSCRIPT_CLASSIFIER')) {
+        if (!afkHeaderLatched &&
+            isAgenticQuery &&
+            shouldIncludeFirstPartyOnlyApiHeaders() &&
+            (autoModeStateModule?.isAutoModeActive() ?? false)) {
+            afkHeaderLatched = true;
+            setAfkModeHeaderLatched(true);
+        }
+    }
+    let fastModeHeaderLatched = getFastModeHeaderLatched() === true;
+    if (!fastModeHeaderLatched && isFastMode) {
+        fastModeHeaderLatched = true;
+        setFastModeHeaderLatched(true);
+    }
+    let cacheEditingHeaderLatched = getCacheEditingHeaderLatched() === true;
+    if (feature('CACHED_MICROCOMPACT')) {
+        if (!cacheEditingHeaderLatched &&
+            cachedMCEnabled &&
+            false &&
+            options.querySource === 'repl_main_thread') {
+            cacheEditingHeaderLatched = true;
+            setCacheEditingHeaderLatched(true);
+        }
+    }
+    let thinkingClearLatched = getThinkingClearLatched() === true;
+    if (!thinkingClearLatched && isAgenticQuery) {
+        const lastCompletion = getLastApiCompletionTimestamp();
+        if (lastCompletion !== null &&
+            Date.now() - lastCompletion > CACHE_TTL_1HOUR_MS) {
+            thinkingClearLatched = true;
+            setThinkingClearLatched(true);
+        }
+    }
+    const effort = resolveAppliedEffort(options.model, options.effortValue);
+    if (feature('PROMPT_CACHE_BREAK_DETECTION')) {
+        const toolsForCacheDetection = allTools.filter(t => !('defer_loading' in t && t.defer_loading));
+        recordPromptState({
+            system,
+            toolSchemas: toolsForCacheDetection,
+            querySource: options.querySource,
+            model: options.model,
+            agentId: options.agentId,
+            fastMode: fastModeHeaderLatched,
+            globalCacheStrategy,
+            apiHeaders,
+            autoModeActive: afkHeaderLatched,
+            isUsingOverage: currentLimits.isUsingOverage ?? false,
+            cachedMCEnabled: cacheEditingHeaderLatched,
+            effortValue: effort,
+            extraBodyParams: getExtraBodyParams(),
+        });
+    }
+    const newContext: LLMRequestNewContext | undefined = isPreviewTracingEnabled()
+        ? {
+            systemPrompt: systemPrompt.join('\n\n'),
+            querySource: options.querySource,
+            tools: jsonStringify(allTools),
+        }
+        : undefined;
+    const llmSpan = startLLMRequestSpan(options.model, newContext, messagesForAPI, isFastMode);
+    const startIncludingRetries = Date.now();
+    let start = Date.now();
+    let attemptNumber = 0;
+    const attemptStartTimes: number[] = [];
+    let stream: Stream<AgentStreamEvent> | undefined = undefined;
+    let streamRequestId: string | null | undefined = undefined;
+    let clientRequestId: string | undefined = undefined;
+    let streamResponse: Response | undefined = undefined;
+    function releaseStreamResources(): void {
+        cleanupStream(stream);
+        stream = undefined;
+        if (streamResponse) {
+            streamResponse.body?.cancel().catch(() => { });
+            streamResponse = undefined;
+        }
+    }
+    const consumedCacheEdits = cachedMCEnabled ? consumePendingCacheEdits() : null;
+    const consumedPinnedEdits = cachedMCEnabled ? getPinnedCacheEdits() : [];
+    let lastRequestApiHeaders: string[] | undefined;
+    const paramsFromContext = (retryContext: RetryContext): MessageStreamParams => {
+        const apiHeadersParams = [...apiHeaders];
+        if (!apiHeadersParams.includes(CONTEXT_1M_HEADER) &&
+            getLongContextExpTreatmentEnabled(retryContext.model)) {
+            apiHeadersParams.push(CONTEXT_1M_HEADER);
+        }
+        const extraBodyParams = getExtraBodyParams([]);
+        const outputConfig: OutputConfig = {
+            ...((extraBodyParams.output_config as OutputConfig) ?? {}),
+        };
+        configureEffortParams(effort, outputConfig, extraBodyParams, apiHeadersParams, options.model);
+        configureTaskBudgetParams(options.taskBudget, outputConfig as OutputConfig & {
+            task_budget?: TaskBudgetParam;
+        }, apiHeadersParams);
+        if (options.outputFormat && !('format' in outputConfig)) {
+            outputConfig.format = options.outputFormat as JSONOutputFormat;
+            if (modelSupportsStructuredOutputs(options.model) &&
+                !apiHeadersParams.includes(STRUCTURED_OUTPUTS_HEADER)) {
+                apiHeadersParams.push(STRUCTURED_OUTPUTS_HEADER);
+            }
+        }
+        const maxOutputTokens = retryContext?.maxTokensOverride ||
+            options.maxOutputTokensOverride ||
+            getMaxOutputTokensForModel(options.model);
+        const hasThinking = thinkingConfig.type !== 'disabled' &&
+            !isEnvTruthy(getOpenCodeCliEnv('DISABLE_THINKING'));
+        let thinking: MessageStreamParams['thinking'] | undefined = undefined;
+        if (hasThinking && modelSupportsThinking(options.model)) {
+            if (!isEnvTruthy(process.env.OPEN_CODE_CLI_DISABLE_ADAPTIVE_THINKING) &&
+                modelSupportsAdaptiveThinking(options.model)) {
+                thinking = {
+                    type: 'adaptive',
+                } satisfies MessageStreamParams['thinking'];
+            }
+            else {
+                let thinkingBudget = getMaxThinkingTokensForModel(options.model);
+                if (thinkingConfig.type === 'enabled' &&
+                    thinkingConfig.budgetTokens !== undefined) {
+                    thinkingBudget = thinkingConfig.budgetTokens;
+                }
+                thinkingBudget = Math.min(maxOutputTokens - 1, thinkingBudget);
+                thinking = {
+                    budget_tokens: thinkingBudget,
+                    type: 'enabled',
+                } satisfies MessageStreamParams['thinking'];
+            }
+        }
+        const contextManagement = getAPIContextManagement({
+            hasThinking,
+            isRedactThinkingActive: apiHeadersParams.includes(REDACT_THINKING_HEADER),
+            clearAllThinking: thinkingClearLatched,
+        });
+        const enablePromptCaching = options.enablePromptCaching ?? getPromptCachingEnabled(retryContext.model);
+        let speed: MessageStreamParams['speed'];
+        const isFastModeForRetry = isFastModeEnabled() &&
+            isFastModeAvailable() &&
+            !isFastModeCooldown() &&
+            isFastModeSupportedByModel(options.model) &&
+            !!retryContext.fastMode;
+        if (isFastModeForRetry) {
+            speed = 'fast';
+        }
+        if (fastModeHeaderLatched && !apiHeadersParams.includes(FAST_MODE_HEADER)) {
+            apiHeadersParams.push(FAST_MODE_HEADER);
+        }
+        if (feature('TRANSCRIPT_CLASSIFIER')) {
+            if (afkHeaderLatched &&
+                shouldIncludeFirstPartyOnlyApiHeaders() &&
+                isAgenticQuery &&
+                !apiHeadersParams.includes(AFK_MODE_HEADER)) {
+                apiHeadersParams.push(AFK_MODE_HEADER);
+            }
+        }
+        const useCachedMC = cachedMCEnabled &&
+            false &&
+            options.querySource === 'repl_main_thread';
+        if (cacheEditingHeaderLatched &&
+            false &&
+            options.querySource === 'repl_main_thread' &&
+            !apiHeadersParams.includes(cacheEditingBetaHeader)) {
+            apiHeadersParams.push(cacheEditingBetaHeader);
+            logForDebugging('Cache editing beta header enabled for cached microcompact');
+        }
+        const temperature = !hasThinking
+            ? (options.temperatureOverride ?? 1)
+            : undefined;
+        lastRequestApiHeaders = apiHeadersParams;
+        return {
+            model: normalizeModelStringForAPI(options.model),
+            messages: addCacheBreakpoints(messagesForAPI, enablePromptCaching, options.querySource, useCachedMC, consumedCacheEdits, consumedPinnedEdits, options.skipCacheWrite),
+            system,
+            tools: allTools,
+            tool_choice: options.toolChoice,
+            ...(useApiHeaders ? { apiHeaders: apiHeadersParams } : {}),
+            metadata: getAPIMetadata(),
+            max_tokens: maxOutputTokens,
+            ...(temperature !== undefined && { temperature }),
+            ...(contextManagement &&
+                useApiHeaders &&
+                apiHeadersParams.includes(CONTEXT_MANAGEMENT_HEADER)
+                ? { context_management: contextManagement }
+                : {}),
+            ...extraBodyParams,
+            ...(Object.keys(outputConfig).length > 0 && {
+                output_config: outputConfig,
+            }),
+            ...(speed !== undefined && { speed }),
+        };
+    };
+    {
+        const queryParams = paramsFromContext({
+            model: options.model,
+            thinkingConfig,
+        });
+        const logMessagesLength = queryParams.messages.length;
+        const logApiHeaders = useApiHeaders ? (queryParams.apiHeaders ?? []) : [];
+        const logThinkingType = (queryParams.thinking?.type as 'adaptive' | 'enabled' | 'disabled' | undefined) ?? 'disabled';
+        const logEffortValue = queryParams.output_config?.effort as EffortLevel | null | undefined;
+        void options.getToolPermissionContext().then(permissionContext => {
+            logAPIQuery({
+                model: options.model,
+                messagesLength: logMessagesLength,
+                temperature: options.temperatureOverride ?? 1,
+                apiHeaders: logApiHeaders,
+                permissionMode: permissionContext.mode,
+                querySource: options.querySource,
+                queryTracking: options.queryTracking,
+                thinkingType: logThinkingType,
+                effortValue: logEffortValue,
+                fastMode: isFastMode,
+                previousRequestId,
+            });
+        });
+    }
+    const newMessages: AssistantMessage[] = [];
+    let ttftMs = 0;
+    let partialMessage: AgentMessage | undefined = undefined;
+    const contentBlocks: (MessageContentBlock | ConnectorTextBlock)[] = [];
+    let usage: NonNullableUsage = EMPTY_USAGE;
+    let costUSD = 0;
+    let stopReason: StopReason | null = null;
+    let didFallBackToNonStreaming = false;
+    let fallbackMessage: AssistantMessage | undefined;
+    let maxOutputTokens = 0;
+    let responseHeaders: globalThis.Headers | undefined = undefined;
+    let research: unknown = undefined;
+    let isFastModeRequest = isFastMode;
+    let isAdvisorInProgress = false;
+    try {
+        queryCheckpoint('query_client_creation_start');
+        const generator = withRetry(() => getProviderClient({
+            maxRetries: 0,
+            model: options.model,
+            fetchOverride: options.fetchOverride,
+            source: options.querySource,
+        }), async (chatCompletionsClient, attempt, context) => {
+            attemptNumber = attempt;
+            isFastModeRequest = context.fastMode ?? false;
+            start = Date.now();
+            attemptStartTimes.push(start);
+            queryCheckpoint('query_client_creation_end');
+            const params = paramsFromContext(context);
+            captureAPIRequest(params, options.querySource);
+            maxOutputTokens = params.max_tokens;
+            queryCheckpoint('query_api_request_sent');
+            if (!options.agentId) {
+                headlessProfilerCheckpoint('api_request_sent');
+            }
+            clientRequestId = randomUUID();
+            const result = await chatCompletionsClient.messages
+                .create({ ...params, stream: true }, {
+                signal,
+                ...(clientRequestId && {
+                    headers: { [CLIENT_REQUEST_ID_HEADER]: clientRequestId },
+                }),
+            })
+                .withResponse();
+            queryCheckpoint('query_response_headers_received');
+            streamRequestId = result.request_id;
+            streamResponse = result.response;
+            return result.data;
+        }, {
+            model: options.model,
+            fallbackModel: options.fallbackModel,
+            thinkingConfig,
+            ...(isFastModeEnabled() ? { fastMode: isFastMode } : false),
+            signal,
+            querySource: options.querySource,
+        });
+        let e;
+        do {
+            e = await generator.next();
+            if (!e.done && !('controller' in e.value)) {
+                yield e.value;
+            }
+        } while (!e.done);
+        stream = e.value as Stream<AgentStreamEvent>;
+        newMessages.length = 0;
+        ttftMs = 0;
+        partialMessage = undefined;
+        contentBlocks.length = 0;
+        usage = EMPTY_USAGE;
+        stopReason = null;
+        isAdvisorInProgress = false;
+        const streamWatchdogEnabled = isEnvTruthy(process.env.OPEN_CODE_ENABLE_STREAM_WATCHDOG);
+        const STREAM_IDLE_TIMEOUT_MS = parseInt(process.env.OPEN_CODE_STREAM_IDLE_TIMEOUT_MS || '', 10) || 90000;
+        const STREAM_IDLE_WARNING_MS = STREAM_IDLE_TIMEOUT_MS / 2;
+        let streamIdleAborted = false;
+        let streamWatchdogFiredAt: number | null = null;
+        let streamIdleWarningTimer: ReturnType<typeof setTimeout> | null = null;
+        let streamIdleTimer: ReturnType<typeof setTimeout> | null = null;
+        function clearStreamIdleTimers(): void {
+            if (streamIdleWarningTimer !== null) {
+                clearTimeout(streamIdleWarningTimer);
+                streamIdleWarningTimer = null;
+            }
+            if (streamIdleTimer !== null) {
+                clearTimeout(streamIdleTimer);
+                streamIdleTimer = null;
+            }
+        }
+        function resetStreamIdleTimer(): void {
+            clearStreamIdleTimers();
+            if (!streamWatchdogEnabled) {
+                return;
+            }
+            streamIdleWarningTimer = setTimeout(warnMs => {
+                logForDebugging(`Streaming idle warning: no chunks received for ${warnMs / 1000}s`, { level: 'warn' });
+                logForDiagnosticsNoPII('warn', 'cli_streaming_idle_warning');
+            }, STREAM_IDLE_WARNING_MS, STREAM_IDLE_WARNING_MS);
+            streamIdleTimer = setTimeout(() => {
+                streamIdleAborted = true;
+                streamWatchdogFiredAt = performance.now();
+                logForDebugging(`Streaming idle timeout: no chunks received for ${STREAM_IDLE_TIMEOUT_MS / 1000}s, aborting stream`, { level: 'error' });
+                logForDiagnosticsNoPII('error', 'cli_streaming_idle_timeout');
+                logEvent('open_code_cli_streaming_idle_timeout', {
+                    model: options.model as AnalyticsScalarMetadata,
+                    request_id: (streamRequestId ??
+                        'unknown') as AnalyticsScalarMetadata,
+                    timeout_ms: STREAM_IDLE_TIMEOUT_MS,
+                });
+                releaseStreamResources();
+            }, STREAM_IDLE_TIMEOUT_MS);
+        }
+        resetStreamIdleTimer();
+        startSessionActivity('api_call');
+        try {
+            let isFirstChunk = true;
+            let lastEventTime: number | null = null;
+            const STALL_THRESHOLD_MS = 30000;
+            let totalStallTime = 0;
+            let stallCount = 0;
+            for await (const part of stream) {
+                resetStreamIdleTimer();
+                const now = Date.now();
+                if (lastEventTime !== null) {
+                    const timeSinceLastEvent = now - lastEventTime;
+                    if (timeSinceLastEvent > STALL_THRESHOLD_MS) {
+                        stallCount++;
+                        totalStallTime += timeSinceLastEvent;
+                        logForDebugging(`Streaming stall detected: ${(timeSinceLastEvent / 1000).toFixed(1)}s gap between events (stall #${stallCount})`, { level: 'warn' });
+                        logEvent('open_code_cli_streaming_stall', {
+                            stall_duration_ms: timeSinceLastEvent,
+                            stall_count: stallCount,
+                            total_stall_time_ms: totalStallTime,
+                            event_type: part.type as AnalyticsScalarMetadata,
+                            model: options.model as AnalyticsScalarMetadata,
+                            request_id: (streamRequestId ??
+                                'unknown') as AnalyticsScalarMetadata,
+                        });
+                    }
+                }
+                lastEventTime = now;
+                if (isFirstChunk) {
+                    logForDebugging('Stream started - received first chunk');
+                    queryCheckpoint('query_first_chunk_received');
+                    if (!options.agentId) {
+                        headlessProfilerCheckpoint('first_chunk');
+                    }
+                    endQueryProfile();
+                    isFirstChunk = false;
+                }
+                switch (part.type) {
+                    case 'message_start': {
+                        partialMessage = part.message;
+                        ttftMs = Date.now() - start;
+                        usage = updateUsage(usage, part.message?.usage);
+                        if (process.env.USER_TYPE === 'ant' &&
+                            'research' in (part.message as unknown as Record<string, unknown>)) {
+                            research = (part.message as unknown as Record<string, unknown>)
+                                .research;
+                        }
+                        break;
+                    }
+                    case 'content_block_start':
+                        switch (part.content_block.type) {
+                            case 'tool_use':
+                                contentBlocks[part.index] = {
+                                    ...part.content_block,
+                                    input: '',
+                                };
+                                break;
+                            case 'server_tool_use':
+                                contentBlocks[part.index] = {
+                                    ...part.content_block,
+                                    input: '' as unknown as {
+                                        [key: string]: unknown;
+                                    },
+                                };
+                                if ((part.content_block.name as string) === 'advisor') {
+                                    isAdvisorInProgress = true;
+                                    logForDebugging(`[AdvisorTool] Advisor tool called`);
+                                    logEvent('open_code_cli_advisor_tool_call', {
+                                        model: options.model as AnalyticsScalarMetadata,
+                                        advisor_model: (advisorModel ??
+                                            'unknown') as AnalyticsScalarMetadata,
+                                    });
+                                }
+                                break;
+                            case 'text':
+                                contentBlocks[part.index] = {
+                                    ...part.content_block,
+                                    text: '',
+                                };
+                                break;
+                            case 'thinking':
+                                contentBlocks[part.index] = {
+                                    ...part.content_block,
+                                    thinking: '',
+                                    signature: '',
+                                };
+                                break;
+                            default:
+                                contentBlocks[part.index] = { ...part.content_block };
+                                if ((part.content_block.type as string) === 'advisor_tool_result') {
+                                    isAdvisorInProgress = false;
+                                    logForDebugging(`[AdvisorTool] Advisor tool result received`);
+                                }
+                                break;
+                        }
+                        break;
+                    case 'content_block_delta': {
+                        const contentBlock = contentBlocks[part.index];
+                        const delta = part.delta as typeof part.delta | ConnectorTextDelta;
+                        if (!contentBlock) {
+                            logEvent('open_code_cli_streaming_error', {
+                                error_type: 'content_block_not_found_delta' as AnalyticsScalarMetadata,
+                                part_type: part.type as AnalyticsScalarMetadata,
+                                part_index: part.index,
+                            });
+                            throw new RangeError('Content block not found');
+                        }
+                        if (feature('CONNECTOR_TEXT') &&
+                            delta.type === 'connector_text_delta') {
+                            if (contentBlock.type !== 'connector_text') {
+                                logEvent('open_code_cli_streaming_error', {
+                                    error_type: 'content_block_type_mismatch_connector_text' as AnalyticsScalarMetadata,
+                                    expected_type: 'connector_text' as AnalyticsScalarMetadata,
+                                    actual_type: contentBlock.type as AnalyticsScalarMetadata,
+                                });
+                                throw new Error('Content block is not a connector_text block');
+                            }
+                            contentBlock.connector_text += delta.connector_text;
+                        }
+                        else {
+                            switch (delta.type) {
+                                case 'citations_delta':
+                                    break;
+                                case 'input_json_delta':
+                                    if (contentBlock.type !== 'tool_use' &&
+                                        contentBlock.type !== 'server_tool_use') {
+                                        logEvent('open_code_cli_streaming_error', {
+                                            error_type: 'content_block_type_mismatch_input_json' as AnalyticsScalarMetadata,
+                                            expected_type: 'tool_use' as AnalyticsScalarMetadata,
+                                            actual_type: contentBlock.type as AnalyticsScalarMetadata,
+                                        });
+                                        throw new Error('Content block is not a input_json block');
+                                    }
+                                    if (typeof contentBlock.input !== 'string') {
+                                        logEvent('open_code_cli_streaming_error', {
+                                            error_type: 'content_block_input_not_string' as AnalyticsScalarMetadata,
+                                            input_type: typeof contentBlock.input as AnalyticsScalarMetadata,
+                                        });
+                                        throw new Error('Content block input is not a string');
+                                    }
+                                    contentBlock.input += delta.partial_json;
+                                    break;
+                                case 'text_delta':
+                                    if (contentBlock.type !== 'text') {
+                                        logEvent('open_code_cli_streaming_error', {
+                                            error_type: 'content_block_type_mismatch_text' as AnalyticsScalarMetadata,
+                                            expected_type: 'text' as AnalyticsScalarMetadata,
+                                            actual_type: contentBlock.type as AnalyticsScalarMetadata,
+                                        });
+                                        throw new Error('Content block is not a text block');
+                                    }
+                                    contentBlock.text += delta.text;
+                                    break;
+                                case 'signature_delta':
+                                    if (feature('CONNECTOR_TEXT') &&
+                                        contentBlock.type === 'connector_text') {
+                                        contentBlock.signature = delta.signature;
+                                        break;
+                                    }
+                                    if (contentBlock.type !== 'thinking') {
+                                        logEvent('open_code_cli_streaming_error', {
+                                            error_type: 'content_block_type_mismatch_thinking_signature' as AnalyticsScalarMetadata,
+                                            expected_type: 'thinking' as AnalyticsScalarMetadata,
+                                            actual_type: contentBlock.type as AnalyticsScalarMetadata,
+                                        });
+                                        throw new Error('Content block is not a thinking block');
+                                    }
+                                    contentBlock.signature = delta.signature;
+                                    break;
+                                case 'thinking_delta':
+                                    if (contentBlock.type !== 'thinking') {
+                                        logEvent('open_code_cli_streaming_error', {
+                                            error_type: 'content_block_type_mismatch_thinking_delta' as AnalyticsScalarMetadata,
+                                            expected_type: 'thinking' as AnalyticsScalarMetadata,
+                                            actual_type: contentBlock.type as AnalyticsScalarMetadata,
+                                        });
+                                        throw new Error('Content block is not a thinking block');
+                                    }
+                                    contentBlock.thinking += delta.thinking;
+                                    break;
+                            }
+                        }
+                        if (process.env.USER_TYPE === 'ant' && 'research' in part) {
+                            research = (part as {
+                                research: unknown;
+                            }).research;
+                        }
+                        break;
+                    }
+                    case 'content_block_stop': {
+                        const contentBlock = contentBlocks[part.index];
+                        if (!contentBlock) {
+                            logEvent('open_code_cli_streaming_error', {
+                                error_type: 'content_block_not_found_stop' as AnalyticsScalarMetadata,
+                                part_type: part.type as AnalyticsScalarMetadata,
+                                part_index: part.index,
+                            });
+                            throw new RangeError('Content block not found');
+                        }
+                        if (!partialMessage) {
+                            logEvent('open_code_cli_streaming_error', {
+                                error_type: 'partial_message_not_found' as AnalyticsScalarMetadata,
+                                part_type: part.type as AnalyticsScalarMetadata,
+                            });
+                            throw new Error('Message not found');
+                        }
+                        const m: AssistantMessage = {
+                            message: {
+                                ...partialMessage,
+                                content: normalizeContentFromAPI([contentBlock] as MessageContentBlock[], tools, options.agentId),
+                            },
+                            requestId: streamRequestId ?? undefined,
+                            type: 'assistant',
+                            uuid: randomUUID(),
+                            timestamp: new Date().toISOString(),
+                            ...(process.env.USER_TYPE === 'ant' &&
+                                research !== undefined && { research }),
+                            ...(advisorModel && { advisorModel }),
+                        };
+                        newMessages.push(m);
+                        yield m;
+                        break;
+                    }
+                    case 'message_delta': {
+                        usage = updateUsage(usage, part.usage);
+                        if (process.env.USER_TYPE === 'ant' &&
+                            'research' in (part as unknown as Record<string, unknown>)) {
+                            research = (part as unknown as Record<string, unknown>).research;
+                            for (const msg of newMessages) {
+                                msg.research = research;
+                            }
+                        }
+                        stopReason = part.delta.stop_reason;
+                        const lastMsg = newMessages.at(-1);
+                        if (lastMsg) {
+                            lastMsg.message.usage = usage;
+                            lastMsg.message.stop_reason = stopReason;
+                        }
+                        const costUSDForPart = calculateUSDCost(resolvedModel, usage);
+                        costUSD += addToTotalSessionCost(costUSDForPart, usage, options.model);
+                        const refusalMessage = getErrorMessageIfRefusal(part.delta.stop_reason, options.model);
+                        if (refusalMessage) {
+                            yield refusalMessage;
+                        }
+                        if (stopReason === 'max_tokens') {
+                            logEvent('open_code_cli_max_tokens_reached', {
+                                max_tokens: maxOutputTokens,
+                            });
+                            yield createAssistantAPIErrorMessage({
+                                content: `${API_ERROR_MESSAGE_PREFIX}: Open Code CLI's response exceeded the ${maxOutputTokens} output token maximum. To configure this behavior, set the OPEN_CODE_CLI_MAX_COMPLETION_TOKENS environment variable.`,
+                                apiError: 'max_completion_tokens',
+                                error: 'max_completion_tokens',
+                            });
+                        }
+                        if (stopReason === 'model_context_window_exceeded') {
+                            logEvent('open_code_cli_context_window_exceeded', {
+                                max_tokens: maxOutputTokens,
+                                completion_tokens: usage.completion_tokens,
+                            });
+                            yield createAssistantAPIErrorMessage({
+                                content: `${API_ERROR_MESSAGE_PREFIX}: The model has reached its context window limit.`,
+                                apiError: 'max_completion_tokens',
+                                error: 'max_completion_tokens',
+                            });
+                        }
+                        break;
+                    }
+                    case 'message_stop':
+                        break;
+                }
+                yield {
+                    type: 'stream_event',
+                    event: part,
+                    ...(part.type === 'message_start' ? { ttftMs } : undefined),
+                };
+            }
+            clearStreamIdleTimers();
+            if (streamIdleAborted) {
+                const exitDelayMs = streamWatchdogFiredAt !== null
+                    ? Math.round(performance.now() - streamWatchdogFiredAt)
+                    : -1;
+                logForDiagnosticsNoPII('info', 'cli_stream_loop_exited_after_watchdog_clean');
+                logEvent('open_code_cli_stream_loop_exited_after_watchdog', {
+                    request_id: (streamRequestId ??
+                        'unknown') as AnalyticsScalarMetadata,
+                    exit_delay_ms: exitDelayMs,
+                    exit_path: 'clean' as AnalyticsScalarMetadata,
+                    model: options.model as AnalyticsScalarMetadata,
+                });
+                streamWatchdogFiredAt = null;
+                throw new Error('Stream idle timeout - no chunks received');
+            }
+            if (!partialMessage || (newMessages.length === 0 && !stopReason)) {
+                logForDebugging(!partialMessage
+                    ? 'Stream completed without receiving message_start event - triggering non-streaming fallback'
+                    : 'Stream completed with message_start but no content blocks completed - triggering non-streaming fallback', { level: 'error' });
+                logEvent('open_code_cli_stream_no_events', {
+                    model: options.model as AnalyticsScalarMetadata,
+                    request_id: (streamRequestId ??
+                        'unknown') as AnalyticsScalarMetadata,
+                });
+                throw new Error('Stream ended without receiving any events');
+            }
+            if (stallCount > 0) {
+                logForDebugging(`Streaming completed with ${stallCount} stall(s), total stall time: ${(totalStallTime / 1000).toFixed(1)}s`, { level: 'warn' });
+                logEvent('open_code_cli_streaming_stall_summary', {
+                    stall_count: stallCount,
+                    total_stall_time_ms: totalStallTime,
+                    model: options.model as AnalyticsScalarMetadata,
+                    request_id: (streamRequestId ??
+                        'unknown') as AnalyticsScalarMetadata,
+                });
+            }
+            if (feature('PROMPT_CACHE_BREAK_DETECTION')) {
+                void checkResponseForCacheInvalidation(options.querySource, usage.cached_tokens, 0, messages, options.agentId, streamRequestId);
+            }
+            const resp = streamResponse as unknown as Response | undefined;
+            if (resp) {
+                extractQuotaStatusFromHeaders(resp.headers);
+                responseHeaders = resp.headers;
+            }
+        }
+        catch (streamingError) {
+            clearStreamIdleTimers();
+            if (streamIdleAborted && streamWatchdogFiredAt !== null) {
+                const exitDelayMs = Math.round(performance.now() - streamWatchdogFiredAt);
+                logForDiagnosticsNoPII('info', 'cli_stream_loop_exited_after_watchdog_error');
+                logEvent('open_code_cli_stream_loop_exited_after_watchdog', {
+                    request_id: (streamRequestId ??
+                        'unknown') as AnalyticsScalarMetadata,
+                    exit_delay_ms: exitDelayMs,
+                    exit_path: 'error' as AnalyticsScalarMetadata,
+                    error_name: streamingError instanceof Error
+                        ? (streamingError.name as AnalyticsScalarMetadata)
+                        : ('unknown' as AnalyticsScalarMetadata),
+                    model: options.model as AnalyticsScalarMetadata,
+                });
+            }
+            if (streamingError instanceof APIUserAbortError) {
+                if (signal.aborted) {
+                    logForDebugging(`Streaming aborted by user: ${errorMessage(streamingError)}`);
+                    if (isAdvisorInProgress) {
+                        logEvent('open_code_cli_advisor_tool_interrupted', {
+                            model: options.model as AnalyticsScalarMetadata,
+                            advisor_model: (advisorModel ??
+                                'unknown') as AnalyticsScalarMetadata,
+                        });
+                    }
+                    throw streamingError;
+                }
+                else {
+                    logForDebugging(`Streaming timeout (SDK abort): ${streamingError.message}`, { level: 'error' });
+                    throw new APIConnectionTimeoutError('Request timed out');
+                }
+            }
+            const disableFallback = isEnvTruthy(process.env.OPEN_CODE_CLI_DISABLE_NONSTREAMING_FALLBACK) ||
+                getFeatureValue_CACHED_MAY_BE_STALE('open_code_cli_disable_streaming_to_non_streaming_fallback', false);
+            if (disableFallback) {
+                logForDebugging(`Error streaming (non-streaming fallback disabled): ${errorMessage(streamingError)}`, { level: 'error' });
+                logEvent('open_code_cli_streaming_fallback_to_non_streaming', {
+                    model: options.model as AnalyticsScalarMetadata,
+                    error: streamingError instanceof Error
+                        ? (streamingError.name as AnalyticsScalarMetadata)
+                        : (String(streamingError) as AnalyticsScalarMetadata),
+                    attemptNumber,
+                    maxOutputTokens,
+                    thinkingType: thinkingConfig.type as AnalyticsScalarMetadata,
+                    fallback_disabled: true,
+                    request_id: (streamRequestId ??
+                        'unknown') as AnalyticsScalarMetadata,
+                    fallback_cause: (streamIdleAborted
+                        ? 'watchdog'
+                        : 'other') as AnalyticsScalarMetadata,
+                });
+                throw streamingError;
+            }
+            logForDebugging(`Error streaming, falling back to non-streaming mode: ${errorMessage(streamingError)}`, { level: 'error' });
+            didFallBackToNonStreaming = true;
+            if (options.onStreamingFallback) {
+                options.onStreamingFallback();
+            }
+            logEvent('open_code_cli_streaming_fallback_to_non_streaming', {
+                model: options.model as AnalyticsScalarMetadata,
+                error: streamingError instanceof Error
+                    ? (streamingError.name as AnalyticsScalarMetadata)
+                    : (String(streamingError) as AnalyticsScalarMetadata),
+                attemptNumber,
+                maxOutputTokens,
+                thinkingType: thinkingConfig.type as AnalyticsScalarMetadata,
+                fallback_disabled: false,
+                request_id: (streamRequestId ??
+                    'unknown') as AnalyticsScalarMetadata,
+                fallback_cause: (streamIdleAborted
+                    ? 'watchdog'
+                    : 'other') as AnalyticsScalarMetadata,
+            });
+            logForDiagnosticsNoPII('info', 'cli_nonstreaming_fallback_started');
+            logEvent('open_code_cli_nonstreaming_fallback_started', {
+                request_id: (streamRequestId ??
+                    'unknown') as AnalyticsScalarMetadata,
+                model: options.model as AnalyticsScalarMetadata,
+                fallback_cause: (streamIdleAborted
+                    ? 'watchdog'
+                    : 'other') as AnalyticsScalarMetadata,
+            });
+            const result = yield* executeNonStreamingRequest({ model: options.model, source: options.querySource }, {
+                model: options.model,
+                fallbackModel: options.fallbackModel,
+                thinkingConfig,
+                ...(isFastModeEnabled() && { fastMode: isFastMode }),
+                signal,
+                initialConsecutive529Errors: is529Error(streamingError) ? 1 : 0,
+                querySource: options.querySource,
+            }, paramsFromContext, (attempt, _startTime, tokens) => {
+                attemptNumber = attempt;
+                maxOutputTokens = tokens;
+            }, params => captureAPIRequest(params, options.querySource), streamRequestId);
+            const m: AssistantMessage = {
+                message: {
+                    ...result,
+                    content: normalizeContentFromAPI(result.content, tools, options.agentId),
+                },
+                requestId: streamRequestId ?? undefined,
+                type: 'assistant',
+                uuid: randomUUID(),
+                timestamp: new Date().toISOString(),
+                ...(process.env.USER_TYPE === 'ant' &&
+                    research !== undefined && {
+                    research,
+                }),
+                ...(advisorModel && {
+                    advisorModel,
+                }),
+            };
+            newMessages.push(m);
+            fallbackMessage = m;
+            yield m;
+        }
+        finally {
+            clearStreamIdleTimers();
+        }
+    }
+    catch (errorFromRetry) {
+        if (errorFromRetry instanceof FallbackTriggeredError) {
+            throw errorFromRetry;
+        }
+        const is404StreamCreationError = !didFallBackToNonStreaming &&
+            errorFromRetry instanceof CannotRetryError &&
+            errorFromRetry.originalError instanceof APIError &&
+            errorFromRetry.originalError.status === 404;
+        if (is404StreamCreationError) {
+            const failedRequestId = (errorFromRetry.originalError as APIError).requestID ?? 'unknown';
+            logForDebugging('Streaming endpoint returned 404, falling back to non-streaming mode', { level: 'warn' });
+            didFallBackToNonStreaming = true;
+            if (options.onStreamingFallback) {
+                options.onStreamingFallback();
+            }
+            logEvent('open_code_cli_streaming_fallback_to_non_streaming', {
+                model: options.model as AnalyticsScalarMetadata,
+                error: '404_stream_creation' as AnalyticsScalarMetadata,
+                attemptNumber,
+                maxOutputTokens,
+                thinkingType: thinkingConfig.type as AnalyticsScalarMetadata,
+                request_id: failedRequestId as AnalyticsScalarMetadata,
+                fallback_cause: '404_stream_creation' as AnalyticsScalarMetadata,
+            });
+            try {
+                const result = yield* executeNonStreamingRequest({ model: options.model, source: options.querySource }, {
+                    model: options.model,
+                    fallbackModel: options.fallbackModel,
+                    thinkingConfig,
+                    ...(isFastModeEnabled() && { fastMode: isFastMode }),
+                    signal,
+                }, paramsFromContext, (attempt, _startTime, tokens) => {
+                    attemptNumber = attempt;
+                    maxOutputTokens = tokens;
+                }, params => captureAPIRequest(params, options.querySource), failedRequestId);
+                const m: AssistantMessage = {
+                    message: {
+                        ...result,
+                        content: normalizeContentFromAPI(result.content, tools, options.agentId),
+                    },
+                    requestId: streamRequestId ?? undefined,
+                    type: 'assistant',
+                    uuid: randomUUID(),
+                    timestamp: new Date().toISOString(),
+                    ...(process.env.USER_TYPE === 'ant' &&
+                        research !== undefined && { research }),
+                    ...(advisorModel && { advisorModel }),
+                };
+                newMessages.push(m);
+                fallbackMessage = m;
+                yield m;
+            }
+            catch (fallbackError) {
+                if (fallbackError instanceof FallbackTriggeredError) {
+                    throw fallbackError;
+                }
+                logForDebugging(`Non-streaming fallback also failed: ${errorMessage(fallbackError)}`, { level: 'error' });
+                let error = fallbackError;
+                let errorModel = options.model;
+                if (fallbackError instanceof CannotRetryError) {
+                    error = fallbackError.originalError;
+                    errorModel = fallbackError.retryContext.model;
+                }
+                if (error instanceof APIError) {
+                    extractQuotaStatusFromError(error);
+                }
+                const requestId = streamRequestId ||
+                    (error instanceof APIError ? error.requestID : undefined) ||
+                    (error instanceof APIError
+                        ? (error.error as {
+                            request_id?: string;
+                        })?.request_id
+                        : undefined);
+                logAPIError({
+                    error,
+                    model: errorModel,
+                    messageCount: messagesForAPI.length,
+                    messageTokens: tokenCountFromLastAPIResponse(messagesForAPI),
+                    durationMs: Date.now() - start,
+                    durationMsIncludingRetries: Date.now() - startIncludingRetries,
+                    attempt: attemptNumber,
+                    requestId,
+                    clientRequestId,
+                    didFallBackToNonStreaming,
+                    queryTracking: options.queryTracking,
+                    querySource: options.querySource,
+                    llmSpan,
+                    fastMode: isFastModeRequest,
+                    previousRequestId,
+                });
+                if (error instanceof APIUserAbortError) {
+                    releaseStreamResources();
+                    return;
+                }
+                yield getAssistantMessageFromError(error, errorModel, {
+                    messages,
+                    messagesForAPI,
+                });
+                releaseStreamResources();
+                return;
+            }
+        }
+        else {
+            logForDebugging(`Error in API request: ${errorMessage(errorFromRetry)}`, {
+                level: 'error',
+            });
+            let error = errorFromRetry;
+            let errorModel = options.model;
+            if (errorFromRetry instanceof CannotRetryError) {
+                error = errorFromRetry.originalError;
+                errorModel = errorFromRetry.retryContext.model;
+            }
+            if (error instanceof APIError) {
+                extractQuotaStatusFromError(error);
+            }
+            const requestId = streamRequestId ||
+                (error instanceof APIError ? error.requestID : undefined) ||
+                (error instanceof APIError
+                    ? (error.error as {
+                        request_id?: string;
+                    })?.request_id
+                    : undefined);
+            logAPIError({
+                error,
+                model: errorModel,
+                messageCount: messagesForAPI.length,
+                messageTokens: tokenCountFromLastAPIResponse(messagesForAPI),
+                durationMs: Date.now() - start,
+                durationMsIncludingRetries: Date.now() - startIncludingRetries,
+                attempt: attemptNumber,
+                requestId,
+                clientRequestId,
+                didFallBackToNonStreaming,
+                queryTracking: options.queryTracking,
+                querySource: options.querySource,
+                llmSpan,
+                fastMode: isFastModeRequest,
+                previousRequestId,
+            });
+            if (error instanceof APIUserAbortError) {
+                releaseStreamResources();
+                return;
+            }
+            yield getAssistantMessageFromError(error, errorModel, {
+                messages,
+                messagesForAPI,
+            });
+            releaseStreamResources();
+            return;
+        }
+    }
+    finally {
+        stopSessionActivity('api_call');
+        releaseStreamResources();
+        if (fallbackMessage) {
+            const fallbackUsage = fallbackMessage.message.usage;
+            usage = updateUsage(EMPTY_USAGE, fallbackUsage);
+            stopReason = fallbackMessage.message.stop_reason;
+            const fallbackCost = calculateUSDCost(resolvedModel, fallbackUsage);
+            costUSD += addToTotalSessionCost(fallbackCost, fallbackUsage, options.model);
+        }
+    }
+    if (feature('CACHED_MICROCOMPACT') && cachedMCEnabled) {
+        markToolsSentToAPIState();
+    }
+    if (streamRequestId &&
+        !getAgentContext() &&
+        (options.querySource.startsWith('repl_main_thread') ||
+            options.querySource === 'sdk')) {
+        setLastMainRequestId(streamRequestId);
+    }
+    const logMessageCount = messagesForAPI.length;
+    const logMessageTokens = tokenCountFromLastAPIResponse(messagesForAPI);
+    void options.getToolPermissionContext().then(permissionContext => {
+        logAPISuccessAndDuration({
+            model: newMessages[0]?.message.model ?? partialMessage?.model ?? options.model,
+            preNormalizedModel: options.model,
+            usage,
+            start,
+            startIncludingRetries,
+            attempt: attemptNumber,
+            messageCount: logMessageCount,
+            messageTokens: logMessageTokens,
+            requestId: streamRequestId ?? null,
+            stopReason,
+            ttftMs,
+            didFallBackToNonStreaming,
+            querySource: options.querySource,
+            headers: responseHeaders,
+            costUSD,
+            queryTracking: options.queryTracking,
+            permissionMode: permissionContext.mode,
+            newMessages,
+            llmSpan,
+            globalCacheStrategy,
+            requestSetupMs: start - startIncludingRetries,
+            attemptStartTimes,
+            fastMode: isFastModeRequest,
+            previousRequestId,
+            apiHeaders: lastRequestApiHeaders,
+        });
+    });
+    releaseStreamResources();
+}
+export function cleanupStream(stream: Stream<AgentStreamEvent> | undefined): void {
+    if (!stream) {
+        return;
+    }
+    try {
+        if (!stream.controller.signal.aborted) {
+            stream.controller.abort();
+        }
+    }
+    catch {
+    }
+}
+export function updateUsage(usage: Readonly<NonNullableUsage>, partUsage: MessageDeltaUsage | undefined): NonNullableUsage {
+    if (!partUsage) {
+        return { ...usage };
+    }
+    return {
+        prompt_tokens: partUsage.prompt_tokens != null && partUsage.prompt_tokens > 0
+            ? partUsage.prompt_tokens
+            : usage.prompt_tokens,
+        cached_tokens: partUsage.cached_tokens != null &&
+            partUsage.cached_tokens > 0
+            ? partUsage.cached_tokens
+            : usage.cached_tokens,
+        completion_tokens: partUsage.completion_tokens ?? usage.completion_tokens,
+        server_tool_use: {
+            web_search_requests: partUsage.server_tool_use?.web_search_requests ??
+                usage.server_tool_use.web_search_requests,
+            web_fetch_requests: partUsage.server_tool_use?.web_fetch_requests ??
+                usage.server_tool_use.web_fetch_requests,
+        },
+        service_tier: partUsage.service_tier ?? usage.service_tier,
+        ...(feature('CACHED_MICROCOMPACT')
+            ? {
+                cache_deleted_prompt_tokens: (partUsage as unknown as {
+                    cache_deleted_prompt_tokens?: number;
+                })
+                    .cache_deleted_prompt_tokens != null &&
+                    (partUsage as unknown as {
+                        cache_deleted_prompt_tokens: number;
+                    })
+                        .cache_deleted_prompt_tokens > 0
+                    ? (partUsage as unknown as {
+                        cache_deleted_prompt_tokens: number;
+                    })
+                        .cache_deleted_prompt_tokens
+                    : ((usage as unknown as {
+                        cache_deleted_prompt_tokens?: number;
+                    })
+                        .cache_deleted_prompt_tokens ?? 0),
+            }
+            : {}),
+        inference_geo: partUsage.inference_geo ?? usage.inference_geo,
+        iterations: partUsage.iterations?.map(it => ({
+            prompt_tokens: it.prompt_tokens ?? 0,
+            completion_tokens: it.completion_tokens ?? 0,
+            type: it.type,
+        })) ?? usage.iterations,
+        speed: (partUsage as TokenUsage).speed ?? usage.speed,
+    };
+}
+export function accumulateUsage(totalUsage: Readonly<NonNullableUsage>, messageUsage: Readonly<NonNullableUsage>): NonNullableUsage {
+    return {
+        prompt_tokens: totalUsage.prompt_tokens + messageUsage.prompt_tokens,
+        cached_tokens: totalUsage.cached_tokens + messageUsage.cached_tokens,
+        completion_tokens: totalUsage.completion_tokens + messageUsage.completion_tokens,
+        server_tool_use: {
+            web_search_requests: totalUsage.server_tool_use.web_search_requests +
+                messageUsage.server_tool_use.web_search_requests,
+            web_fetch_requests: totalUsage.server_tool_use.web_fetch_requests +
+                messageUsage.server_tool_use.web_fetch_requests,
+        },
+        service_tier: messageUsage.service_tier,
+        ...(feature('CACHED_MICROCOMPACT')
+            ? {
+                cache_deleted_prompt_tokens: ((totalUsage as unknown as {
+                    cache_deleted_prompt_tokens?: number;
+                })
+                    .cache_deleted_prompt_tokens ?? 0) +
+                    ((messageUsage as unknown as {
+                        cache_deleted_prompt_tokens?: number;
+                    }).cache_deleted_prompt_tokens ?? 0),
+            }
+            : {}),
+        inference_geo: messageUsage.inference_geo,
+        iterations: messageUsage.iterations,
+        speed: messageUsage.speed,
+    };
+}
+function isToolResultBlock(block: unknown): block is {
+    type: 'tool_result';
+    tool_use_id: string;
+} {
+    return (block !== null &&
+        typeof block === 'object' &&
+        'type' in block &&
+        (block as {
+            type: string;
+        }).type === 'tool_result' &&
+        'tool_use_id' in block);
+}
+type CachedMCEditsBlock = {
+    type: 'cache_edits';
+    edits: {
+        type: 'delete';
+        cache_reference: string;
+    }[];
+};
+type CachedMCPinnedEdits = {
+    userMessageIndex: number;
+    block: CachedMCEditsBlock;
+};
+export function addCacheBreakpoints(messages: (UserMessage | AssistantMessage)[], enablePromptCaching: boolean, querySource?: QuerySource, useCachedMC = false, newCacheEdits?: CachedMCEditsBlock | null, pinnedEdits?: CachedMCPinnedEdits[], skipCacheWrite = false): MessageParam[] {
+    logEvent('open_code_cli_api_cache_breakpoints', {
+        totalMessageCount: messages.length,
+        cachingEnabled: enablePromptCaching,
+        skipCacheWrite,
+    });
+    const markerIndex = skipCacheWrite ? messages.length - 2 : messages.length - 1;
+    const result = messages.map((msg, index) => {
+        const addCache = index === markerIndex;
+        if (msg.type === 'user') {
+            return userMessageToMessageParam(msg, addCache, enablePromptCaching, querySource);
+        }
+        return assistantMessageToMessageParam(msg, addCache, enablePromptCaching, querySource);
+    });
+    if (!useCachedMC) {
+        return result;
+    }
+    const seenDeleteRefs = new Set<string>();
+    const deduplicateEdits = (block: CachedMCEditsBlock): CachedMCEditsBlock => {
+        const uniqueEdits = block.edits.filter(edit => {
+            if (seenDeleteRefs.has(edit.cache_reference)) {
+                return false;
+            }
+            seenDeleteRefs.add(edit.cache_reference);
+            return true;
+        });
+        return { ...block, edits: uniqueEdits };
+    };
+    for (const pinned of pinnedEdits ?? []) {
+        const msg = result[pinned.userMessageIndex];
+        if (msg && msg.role === 'user') {
+            if (!Array.isArray(msg.content)) {
+                msg.content = [{ type: 'text', text: msg.content as string }];
+            }
+            const dedupedBlock = deduplicateEdits(pinned.block);
+            if (dedupedBlock.edits.length > 0) {
+                insertBlockAfterToolResults(msg.content, dedupedBlock);
+            }
+        }
+    }
+    if (newCacheEdits && result.length > 0) {
+        const dedupedNewEdits = deduplicateEdits(newCacheEdits);
+        if (dedupedNewEdits.edits.length > 0) {
+            for (let i = result.length - 1; i >= 0; i--) {
+                const msg = result[i];
+                if (msg && msg.role === 'user') {
+                    if (!Array.isArray(msg.content)) {
+                        msg.content = [{ type: 'text', text: msg.content as string }];
+                    }
+                    insertBlockAfterToolResults(msg.content, dedupedNewEdits);
+                    pinCacheEdits(i, newCacheEdits);
+                    logForDebugging(`Added cache_edits block with ${dedupedNewEdits.edits.length} deletion(s) to message[${i}]: ${dedupedNewEdits.edits.map(e => e.cache_reference).join(', ')}`);
+                    break;
+                }
+            }
+        }
+    }
+    if (enablePromptCaching) {
+        let lastCCMsg = -1;
+        for (let i = 0; i < result.length; i++) {
+            const msg = result[i]!;
+            if (Array.isArray(msg.content)) {
+                for (const block of msg.content) {
+                    if (block && typeof block === 'object' && 'cache_control' in block) {
+                        lastCCMsg = i;
+                    }
+                }
+            }
+        }
+        if (lastCCMsg >= 0) {
+            for (let i = 0; i < lastCCMsg; i++) {
+                const msg = result[i]!;
+                if (msg.role !== 'user' || !Array.isArray(msg.content)) {
+                    continue;
+                }
+                let cloned = false;
+                for (let j = 0; j < msg.content.length; j++) {
+                    const block = msg.content[j];
+                    if (block && isToolResultBlock(block)) {
+                        if (!cloned) {
+                            msg.content = [...msg.content];
+                            cloned = true;
+                        }
+                        msg.content[j] = Object.assign({}, block, {
+                            cache_reference: block.tool_use_id,
+                        });
+                    }
+                }
+            }
+        }
+    }
+    return result;
+}
+export function buildSystemPromptBlocks(systemPrompt: SystemPrompt, enablePromptCaching: boolean, options?: {
+    skipGlobalCacheForSystemPrompt?: boolean;
+    querySource?: QuerySource;
+}): TextBlockParam[] {
+    return splitSysPromptPrefix(systemPrompt, {
+        skipGlobalCacheForSystemPrompt: options?.skipGlobalCacheForSystemPrompt,
+    }).map(block => {
+        return {
+            type: 'text' as const,
+            text: block.text,
+            ...(enablePromptCaching &&
+                block.cacheScope !== null && {
+                cache_control: getCacheControl({
+                    scope: block.cacheScope,
+                    querySource: options?.querySource,
+                }),
+            }),
+        };
+    });
+}
+type FastModelOptions = Omit<Options, 'model' | 'getToolPermissionContext'>;
+export async function queryFastModel({ systemPrompt = asSystemPrompt([]), userPrompt, outputFormat, signal, options, }: {
+    systemPrompt: SystemPrompt;
+    userPrompt: string;
+    outputFormat?: JSONOutputFormat;
+    signal: AbortSignal;
+    options: FastModelOptions;
+}): Promise<AssistantMessage> {
+    const result = await withVCR([
+        createUserMessage({
+            content: systemPrompt.map(text => ({ type: 'text', text })),
+        }),
+        createUserMessage({
+            content: userPrompt,
+        }),
+    ], async () => {
+        const messages = [
+            createUserMessage({
+                content: userPrompt,
+            }),
+        ];
+        const result = await queryModelWithoutStreaming({
+            messages,
+            systemPrompt,
+            thinkingConfig: { type: 'disabled' },
+            tools: [],
+            signal,
+            options: {
+                ...options,
+                model: getSmallFastModel(),
+                enablePromptCaching: options.enablePromptCaching ?? false,
+                outputFormat,
+                async getToolPermissionContext() {
+                    return getEmptyToolPermissionContext();
+                },
+            },
+        });
+        return [result];
+    });
+    return result[0]! as AssistantMessage;
+}
+type QueryWithModelOptions = Omit<Options, 'getToolPermissionContext'>;
+export async function queryWithModel({ systemPrompt = asSystemPrompt([]), userPrompt, outputFormat, signal, options, }: {
+    systemPrompt: SystemPrompt;
+    userPrompt: string;
+    outputFormat?: JSONOutputFormat;
+    signal: AbortSignal;
+    options: QueryWithModelOptions;
+}): Promise<AssistantMessage> {
+    const result = await withVCR([
+        createUserMessage({
+            content: systemPrompt.map(text => ({ type: 'text', text })),
+        }),
+        createUserMessage({
+            content: userPrompt,
+        }),
+    ], async () => {
+        const messages = [
+            createUserMessage({
+                content: userPrompt,
+            }),
+        ];
+        const result = await queryModelWithoutStreaming({
+            messages,
+            systemPrompt,
+            thinkingConfig: { type: 'disabled' },
+            tools: [],
+            signal,
+            options: {
+                ...options,
+                enablePromptCaching: options.enablePromptCaching ?? false,
+                outputFormat,
+                async getToolPermissionContext() {
+                    return getEmptyToolPermissionContext();
+                },
+            },
+        });
+        return [result];
+    });
+    return result[0]! as AssistantMessage;
+}
+export const MAX_NON_STREAMING_TOKENS = 64000;
+export function adjustParamsForNonStreaming<T extends {
+    max_tokens: number;
+    thinking?: MessageStreamParams['thinking'];
+}>(params: T, maxTokensCap: number): T {
+    const cappedMaxTokens = Math.min(params.max_tokens, maxTokensCap);
+    const adjustedParams = { ...params };
+    if (adjustedParams.thinking?.type === 'enabled' &&
+        typeof adjustedParams.thinking.budget_tokens === 'number' &&
+        adjustedParams.thinking.budget_tokens) {
+        adjustedParams.thinking = {
+            ...adjustedParams.thinking,
+            budget_tokens: Math.min(adjustedParams.thinking.budget_tokens, cappedMaxTokens - 1),
+        };
+    }
+    return {
+        ...adjustedParams,
+        max_tokens: cappedMaxTokens,
+    };
+}
+function isMaxTokensCapEnabled(): boolean {
+    return getFeatureValue_CACHED_MAY_BE_STALE('open_code_cli_otk_slot_v1', false);
+}
+export function getMaxOutputTokensForModel(model: string): number {
+    const maxOutputTokens = getModelMaxOutputTokens(model);
+    const defaultTokens = isMaxTokensCapEnabled()
+        ? Math.min(maxOutputTokens.default, CAPPED_DEFAULT_MAX_TOKENS)
+        : maxOutputTokens.default;
+    const result = validateBoundedIntEnvVar('OPEN_CODE_CLI_MAX_COMPLETION_TOKENS', process.env.OPEN_CODE_CLI_MAX_COMPLETION_TOKENS, defaultTokens, maxOutputTokens.upperLimit);
+    return result.effective;
+}

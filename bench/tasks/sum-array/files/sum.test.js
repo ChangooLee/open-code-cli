@@ -1,0 +1,6 @@
+const assert = require('node:assert')
+const { sum } = require('./sum.js')
+assert.strictEqual(sum([1, 2, 3, 4]), 10)
+assert.strictEqual(sum([]), 0)
+assert.strictEqual(sum([5]), 5)
+console.log('sum ok')

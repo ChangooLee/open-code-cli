@@ -1,0 +1,74 @@
+import memoize from 'lodash-es/memoize.js'
+import { basename } from 'path'
+import type { ResponseThemeConfig } from '../constants/responseThemes.js'
+import { logForDebugging } from '../utils/debug.js'
+import { coerceDescriptionToString } from '../utils/frontmatterParser.js'
+import { logError } from '../utils/log.js'
+import {
+  extractDescriptionFromMarkdown,
+  loadMarkdownFilesForSubdir,
+} from '../utils/markdownConfigLoader.js'
+import { clearPluginResponseThemeCache } from '../utils/plugins/loadPluginResponseThemes.js'
+export const getResponseThemeDirStyles = memoize(
+  async (cwd: string): Promise<ResponseThemeConfig[]> => {
+    try {
+      const markdownFiles = await loadMarkdownFilesForSubdir(
+        'response-themes',
+        cwd,
+      )
+      const styles = markdownFiles
+        .map(({ filePath, frontmatter, content, source }) => {
+          try {
+            const fileName = basename(filePath)
+            const styleName = fileName.replace(/\.md$/, '')
+            const name = (frontmatter['name'] || styleName) as string
+            const description =
+              coerceDescriptionToString(
+                frontmatter['description'],
+                styleName,
+              ) ??
+              extractDescriptionFromMarkdown(
+                content,
+                `Custom ${styleName} output style`,
+              )
+            const keepCodingInstructionsRaw =
+              frontmatter['keep-coding-instructions']
+            const keepCodingInstructions =
+              keepCodingInstructionsRaw === true ||
+              keepCodingInstructionsRaw === 'true'
+                ? true
+                : keepCodingInstructionsRaw === false ||
+                    keepCodingInstructionsRaw === 'false'
+                  ? false
+                  : undefined
+            if (frontmatter['force-for-plugin'] !== undefined) {
+              logForDebugging(
+                `Output style "${name}" has force-for-plugin set, but this option only applies to plugin output styles. Ignoring.`,
+                { level: 'warn' },
+              )
+            }
+            return {
+              name,
+              description,
+              prompt: content.trim(),
+              source,
+              keepCodingInstructions,
+            }
+          } catch (error) {
+            logError(error)
+            return null
+          }
+        })
+        .filter(style => style !== null)
+      return styles
+    } catch (error) {
+      logError(error)
+      return []
+    }
+  },
+)
+export function clearResponseThemeCaches(): void {
+  getResponseThemeDirStyles.cache?.clear?.()
+  loadMarkdownFilesForSubdir.cache?.clear?.()
+  clearPluginResponseThemeCache()
+}

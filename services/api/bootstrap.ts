@@ -1,0 +1,120 @@
+import axios from 'axios'
+import isEqual from 'lodash-es/isEqual.js'
+import {
+  getProviderApiKey,
+  getOpenCodeCliOAuthTokens,
+  hasProfileScope,
+} from 'src/utils/auth.js'
+import { z } from 'zod'
+import { getOauthConfig, OAUTH_HEADER } from '../../constants/oauth.js'
+import { getGlobalConfig, saveGlobalConfig } from '../../utils/config.js'
+import { logForDebugging } from '../../utils/debug.js'
+import { withOAuth401Retry } from '../../utils/http.js'
+import { lazySchema } from '../../utils/lazySchema.js'
+import { logError } from '../../utils/log.js'
+import { getAPIProvider } from '../../utils/model/providers.js'
+import { isEssentialTrafficOnly } from '../../utils/privacyLevel.js'
+import { getOpenCodeCliUserAgent } from '../../utils/userAgent.js'
+const bootstrapResponseSchema = lazySchema(() =>
+  z.object({
+    client_data: (z.record as any)(z.unknown()).nullish(),
+    additional_model_options: z
+      .array(
+        z
+          .object({
+            model: z.string(),
+            name: z.string(),
+            description: z.string(),
+          })
+          .transform(({ model, name, description }) => ({
+            value: model,
+            label: name,
+            description,
+          })),
+      )
+      .nullish(),
+  }),
+)
+type BootstrapResponse = z.infer<ReturnType<typeof bootstrapResponseSchema>>
+async function fetchBootstrapAPI(): Promise<BootstrapResponse | null> {
+  if (isEssentialTrafficOnly()) {
+    logForDebugging('[Bootstrap] Skipped: Nonessential traffic disabled')
+    return null
+  }
+  if (true) {
+    logForDebugging('[Bootstrap] Skipped: 3P provider')
+    return null
+  }
+  const apiKey = getProviderApiKey()
+  const hasUsableOAuth =
+    getOpenCodeCliOAuthTokens()?.accessToken && hasProfileScope()
+  if (!hasUsableOAuth && !apiKey) {
+    logForDebugging('[Bootstrap] Skipped: no usable OAuth or API key')
+    return null
+  }
+  const endpoint = `${getOauthConfig().BASE_API_URL}/api/open_code_cli/bootstrap`
+  try {
+    return await withOAuth401Retry(async () => {
+      const token = getOpenCodeCliOAuthTokens()?.accessToken
+      let authHeaders: Record<string, string>
+      if (token && hasProfileScope()) {
+        authHeaders = {
+          Authorization: `Bearer ${token}`,
+          'openai-compatible-beta': OAUTH_HEADER,
+        }
+      } else if (apiKey) {
+        authHeaders = { 'x-api-key': apiKey }
+      } else {
+        logForDebugging('[Bootstrap] No auth available on retry, aborting')
+        return null
+      }
+      logForDebugging('[Bootstrap] Fetching')
+      const response = await axios.get<unknown>(endpoint, {
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': getOpenCodeCliUserAgent(),
+          ...authHeaders,
+        },
+        timeout: 5000,
+      })
+      const parsed = bootstrapResponseSchema().safeParse(response.data)
+      if (!parsed.success) {
+        logForDebugging(
+          `[Bootstrap] Response failed validation: ${parsed.error.message}`,
+        )
+        return null
+      }
+      logForDebugging('[Bootstrap] Fetch ok')
+      return parsed.data
+    })
+  } catch (error) {
+    logForDebugging(
+      `[Bootstrap] Fetch failed: ${axios.isAxiosError(error) ? (error.response?.status ?? error.code) : 'unknown'}`,
+    )
+    throw error
+  }
+}
+export async function fetchBootstrapData(): Promise<void> {
+  try {
+    const response = await fetchBootstrapAPI()
+    if (!response) return
+    const clientData = response.client_data ?? null
+    const additionalModelOptions = response.additional_model_options ?? []
+    const config = getGlobalConfig()
+    if (
+      isEqual(config.clientDataCache, clientData) &&
+      isEqual(config.additionalModelOptionsCache, additionalModelOptions)
+    ) {
+      logForDebugging('[Bootstrap] Cache unchanged, skipping write')
+      return
+    }
+    logForDebugging('[Bootstrap] Cache updated, persisting to disk')
+    saveGlobalConfig(current => ({
+      ...current,
+      clientDataCache: clientData,
+      additionalModelOptionsCache: additionalModelOptions,
+    }))
+  } catch (error) {
+    logError(error)
+  }
+}

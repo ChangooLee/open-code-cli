@@ -1,0 +1,8 @@
+{
+  "name": "fix-add",
+  "description": "Fix an off-by-operator bug so an existing test passes.",
+  "prompt": "add.js has a bug: the add(a, b) function should return a + b but currently returns a - b. Fix add.js so that `node add.test.js` passes.",
+  "allowedTools": "Read,Edit,Write,Bash",
+  "maxTurns": 15,
+  "check": "node add.test.js"
+}
